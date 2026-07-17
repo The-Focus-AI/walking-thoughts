@@ -1,4 +1,5 @@
 export type AuthConfiguration = {
+  clerkReady: boolean;
   configured: boolean;
   publishableKey: boolean;
   secretKey: boolean;
@@ -44,10 +45,11 @@ export function authConfiguration(
       canonicalOrigin.startsWith("https://") &&
       authorizedParties.length === 1 &&
       authorizedParties[0] === canonicalOrigin);
+  const clerkReady = publishableKey && secretKey && productionReady;
 
   return {
-    configured:
-      publishableKey && secretKey && allowedUserIds.size > 0 && productionReady,
+    clerkReady,
+    configured: clerkReady && allowedUserIds.size > 0,
     publishableKey,
     secretKey,
     allowedUserIds,

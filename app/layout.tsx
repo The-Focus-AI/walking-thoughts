@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 
-  return authConfiguration().configured ? (
+  return authConfiguration().clerkReady ? (
     <ClerkProvider>{content}</ClerkProvider>
   ) : (
     content

@@ -8,6 +8,7 @@ pnpm = "latest"
 gh = "latest"
 jq = "latest"
 ripgrep = "latest"
+"npm:clerk" = "latest"
 
 [env]
 _.file = ".fnox/env"

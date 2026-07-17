@@ -2,6 +2,7 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { authConfiguration } from "@/lib/auth-config";
+import { restorePassThroughForExactSelfRewrite } from "@/lib/clerk-middleware-response";
 
 const clerk = clerkMiddleware(() => undefined, (request) => ({
   authorizedParties: authConfiguration().authorizedParties.length
@@ -10,17 +11,28 @@ const clerk = clerkMiddleware(() => undefined, (request) => ({
         request.nextUrl.hostname === "127.0.0.1"
       ? [request.nextUrl.origin]
       : [],
+  signInUrl: "/sign-in",
+  signUpUrl: "/sign-up",
 }));
 
-export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (!authConfiguration().configured) return NextResponse.next();
-  return clerk(request, event);
+export default async function proxy(
+  request: NextRequest,
+  event: NextFetchEvent,
+) {
+  if (!authConfiguration().clerkReady) return NextResponse.next();
+
+  const response = (await clerk(request, event)) ?? NextResponse.next();
+
+  // Clerk decorates pass-through requests by rewriting them to their own URL.
+  // Next 16's Node proxy treats that as an outbound proxy and recursively calls
+  // this server. Preserve Clerk's request headers while restoring pass-through.
+  return restorePassThroughForExactSelfRewrite(response, request.nextUrl);
 }
 
 export const config = {
   matcher: [
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
-    "/__clerk/(.*)",
+    "/__clerk/:path*",
   ],
 };
