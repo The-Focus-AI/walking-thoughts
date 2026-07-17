@@ -1,3 +1,7 @@
 [tools]
 codex = "latest"
 node = "25"
+
+[tasks."prototype:reviewing"]
+description = "Run the throwaway viewing and reviewing UI prototype"
+run = "node prototypes/reviewing-ui/serve.mjs"

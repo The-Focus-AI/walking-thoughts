@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Viewing and reviewing prototype — Walking Thoughts</title>
+  <!-- Three variants of the post-walk review experience, switchable via ?variant=, on a throwaway prototype route. -->
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; --ink:#15241c; --muted:#6e7b72; --paper:#f4f2e9; --forest:#173f2b; --moss:#dbe85b; --line:#dedfd6; --alert:#e7674f; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:#d8dad4; color:var(--ink); }
+    button, textarea { font:inherit; }
+    button { cursor:pointer; }
+    .stage { min-height:100vh; display:grid; grid-template-columns:minmax(680px,1000px) minmax(250px,340px); gap:26px; justify-content:center; padding:26px 24px 110px; }
+    .app { min-height:760px; border-radius:28px; overflow:hidden; background:var(--paper); box-shadow:0 28px 75px rgba(26,39,31,.2); position:relative; }
+    .notes { padding:20px 4px; align-self:start; }
+    .eyebrow { color:#77827a; text-transform:uppercase; letter-spacing:.16em; font-size:11px; font-weight:850; }
+    .notes h1 { margin:12px 0 8px; font:500 31px/1.06 Georgia,serif; }
+    .notes p { color:#68736c; line-height:1.5; }
+    .state { margin-top:20px; background:#1d2721; color:#d9efdf; border-radius:18px; padding:15px; }
+    .state strong { display:block; color:#9fb0a2; text-transform:uppercase; letter-spacing:.14em; font-size:10px; margin-bottom:9px; }
+    pre { margin:0; white-space:pre-wrap; font:11px/1.5 ui-monospace,monospace; }
+    .switcher { position:fixed; z-index:50; left:50%; bottom:20px; transform:translateX(-50%); display:flex; gap:8px; align-items:center; border-radius:999px; padding:7px; background:#111713; color:#fff; box-shadow:0 14px 40px rgba(0,0,0,.36); }
+    .switcher button { width:38px; height:38px; border:0; border-radius:50%; background:#2b352e; color:#fff; font-size:19px; }
+    .switcher span { min-width:190px; text-align:center; font-size:13px; font-weight:800; }
+    .brand { font:600 18px Georgia,serif; }
+    .status { display:inline-flex; align-items:center; gap:7px; color:#647168; font-size:12px; font-weight:750; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#5aa66c; }
+    .dot.alert { background:var(--alert); }
+    .pill { display:inline-flex; gap:6px; align-items:center; border-radius:999px; padding:7px 10px; background:#edf0e7; color:#536159; font-size:11px; font-weight:800; }
+    .avatar { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:var(--forest); color:#fff; font-weight:850; }
+    .source { display:inline-flex; margin:4px 5px 0 0; padding:7px 9px; border-radius:10px; background:#edf1e8; color:#345640; text-decoration:none; font-size:11px; font-weight:750; }
+    .followup { display:grid; grid-template-columns:1fr auto; gap:8px; padding:10px; border-radius:18px; background:#173f2b; }
+    .followup textarea { border:0; border-radius:12px; padding:12px; resize:none; min-height:46px; outline:none; }
+    .followup button { border:0; border-radius:12px; padding:0 16px; background:var(--moss); color:#173f2b; font-weight:900; }
+
+    /* A — library reader */
+    .reader { min-height:760px; display:grid; grid-template-columns:310px 1fr; }
+    .reader-sidebar { background:#e9eadf; padding:20px 14px; border-right:1px solid #d5d7cc; }
+    .reader-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding:0 6px; }
+    .filters { display:flex; gap:6px; margin:0 4px 14px; }
+    .filters button { border:0; border-radius:999px; padding:8px 10px; background:transparent; color:#69756d; font-size:11px; font-weight:800; }
+    .filters button.active { background:#fff; color:#233c2d; }
+    .thread-row { width:100%; border:0; text-align:left; border-radius:17px; background:transparent; padding:13px 12px; margin-bottom:5px; color:var(--ink); }
+    .thread-row.active { background:#fff; box-shadow:0 9px 22px rgba(34,49,39,.08); }
+    .thread-row .row-top { display:flex; justify-content:space-between; gap:10px; }
+    .thread-row strong { font-size:14px; }
+    .thread-row p { margin:6px 0 0; color:#768178; font-size:12px; line-height:1.35; }
+    .thread-row time { color:#8b948d; font-size:10px; white-space:nowrap; }
+    .reader-main { min-width:0; display:flex; flex-direction:column; background:#faf8f1; }
+    .reader-header { padding:20px 26px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); }
+    .reader-header h2 { margin:0 0 4px; font:500 27px Georgia,serif; }
+    .thread-stream { flex:1; padding:26px clamp(20px,5vw,72px); overflow:auto; }
+    .entry { margin-bottom:20px; }
+    .entry-meta { display:flex; align-items:center; gap:8px; color:#7d877f; font-size:11px; font-weight:750; margin-bottom:7px; }
+    .entry-body { border-radius:20px; padding:17px 18px; line-height:1.55; font-size:14px; }
+    .capture .entry-body { background:#dfead2; margin-left:9%; }
+    .enrichment .entry-body { background:#fff; border:1px solid #e2e2d9; box-shadow:0 10px 20px rgba(43,56,46,.05); }
+    .entry-body h3 { font:500 22px Georgia,serif; margin:0 0 10px; }
+    .reader-compose { padding:14px 26px 20px; }
+
+    /* B — attention queue */
+    .queue { min-height:760px; padding:24px; background:linear-gradient(135deg,#163b29 0 37%,#eaeadd 37%); }
+    .queue-head { color:#fff; display:flex; justify-content:space-between; align-items:start; margin-bottom:30px; }
+    .queue-head h2 { margin:28px 0 5px; font:500 38px Georgia,serif; }
+    .queue-head p { margin:0; color:#bac9bd; }
+    .review-grid { display:grid; grid-template-columns:repeat(3,1fr); align-items:start; gap:16px; }
+    .review-card { min-height:460px; display:flex; flex-direction:column; border-radius:24px; background:#fbfaf4; padding:19px; box-shadow:0 16px 38px rgba(26,40,31,.14); transition:opacity .2s,transform .2s; }
+    .review-card.reviewed { opacity:.5; transform:scale(.97); }
+    .review-card.needs { border:2px solid #e16d55; }
+    .review-card h3 { margin:15px 0 8px; font:500 23px Georgia,serif; }
+    .review-card p { color:#667169; font-size:13px; line-height:1.5; }
+    .thumb { height:135px; border-radius:17px; background:linear-gradient(150deg,#b5c6a3,#5a785d 48%,#263e2e); position:relative; overflow:hidden; }
+    .thumb::after { content:""; position:absolute; width:66px; height:38px; border-radius:48% 52% 42% 58%; background:#e5e2cf; left:50%; top:58%; transform:translate(-50%,-50%) rotate(-8deg); box-shadow:18px -8px 0 -12px #e5e2cf; }
+    .review-summary { flex:1; }
+    .card-actions { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:14px; }
+    .card-actions button { border:0; border-radius:13px; padding:11px 12px; font-weight:850; }
+    .review-button { background:var(--forest); color:#fff; }
+    .open-button { background:#e9ecdf; color:#344b3b; }
+
+    /* C — map journal */
+    .atlas { min-height:760px; display:grid; grid-template-columns:58% 42%; background:#dce5d1; }
+    .map { position:relative; overflow:hidden; background-color:#cdd9bd; background-image:repeating-radial-gradient(ellipse at 30% 45%,transparent 0 28px,rgba(71,100,67,.18) 29px 31px,transparent 32px 47px); }
+    .map::before { content:""; position:absolute; width:120%; height:12px; top:44%; left:-10%; border-radius:50%; border-top:5px solid rgba(239,244,229,.9); border-bottom:2px solid rgba(120,144,109,.55); transform:rotate(-14deg); }
+    .map::after { content:""; position:absolute; width:110%; height:5px; top:69%; left:-7%; background:#6e8a63; border-radius:50%; transform:rotate(23deg); box-shadow:0 0 0 2px rgba(247,245,218,.6); }
+    .map-head { position:absolute; z-index:3; left:20px; right:20px; top:20px; display:flex; justify-content:space-between; align-items:center; }
+    .map-head .brand { background:rgba(248,248,239,.9); padding:11px 13px; border-radius:14px; }
+    .location { background:#173f2b; color:#fff; border:0; border-radius:50%; width:44px; height:44px; }
+    .marker { position:absolute; z-index:4; border:4px solid #fff; width:48px; height:48px; border-radius:18px 18px 18px 5px; background:var(--forest); color:#fff; box-shadow:0 8px 20px rgba(28,44,33,.25); transform:rotate(-12deg); }
+    .marker span { display:block; transform:rotate(12deg); font-size:20px; }
+    .marker.active { background:var(--moss); color:#173f2b; width:58px; height:58px; }
+    .m1 { left:28%; top:32%; } .m2 { left:61%; top:54%; } .m3 { left:43%; top:73%; }
+    .atlas-panel { background:#f8f6ee; padding:22px; overflow:auto; }
+    .atlas-panel h2 { font:500 30px Georgia,serif; margin:34px 0 4px; }
+    .place { color:#78837b; font-size:12px; }
+    .media-preview { margin:20px 0; height:180px; border-radius:22px; background:linear-gradient(150deg,#b5c6a3,#5a785d 48%,#263e2e); }
+    .atlas-panel article { font-size:14px; line-height:1.55; }
+    .atlas-panel article h3 { font:500 20px Georgia,serif; }
+
+    @media(max-width:850px) {
+      .stage { display:block; padding:0 0 154px; }
+      .app { min-height:100dvh; border-radius:0; box-shadow:none; }
+      .notes { padding:18px; }
+      .notes h1,.notes>p:not(.eyebrow) { display:none; }
+      .state { margin-top:5px; }
+      .reader { min-height:100dvh; grid-template-columns:1fr; }
+      .reader-sidebar { display:none; }
+      .reader-header { padding:18px; }
+      .reader-header::before { content:"‹ Threads"; color:#476052; font-size:12px; font-weight:850; }
+      .reader-header>div:first-of-type { margin-left:12px; }
+      .thread-stream { padding:20px 16px; }
+      .reader-compose { padding:10px 14px 18px; }
+      .queue { min-height:100dvh; padding:18px; background:linear-gradient(180deg,#163b29 0 230px,#eaeadd 230px); }
+      .review-grid { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:12px; }
+      .review-card { flex:0 0 88%; scroll-snap-align:center; }
+      .atlas { min-height:100dvh; grid-template-columns:1fr; grid-template-rows:52vh auto; }
+      .atlas-panel { border-radius:28px 28px 0 0; margin-top:-26px; position:relative; z-index:5; }
+      .switcher { bottom:12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="app" id="app"></section>
+    <aside class="notes"><p class="eyebrow">Throwaway prototype</p><h1 id="conceptTitle"></h1><p id="conceptCopy"></p><div class="state"><strong>Visible prototype state</strong><pre id="stateOutput"></pre></div></aside>
+  </main>
+  <nav class="switcher"><button id="previous">←</button><span id="variantName"></span><button id="next">→</button></nav>
+  <script>
+    const variants=["A","B","C"];
+    const names={A:"A — Thread reader",B:"B — Review queue",C:"C — Map journal"};
+    const concepts={
+      A:["A library for sustained reading","Threads are the primary object. This is strongest for desktop research, sources and long follow-ups."],
+      B:["A queue for getting caught up","Unread Enrichments and failures are the primary object. This is strongest for a quick post-walk review ritual."],
+      C:["A journal organized by place","The map is the primary object. This is strongest when remembering where an observation happened matters most."],
+    };
+    const threads={
+      opossum:{title:"Roadside skeleton",status:"complete",time:"12 min",place:"Ridge trail · 2:14 PM",icon:"◉",capture:"What animal is this? I found the skeleton beside the trail.",enrichment:"The skull shape, long narrow snout, and unusually high tooth count are consistent with a Virginia opossum. The location and visible dentition make raccoon less likely.",sources:["Animal Diversity Web","iNaturalist taxonomy"]},
+      podcast:{title:"Forest succession podcast",status:"needs attention",time:"1 hr",place:"Home loop · 10:42 AM",icon:"◌",capture:"Find the transcript where they explain why birches cluster after disturbance.",enrichment:"I found the episode, but the publisher does not expose a transcript. I preserved the episode link and can research the concept from primary ecology sources instead.",sources:["Episode page"]},
+      birches:{title:"Birches along the ridge",status:"complete",time:"Yesterday",place:"North ridge · 9:38 AM",icon:"⌁",capture:"Why are all the birches concentrated on this exposed section?",enrichment:"Birches are pioneer species that rapidly colonize disturbed, sunny ground. The clustering suggests a past canopy opening, fire, logging, windthrow, or shallow rocky soil that favors light-demanding species.",sources:["US Forest Service","Cary Institute"]},
+      marker:{title:"Old trail marker",status:"syncing",time:"Yesterday",place:"Creek crossing · 9:03 AM",icon:"▣",capture:"Photographed a faded metal marker at the old crossing.",enrichment:"Waiting for the original photo to finish uploading.",sources:[]},
+    };
+    let state={variant:new URLSearchParams(location.search).get("variant")?.toUpperCase()||"A",selectedThread:"opossum",filter:"all",reviewed:[],followupDraft:"",connectivity:"online",unreadCount:3};
+    if(!variants.includes(state.variant)) state.variant="A";
+    const app=document.querySelector("#app");
+    function statusMarkup(status){return `<span class="pill"><i class="dot ${status==="needs attention"?"alert":""}"></i>${status}</span>`;}
+    function threadRows(){return Object.entries(threads).map(([id,t])=>`<button class="thread-row ${state.selectedThread===id?"active":""}" data-thread="${id}"><div class="row-top"><strong>${t.title}</strong><time>${t.time}</time></div><p>${t.enrichment.slice(0,72)}…</p></button>`).join("");}
+    function entries(t){return `<div class="entry capture"><div class="entry-meta"><span class="avatar">W</span>Capture · ${t.place}</div><div class="entry-body">${t.capture}</div></div><div class="entry enrichment"><div class="entry-meta"><span class="avatar">AI</span>Enrichment · Claude Sonnet · complete history</div><div class="entry-body"><h3>What I found</h3>${t.enrichment}<div>${t.sources.map(s=>`<a class="source" href="#">↗ ${s}</a>`).join("")}</div></div></div>`;}
+    function followup(){return `<div class="followup"><textarea data-draft placeholder="Add a follow-up Capture…">${state.followupDraft}</textarea><button data-send>Send</button></div>`;}
+    function variantA(){const t=threads[state.selectedThread];return `<div class="reader"><aside class="reader-sidebar"><div class="reader-top"><span class="brand">Walking Thoughts</span><span class="avatar">W</span></div><div class="filters"><button class="active">All</button><button>Unread 3</button><button>Needs attention</button></div>${threadRows()}</aside><section class="reader-main"><header class="reader-header"><div><h2>${t.title}</h2><span class="status"><i class="dot"></i>${t.place}</span></div>${statusMarkup(t.status)}</header><div class="thread-stream">${entries(t)}</div><div class="reader-compose">${followup()}</div></section></div>`;}
+    function reviewCard(id,t){const reviewed=state.reviewed.includes(id);return `<article class="review-card ${reviewed?"reviewed":""} ${t.status==="needs attention"?"needs":""}" data-card="${id}">${id==="opossum"?'<div class="thumb"></div>':statusMarkup(t.status)}<div class="review-summary"><h3>${t.title}</h3><span class="status">${t.place}</span><p>${t.enrichment}</p>${t.sources.map(s=>`<a class="source" href="#">↗ ${s}</a>`).join("")}</div><div class="card-actions"><button class="review-button" data-review="${id}">${reviewed?"Reviewed ✓":"Mark reviewed"}</button><button class="open-button" data-open="${id}">Open</button></div></article>`;}
+    function variantB(){return `<div class="queue"><header class="queue-head"><div><span class="brand">Walking Thoughts</span><h2>Three things came back.</h2><p>Two are ready to read. One needs your attention.</p></div><span class="avatar">W</span></header><div class="review-grid">${["opossum","birches","podcast"].map(id=>reviewCard(id,threads[id])).join("")}</div></div>`;}
+    function marker(id,klass){return `<button class="marker ${klass} ${state.selectedThread===id?"active":""}" data-thread="${id}"><span>${threads[id].icon}</span></button>`;}
+    function variantC(){const t=threads[state.selectedThread];return `<div class="atlas"><section class="map"><div class="map-head"><span class="brand">Walking Thoughts · Home region</span><button class="location">⌖</button></div>${marker("opossum","m1")}${marker("birches","m2")}${marker("marker","m3")}</section><aside class="atlas-panel">${statusMarkup(t.status)}<h2>${t.title}</h2><div class="place">${t.place}</div><div class="media-preview"></div><article><h3>Enrichment</h3><p>${t.enrichment}</p>${t.sources.map(s=>`<a class="source" href="#">↗ ${s}</a>`).join("")}</article>${followup()}</aside></div>`;}
+    function render(){app.innerHTML=state.variant==="A"?variantA():state.variant==="B"?variantB():variantC();document.querySelector("#variantName").textContent=names[state.variant];document.querySelector("#conceptTitle").textContent=concepts[state.variant][0];document.querySelector("#conceptCopy").textContent=concepts[state.variant][1];document.querySelector("#stateOutput").textContent=JSON.stringify(state,null,2);bind();}
+    function bind(){document.querySelectorAll("[data-thread]").forEach(el=>el.onclick=()=>{state.selectedThread=el.dataset.thread;render();});document.querySelectorAll("[data-review]").forEach(el=>el.onclick=e=>{e.stopPropagation();const id=el.dataset.review;state.reviewed=state.reviewed.includes(id)?state.reviewed.filter(x=>x!==id):[...state.reviewed,id];render();});document.querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>{state.selectedThread=el.dataset.open;state.variant="A";history.replaceState(null,"",`?variant=A`);render();});const draft=document.querySelector("[data-draft]");if(draft)draft.oninput=()=>{state.followupDraft=draft.value;document.querySelector("#stateOutput").textContent=JSON.stringify(state,null,2);};const send=document.querySelector("[data-send]");if(send)send.onclick=()=>{state.followupDraft="";threads[state.selectedThread].capture="Follow-up Capture committed locally. Enrichment queued.";render();};}
+    function cycle(delta){const i=variants.indexOf(state.variant);state.variant=variants[(i+delta+variants.length)%variants.length];history.replaceState(null,"",`?variant=${state.variant}`);render();}
+    document.querySelector("#previous").onclick=()=>cycle(-1);document.querySelector("#next").onclick=()=>cycle(1);document.addEventListener("keydown",e=>{if(["TEXTAREA","INPUT"].includes(document.activeElement.tagName)||document.activeElement.isContentEditable)return;if(e.key==="ArrowLeft")cycle(-1);if(e.key==="ArrowRight")cycle(1);});render();
+  </script>
+</body>
+</html>
