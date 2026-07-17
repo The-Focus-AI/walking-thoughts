@@ -1,3 +1,7 @@
 [tools]
 codex = "latest"
 node = "25"
+
+[tasks."prototype:recording"]
+description = "Run the throwaway recording UI prototype"
+run = "node prototypes/recording-ui/serve.mjs"

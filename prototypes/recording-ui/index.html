@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recording UI prototype — Walking Thoughts</title>
+  <!-- Three variants of the mobile recording experience, switchable via ?variant=, on a throwaway prototype route. -->
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --ink: #15251d;
+      --muted: #6f7c74;
+      --paper: #f2f1e9;
+      --forest: #173f2b;
+      --moss: #d8e555;
+      --signal: #e6553e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #d8d9d3; color: var(--ink); min-height: 100vh; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .stage { min-height: 100vh; display: grid; grid-template-columns: minmax(320px, 430px) minmax(260px, 360px); justify-content: center; gap: 28px; padding: 28px 24px 110px; }
+    .phone { min-height: 780px; border-radius: 36px; overflow: hidden; box-shadow: 0 30px 80px rgba(24, 38, 30, .22); position: relative; background: var(--paper); }
+    .prototype-note { color: #59635d; align-self: start; padding-top: 24px; }
+    .prototype-note .eyebrow { text-transform: uppercase; letter-spacing: .15em; font-weight: 800; font-size: 11px; color: #7c877f; }
+    .prototype-note h1 { margin: 12px 0 10px; font: 500 32px/1.06 Georgia, serif; color: #203329; }
+    .prototype-note p { color: #667169; line-height: 1.5; }
+    .state-card { margin-top: 24px; background: #202923; color: #d8f0df; border-radius: 18px; padding: 16px; box-shadow: 0 16px 34px rgba(25, 35, 29, .16); }
+    .state-card strong { display: block; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9daf9f; margin-bottom: 10px; }
+    pre { margin: 0; white-space: pre-wrap; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .switcher { position: fixed; z-index: 50; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: #111713; color: white; padding: 7px; border-radius: 999px; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
+    .switcher button { border: 0; background: #29322c; color: white; width: 38px; height: 38px; border-radius: 50%; font-size: 19px; }
+    .switcher .variant-name { min-width: 174px; text-align: center; font-size: 13px; font-weight: 750; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; }
+    .offline { display: inline-flex; gap: 6px; align-items: center; }
+    .offline::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #e8b83d; }
+    .thread-pill { border: 1px solid rgba(21,37,29,.13); border-radius: 999px; padding: 8px 12px; background: rgba(255,255,255,.58); font-size: 12px; font-weight: 700; }
+    .wave { display: flex; height: 64px; gap: 4px; align-items: center; justify-content: center; }
+    .wave i { display: block; width: 4px; height: calc(10px + var(--h) * 34px); border-radius: 99px; background: currentColor; opacity: .9; transition: height .2s; }
+    .is-recording .wave i { animation: pulse calc(.55s + var(--h) * .4s) ease-in-out infinite alternate; animation-delay: calc(var(--h) * -.3s); }
+    @keyframes pulse { to { height: calc(18px + var(--h) * 50px); opacity: .55; } }
+    .record-icon { width: 18px; height: 18px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+    /* Variant A — one-tap recorder */
+    .variant-a { background: linear-gradient(180deg, #dce9cf 0, #f7f4e8 48%); min-height: 780px; padding: 28px 22px 24px; display: flex; flex-direction: column; }
+    .variant-a h2 { margin: 72px 0 6px; max-width: 310px; font: 500 38px/1.03 Georgia, serif; letter-spacing: -.035em; }
+    .variant-a .sub { color: #68756d; margin: 0; }
+    .variant-a .a-center { flex: 1; display: grid; place-items: center; text-align: center; }
+    .variant-a .clock { font: 600 42px/1 ui-monospace, monospace; letter-spacing: -.05em; margin-bottom: 20px; }
+    .variant-a .record-orb { border: 0; width: 154px; height: 154px; border-radius: 50%; background: var(--forest); color: white; box-shadow: 0 0 0 14px rgba(23,63,43,.09), 0 22px 44px rgba(23,63,43,.28); display: grid; place-items: center; transition: transform .2s, background .2s; }
+    .variant-a .record-orb .record-icon { width: 42px; height: 42px; }
+    .variant-a.is-recording .record-orb { background: var(--signal); transform: scale(.96); }
+    .variant-a.is-recording .record-icon { border-radius: 8px; width: 34px; height: 34px; }
+    .variant-a .hint { margin-top: 30px; font-weight: 750; font-size: 14px; }
+    .variant-a .a-actions { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .variant-a .a-actions button { border: 0; background: rgba(255,255,255,.72); border-radius: 18px; padding: 13px 8px; color: #31463a; font-weight: 750; }
+    .variant-a .saved { padding: 20px; border-radius: 22px; background: white; box-shadow: 0 16px 30px rgba(44,59,48,.1); width: 100%; text-align: left; }
+    .variant-a .saved strong { font: 500 23px Georgia, serif; }
+    .variant-a .saved p { color: #728077; }
+
+    /* Variant B — outdoor mode */
+    .variant-b { min-height: 780px; background: #15231b; color: #f2f0df; display: flex; flex-direction: column; padding: 24px 20px 26px; }
+    .variant-b .status-row { color: #c0c8be; }
+    .variant-b .thread-pill { background: #25382d; border-color: #354a3e; color: #eaf1e9; }
+    .variant-b h2 { margin: 48px 0 0; text-align: center; font-size: 14px; text-transform: uppercase; letter-spacing: .2em; color: #9eae9f; }
+    .variant-b .b-center { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+    .variant-b .b-time { font: 500 74px/.9 ui-monospace, monospace; letter-spacing: -.08em; }
+    .variant-b .b-message { margin: 18px 0 28px; color: #b8c4b9; max-width: 240px; }
+    .variant-b .hold-button { width: 252px; min-height: 190px; border-radius: 36px; border: 2px solid #71806f; color: #142219; background: var(--moss); box-shadow: inset 0 -12px 0 rgba(59,79,34,.16), 0 18px 50px rgba(0,0,0,.28); font-weight: 900; font-size: 18px; text-transform: uppercase; letter-spacing: .08em; touch-action: none; }
+    .variant-b.is-recording .hold-button { background: #ff6a50; transform: translateY(4px); box-shadow: inset 0 -5px 0 rgba(94,27,15,.18); }
+    .variant-b .b-lock { margin-top: 24px; color: #8fa195; font-size: 13px; }
+    .variant-b .b-meta { display: flex; justify-content: space-between; color: #a4b2a7; font-size: 12px; margin-bottom: 14px; }
+    .variant-b .quick-dock { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px; background: #24332a; border: 1px solid #364a3e; border-radius: 22px; }
+    .variant-b .quick-dock button { border: 0; border-radius: 16px; min-height: 64px; color: #c8d2c9; background: transparent; font-size: 11px; font-weight: 800; }
+    .variant-b .quick-dock button span { display: block; font-size: 23px; line-height: 1.1; margin-bottom: 5px; }
+    .variant-b .quick-dock button.active { background: var(--moss); color: #17251c; }
+    .variant-b .text-capture { width: 100%; text-align: left; }
+    .variant-b .text-capture label { display: block; margin-bottom: 12px; color: #aebcaf; font-weight: 750; }
+    .variant-b .text-capture textarea { width: 100%; min-height: 230px; resize: none; border: 2px solid #53645a; border-radius: 26px; background: #f4f1df; color: #17251c; padding: 20px; font-size: 22px; line-height: 1.35; outline: none; }
+    .variant-b .text-capture textarea:focus { border-color: var(--moss); }
+    .variant-b .commit-text { width: 100%; margin-top: 12px; min-height: 58px; border: 0; border-radius: 18px; background: var(--moss); color: #17251c; font-weight: 900; }
+    .variant-b .viewfinder { width: 100%; aspect-ratio: 4 / 5; max-height: 430px; border-radius: 30px; overflow: hidden; position: relative; display: grid; place-items: center; background: linear-gradient(155deg, #91a58c 0 28%, #526c54 28% 47%, #263e2e 47% 100%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.15); }
+    .variant-b .viewfinder::before, .variant-b .viewfinder::after { content: ""; position: absolute; width: 2px; height: 100%; background: rgba(255,255,255,.18); }
+    .variant-b .viewfinder::before { left: 33%; }
+    .variant-b .viewfinder::after { right: 33%; }
+    .variant-b .viewfinder .horizon { position: absolute; left: 0; right: 0; top: 33%; height: 2px; background: rgba(255,255,255,.18); box-shadow: 0 142px 0 rgba(255,255,255,.18); }
+    .variant-b .shutter { z-index: 1; align-self: end; margin-bottom: 22px; width: 82px; height: 82px; border-radius: 50%; border: 7px solid rgba(255,255,255,.9); background: ${"state.inputMode" === "video" ? "#e6553e" : "white"}; box-shadow: 0 6px 18px rgba(0,0,0,.28); }
+    .variant-b .camera-label { position: absolute; z-index: 1; top: 18px; left: 18px; border-radius: 999px; padding: 8px 11px; background: rgba(16,28,20,.72); color: white; font-weight: 800; font-size: 12px; }
+    .variant-b .capture-confirmation { width: 100%; border: 1px solid #4a5d50; border-radius: 28px; padding: 28px; background: #22352a; text-align: left; }
+    .variant-b .capture-confirmation .check { font-size: 42px; color: var(--moss); }
+    .variant-b .capture-confirmation h3 { font: 500 28px Georgia, serif; margin: 12px 0 8px; }
+    .variant-b .capture-confirmation p { color: #acb9ae; }
+    .variant-b .capture-confirmation button { border: 0; border-radius: 16px; padding: 13px 16px; background: var(--moss); color: #17251c; font-weight: 850; }
+
+    /* Variant C — recorder in Thread */
+    .variant-c { min-height: 780px; background: #f7f4eb; display: flex; flex-direction: column; }
+    .variant-c header { padding: 22px 20px 16px; border-bottom: 1px solid #deded4; background: rgba(247,244,235,.94); }
+    .variant-c header h2 { margin: 22px 0 4px; font: 500 27px Georgia, serif; }
+    .variant-c header p { margin: 0; color: #798078; font-size: 13px; }
+    .variant-c .timeline { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .entry { max-width: 88%; border-radius: 20px; padding: 14px 15px; font-size: 14px; line-height: 1.45; }
+    .entry.capture { align-self: flex-end; background: #dce9cf; border-bottom-right-radius: 6px; }
+    .entry.enrichment { background: white; border: 1px solid #e1e0d8; border-bottom-left-radius: 6px; }
+    .entry small { display: block; margin-top: 8px; color: #7c867e; }
+    .live-card { border: 2px solid #224d35; border-radius: 24px; padding: 16px; background: #edf3e7; }
+    .live-top { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; }
+    .variant-c .composer { margin: 0 14px 18px; border-radius: 24px; background: #183d2a; color: white; padding: 12px; display: grid; grid-template-columns: 44px 1fr 58px; gap: 9px; align-items: center; box-shadow: 0 16px 34px rgba(26,55,39,.22); }
+    .variant-c .composer button { border: 0; border-radius: 16px; height: 48px; }
+    .variant-c .plus { background: #315541; color: white; font-size: 24px; }
+    .variant-c .destination { font-size: 11px; color: #b9cabe; }
+    .variant-c .destination strong { display: block; font-size: 14px; color: white; margin-top: 2px; }
+    .variant-c .mini-record { background: var(--moss); color: #183d2a; display: grid; place-items: center; }
+    .variant-c.is-recording .mini-record { background: #ff6a50; }
+    .variant-c.is-recording .mini-record .record-icon { border-radius: 4px; }
+
+    @media (max-width: 760px) {
+      .stage { display: block; padding: 0 0 156px; }
+      .phone { min-height: 100dvh; border-radius: 0; box-shadow: none; }
+      .prototype-note { padding: 24px 20px; }
+      .prototype-note h1, .prototype-note p:not(.eyebrow) { display: none; }
+      .state-card { margin-top: 8px; }
+      .variant-a, .variant-b, .variant-c { min-height: 100dvh; }
+      .switcher { bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="phone" id="phone"></section>
+    <aside class="prototype-note">
+      <p class="eyebrow">Throwaway prototype</p>
+      <h1 id="conceptTitle"></h1>
+      <p id="conceptCopy"></p>
+      <div class="state-card">
+        <strong>Visible prototype state</strong>
+        <pre id="stateOutput"></pre>
+      </div>
+    </aside>
+  </main>
+  <nav class="switcher" aria-label="Prototype variants">
+    <button type="button" id="previous" aria-label="Previous variant">←</button>
+    <div class="variant-name" id="variantName"></div>
+    <button type="button" id="next" aria-label="Next variant">→</button>
+  </nav>
+  <script>
+    const variants = ["A", "B", "C"];
+    const names = {
+      A: "A — One-tap capture",
+      B: "B — Outdoor quick capture",
+      C: "C — Record in Thread",
+    };
+    const concepts = {
+      A: ["Make recording the whole screen", "A calm, low-decision surface. Tap once to start, tap once to stop, then the audio is already safely committed."],
+      B: ["One outdoor surface, four fast inputs", "The huge hold-to-record target stays central, while Type, Audio, Photo, and Video are always one tap away in the persistent dock."],
+      C: ["Keep context visible", "Recording lives inside the Thread, so the user can see what the model already knows before adding more."],
+    };
+    let state = {
+      variant: new URLSearchParams(location.search).get("variant")?.toUpperCase() || "A",
+      phase: "idle",
+      elapsedSeconds: 0,
+      destination: "Podcast: forest succession",
+      connectivity: "offline",
+      gps: "available · ±8 m",
+      committedLocally: false,
+      attachment: null,
+      inputMode: "audio",
+      draft: "",
+    };
+    if (!variants.includes(state.variant)) state.variant = "A";
+    let timer;
+    let holdActive = false;
+    const phone = document.querySelector("#phone");
+
+    function formatTime(seconds) {
+      return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+    }
+    function wave() {
+      const levels = [.2,.65,.35,.9,.45,.72,.25,.95,.5,.78,.32,.6,.18,.84,.4,.7,.28,.55];
+      return `<div class="wave">${levels.map(level => `<i style="--h:${level}"></i>`).join("")}</div>`;
+    }
+    function status() {
+      return `<div class="status-row"><span class="offline">Offline · saved here</span><span class="thread-pill">${state.destination}⌄</span></div>`;
+    }
+    function variantA() {
+      const review = state.phase === "review";
+      return `<div class="variant-a ${state.phase === "recording" ? "is-recording" : ""}">
+        ${status()}
+        <h2>${review ? "Captured before it disappeared." : "What are you noticing?"}</h2>
+        <p class="sub">Audio, time and place stay on this phone.</p>
+        <div class="a-center">
+          ${review ? `<div class="saved"><strong>Audio saved locally</strong>${wave()}<p>${formatTime(state.elapsedSeconds)} · 2:14 PM · Ridge trail</p><button class="thread-pill" data-action="again">Record another</button></div>` : `<div><div class="clock">${formatTime(state.elapsedSeconds)}</div><button class="record-orb" data-action="toggle" aria-label="${state.phase === "recording" ? "Stop" : "Record"}"><span class="record-icon"></span></button><div class="hint">${state.phase === "recording" ? "Tap to finish & save" : "Tap to record"}</div></div>`}
+        </div>
+        <div class="a-actions"><button>⌨ Text</button><button>▣ Photo</button><button>＋ Attach</button></div>
+      </div>`;
+    }
+    function variantB() {
+      const review = state.phase === "review";
+      let center;
+      if (review) {
+        center = `<div class="capture-confirmation"><div class="check">✓</div><h3>${state.inputMode === "text" ? "Text captured" : state.inputMode === "photo" ? "Photo captured" : state.inputMode === "video" ? "Video captured" : "Audio captured"}</h3><p>Saved locally with time and GPS. It will enrich when you are back online.</p><button data-action="again-mode">Capture another</button></div>`;
+      } else if (state.inputMode === "text") {
+        center = `<div class="text-capture"><label>Type or use Pixel voice typing</label><textarea data-action="draft" autofocus placeholder="What are you noticing?">${state.draft}</textarea><button class="commit-text" data-action="commit-text">Save Capture</button></div>`;
+      } else if (state.inputMode === "photo" || state.inputMode === "video") {
+        center = `<div class="viewfinder"><span class="camera-label">${state.inputMode === "video" ? "VIDEO · max 2:00" : "PHOTO"}</span><span class="horizon"></span><button class="shutter" data-action="shutter" style="background:${state.inputMode === "video" ? "#e6553e" : "white"}" aria-label="Capture ${state.inputMode}"></button></div>`;
+      } else {
+        center = `<div class="b-time">${formatTime(state.elapsedSeconds)}</div><p class="b-message">${state.phase === "recording" ? "Recording while held. Release to save." : "Press and hold. You can keep walking."}</p><button class="hold-button" data-action="hold">${state.phase === "recording" ? "Release to save" : "Hold to record"}</button><div class="b-lock">↑ Slide up to lock recording</div>`;
+      }
+      return `<div class="variant-b ${state.phase === "recording" ? "is-recording" : ""}">
+        ${status()}
+        <h2>Quick capture</h2>
+        <div class="b-center">${center}</div>
+        <div class="b-meta"><span>GPS ±8 m</span><span>Saved on device</span><span>Battery 82%</span></div>
+        <div class="quick-dock">
+          <button data-mode="text" class="${state.inputMode === "text" ? "active" : ""}"><span>⌨</span>Type</button>
+          <button data-mode="audio" class="${state.inputMode === "audio" ? "active" : ""}"><span>●</span>Audio</button>
+          <button data-mode="photo" class="${state.inputMode === "photo" ? "active" : ""}"><span>▣</span>Photo</button>
+          <button data-mode="video" class="${state.inputMode === "video" ? "active" : ""}"><span>▶</span>Video</button>
+        </div>
+      </div>`;
+    }
+    function variantC() {
+      return `<div class="variant-c ${state.phase === "recording" ? "is-recording" : ""}">
+        <header>${status()}<h2>Forest succession</h2><p>3 Captures · last enriched yesterday</p></header>
+        <div class="timeline">
+          <div class="entry enrichment">The open canopy and dense pioneer growth suggest this section was disturbed more recently than the surrounding woods.<small>Enrichment · Claude · 9:42 AM</small></div>
+          <div class="entry capture">Look up why the birches are clustered along this ridge.<small>Text Capture · today</small></div>
+          ${state.phase === "idle" ? "" : `<div class="live-card"><div class="live-top"><span>${state.phase === "review" ? "✓ Audio saved locally" : "● Recording into this Thread"}</span><span>${formatTime(state.elapsedSeconds)}</span></div>${wave()}<small>GPS ±8 m · offline</small></div>`}
+        </div>
+        <div class="composer"><button class="plus">＋</button><div class="destination">Adding to<strong>Forest succession</strong></div><button class="mini-record" data-action="toggle"><span class="record-icon"></span></button></div>
+      </div>`;
+    }
+    function render() {
+      phone.innerHTML = state.variant === "A" ? variantA() : state.variant === "B" ? variantB() : variantC();
+      document.querySelector("#variantName").textContent = names[state.variant];
+      document.querySelector("#conceptTitle").textContent = concepts[state.variant][0];
+      document.querySelector("#conceptCopy").textContent = concepts[state.variant][1];
+      document.querySelector("#stateOutput").textContent = JSON.stringify(state, null, 2);
+      bindActions();
+    }
+    function start() {
+      clearInterval(timer);
+      state = { ...state, phase: "recording", elapsedSeconds: 0, committedLocally: false, attachment: "audio/webm · recording" };
+      timer = setInterval(() => { state.elapsedSeconds += 1; render(); }, 1000);
+      render();
+    }
+    function stop() {
+      clearInterval(timer);
+      state = { ...state, phase: "review", committedLocally: true, attachment: `audio/webm · ${formatTime(state.elapsedSeconds)}` };
+      render();
+    }
+    function bindActions() {
+      document.querySelectorAll('[data-action="toggle"]').forEach(button => button.onclick = () => state.phase === "recording" ? stop() : start());
+      document.querySelectorAll('[data-action="again"]').forEach(button => button.onclick = start);
+      document.querySelectorAll('[data-action="again-mode"]').forEach(button => button.onclick = () => { state = { ...state, phase: "idle", elapsedSeconds: 0, committedLocally: false, attachment: null, draft: "" }; render(); });
+      document.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => {
+        clearInterval(timer);
+        state = { ...state, inputMode: button.dataset.mode, phase: "idle", elapsedSeconds: 0, committedLocally: false, attachment: null };
+        render();
+      });
+      const draft = document.querySelector('[data-action="draft"]');
+      if (draft) draft.oninput = () => { state.draft = draft.value; document.querySelector("#stateOutput").textContent = JSON.stringify(state, null, 2); };
+      const commitText = document.querySelector('[data-action="commit-text"]');
+      if (commitText) commitText.onclick = () => { state = { ...state, phase: "review", committedLocally: true, attachment: null }; render(); };
+      const shutter = document.querySelector('[data-action="shutter"]');
+      if (shutter) shutter.onclick = () => { state = { ...state, phase: "review", committedLocally: true, attachment: `${state.inputMode}/captured` }; render(); };
+      const hold = document.querySelector('[data-action="hold"]');
+      if (hold) {
+        hold.onpointerdown = event => { event.preventDefault(); holdActive = true; start(); };
+      }
+    }
+    function cycle(delta) {
+      clearInterval(timer);
+      const index = variants.indexOf(state.variant);
+      state = { ...state, variant: variants[(index + delta + variants.length) % variants.length], phase: "idle", elapsedSeconds: 0, committedLocally: false, attachment: null, inputMode: "audio", draft: "" };
+      history.replaceState(null, "", `?variant=${state.variant}`);
+      render();
+    }
+    document.querySelector("#previous").onclick = () => cycle(-1);
+    document.querySelector("#next").onclick = () => cycle(1);
+    document.addEventListener("pointerup", () => {
+      if (!holdActive) return;
+      holdActive = false;
+      if (state.phase === "recording") stop();
+    });
+    document.addEventListener("pointercancel", () => {
+      if (!holdActive) return;
+      holdActive = false;
+      if (state.phase === "recording") stop();
+    });
+    document.addEventListener("keydown", event => {
+      if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
+      if (event.key === "ArrowLeft") cycle(-1);
+      if (event.key === "ArrowRight") cycle(1);
+    });
+    render();
+  </script>
+</body>
+</html>
