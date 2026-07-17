@@ -1,0 +1,14 @@
+.next/
+node_modules/
+playwright-report/
+test-results/
+.vercel/
+.env
+.env.local
+.env.*.local
+.fnox/env
+.webreel/
+*.tsbuildinfo
+.vercel
+.env*
+!.env.example

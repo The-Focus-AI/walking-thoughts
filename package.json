@@ -1,0 +1,34 @@
+{
+  "name": "walking-thoughts",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.13.1",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@clerk/testing": "^2.2.9",
+    "@playwright/test": "latest",
+    "@types/node": "24",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "9.39.2",
+    "eslint-config-next": "latest",
+    "typescript": "5.9.3",
+    "webreel": "^0.1.4"
+  }
+}

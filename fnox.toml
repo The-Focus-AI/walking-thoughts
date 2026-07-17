@@ -1,0 +1,59 @@
+# Source of truth: separate 1Password vaults for Development, Preview, and Production.
+
+[providers.op]
+type = "1password"
+vault = "Walking Thoughts - Development"
+
+[profiles.preview.providers.op]
+type = "1password"
+vault = "Walking Thoughts - Preview"
+
+[profiles.prod.providers.op]
+type = "1password"
+vault = "Walking Thoughts - Production"
+
+[secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY]
+provider = "op"
+value = "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+if_missing = "ignore"
+description = "Clerk frontend key — https://dashboard.clerk.com"
+
+[secrets.CLERK_SECRET_KEY]
+provider = "op"
+value = "CLERK_SECRET_KEY"
+if_missing = "ignore"
+description = "Clerk backend key — https://dashboard.clerk.com"
+
+[secrets.CLERK_ALLOWED_USER_IDS]
+provider = "op"
+value = "CLERK_ALLOWED_USER_IDS"
+if_missing = "ignore"
+description = "Comma-separated Clerk user IDs allowed into this personal app"
+
+[secrets.CLERK_AUTHORIZED_PARTIES]
+provider = "op"
+value = "CLERK_AUTHORIZED_PARTIES"
+if_missing = "ignore"
+description = "Comma-separated trusted application origins; lock production to its custom domain"
+
+[profiles.preview.secrets.CLERK_E2E_ALLOWED_EMAIL]
+provider = "op"
+value = "CLERK_E2E_ALLOWED_EMAIL"
+if_missing = "ignore"
+description = "Preview test identity whose Clerk user ID is allowed"
+
+[profiles.preview.secrets.CLERK_E2E_DISALLOWED_EMAIL]
+provider = "op"
+value = "CLERK_E2E_DISALLOWED_EMAIL"
+if_missing = "ignore"
+description = "Preview test identity that the boundary must reject"
+
+[secrets.NEXT_PUBLIC_APP_URL]
+provider = "op"
+value = "NEXT_PUBLIC_APP_URL"
+if_missing = "ignore"
+description = "Canonical application URL for the selected environment"
+
+[secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
+default = "/sign-in"
+description = "Clerk sign-in route"

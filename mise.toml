@@ -1,3 +1,106 @@
 [tools]
 codex = "latest"
-node = "25"
+fnox = "latest"
+node = "24"
+pnpm = "latest"
+"npm:vercel" = "latest"
+"npm:skills" = "1.5.13"
+gh = "latest"
+jq = "latest"
+ripgrep = "latest"
+
+[env]
+_.file = ".fnox/env"
+
+[tasks.setup]
+description = "Create the protected local fnox bootstrap file"
+run = '''
+set -euo pipefail
+mkdir -p .fnox
+chmod 700 .fnox
+if [ ! -f .fnox/env ]; then
+  touch .fnox/env
+  chmod 600 .fnox/env
+  echo "Created .fnox/env. Add the scoped OP_SERVICE_ACCOUNT_TOKEN when provisioned."
+else
+  echo ".fnox/env already exists"
+fi
+'''
+
+[tasks.install]
+description = "Install project dependencies and locked agent skills"
+run = '''
+set -euo pipefail
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium-headless-shell
+skills experimental_install
+'''
+
+[tasks.dev]
+description = "Run the Walking Thoughts development server"
+run = "pnpm dev"
+
+[tasks.lint]
+description = "Lint and typecheck the application"
+run = '''
+set -euo pipefail
+pnpm lint
+pnpm typecheck
+'''
+
+[tasks.test]
+description = "Run public-surface browser tests"
+run = "pnpm test"
+
+[tasks.build]
+description = "Create the production Next.js build"
+run = "pnpm build"
+
+[tasks.deploy]
+description = "Verify and deploy the production application to Vercel"
+depends = ["lint", "test", "build"]
+run = "vercel deploy --prod"
+
+[tasks."secrets:check"]
+description = "Verify declared fnox secrets"
+run = "fnox check"
+
+[tasks."secrets:list"]
+description = "List declared fnox secrets without values"
+run = "fnox list"
+
+[tasks."vercel:sync"]
+description = "Push fnox-resolved configuration to a Vercel environment"
+usage = '''
+flag "-e --env <env>" help="production | preview | development" default="production"
+'''
+run = '''
+set -euo pipefail
+ENV="${usage_env:-production}"
+case "$ENV" in
+  production) PROFILE="prod" ;;
+  preview) PROFILE="preview" ;;
+  development) PROFILE="default" ;;
+  *) echo "Invalid Vercel environment: $ENV"; exit 2 ;;
+esac
+SECRETS_JSON=$(fnox export --profile "$PROFILE" -f json --if-missing ignore)
+KEYS=$(printf '%s' "$SECRETS_JSON" | jq -r '.secrets | keys[]')
+for KEY in $KEYS; do
+  VALUE=$(printf '%s' "$SECRETS_JSON" | jq -r --arg key "$KEY" '.secrets[$key]')
+  if [ -z "$VALUE" ] || [ "$VALUE" = "null" ]; then
+    echo "$KEY skipped (empty)"
+    continue
+  fi
+  vercel env rm "$KEY" "$ENV" --yes >/dev/null 2>&1 || true
+  vercel env add "$KEY" "$ENV" --value "$VALUE" --yes >/dev/null
+  echo "$KEY synced to $ENV"
+done
+'''
+
+[tasks."vercel:preview"]
+description = "Deploy an ad-hoc Vercel Preview"
+run = "vercel deploy"
+
+[tasks."vercel:deploy"]
+description = "Deploy Vercel Production"
+run = "vercel deploy --prod"
