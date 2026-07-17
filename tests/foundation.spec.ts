@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { authConfiguration } from "@/lib/auth-config";
-import { restorePassThroughForExactSelfRewrite } from "@/lib/clerk-middleware-response";
 import { clerkRuntimeConfigured } from "./clerk-test-config";
 
 test("production authentication requires live keys and one canonical origin", () => {
@@ -45,22 +44,13 @@ test("safe Clerk initialization does not unlock private access without an allowl
   expect(configuration.configured).toBe(false);
 });
 
-test("Clerk self-rewrites remain pass-through requests on Next 16", () => {
-  const requestUrl = new URL("http://localhost:3103/offline");
-  const response = new Response(null, {
-    headers: {
-      "x-middleware-rewrite": requestUrl.href,
-      "x-middleware-request-x-clerk-auth-status": "signed-out",
-    },
-  });
+test("middleware requests complete without a self-proxy loop", async ({
+  request,
+}) => {
+  const response = await request.get("/offline", { timeout: 5_000 });
 
-  restorePassThroughForExactSelfRewrite(response, requestUrl);
-
-  expect(response.headers.get("x-middleware-rewrite")).toBeNull();
-  expect(response.headers.get("x-middleware-next")).toBe("1");
-  expect(
-    response.headers.get("x-middleware-request-x-clerk-auth-status"),
-  ).toBe("signed-out");
+  expect(response.status()).toBe(200);
+  await expect(response.text()).resolves.toContain("Offline");
 });
 
 test("installed shell remains useful when the network disappears", async ({
@@ -112,15 +102,16 @@ test("health reports configuration without exposing secret values", async ({
   const response = await request.get("/api/health");
   const payload = await response.json();
 
-  expect([200, 503]).toContain(response.status());
+  expect(response.status()).toBe(clerkRuntimeConfigured ? 200 : 503);
   expect(payload).toEqual({
-    status: expect.stringMatching(/^(ok|configuration_required)$/),
+    status: clerkRuntimeConfigured ? "ok" : "configuration_required",
     services: {
-      clerkPublishableKey: expect.any(Boolean),
-      clerkSecretKey: expect.any(Boolean),
-      allowedUsers: expect.any(Boolean),
+      clerkPublishableKey: Boolean(
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+      ),
+      clerkSecretKey: Boolean(process.env.CLERK_SECRET_KEY),
+      allowedUsers: Boolean(process.env.CLERK_ALLOWED_USER_IDS),
     },
   });
-  expect(response.status()).toBe(payload.status === "ok" ? 200 : 503);
   expect(JSON.stringify(payload)).not.toMatch(/(?:pk|sk)_(?:test|live)_/);
 });

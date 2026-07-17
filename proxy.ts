@@ -4,16 +4,20 @@ import { NextResponse } from "next/server";
 import { authConfiguration } from "@/lib/auth-config";
 import { restorePassThroughForExactSelfRewrite } from "@/lib/clerk-middleware-response";
 
-const clerk = clerkMiddleware(() => undefined, (request) => ({
-  authorizedParties: authConfiguration().authorizedParties.length
-    ? authConfiguration().authorizedParties
-    : request.nextUrl.hostname === "localhost" ||
-        request.nextUrl.hostname === "127.0.0.1"
-      ? [request.nextUrl.origin]
-      : [],
-  signInUrl: "/sign-in",
-  signUpUrl: "/sign-up",
-}));
+const clerk = clerkMiddleware(() => undefined, (request) => {
+  const configuration = authConfiguration();
+
+  return {
+    authorizedParties: configuration.authorizedParties.length
+      ? configuration.authorizedParties
+      : request.nextUrl.hostname === "localhost" ||
+          request.nextUrl.hostname === "127.0.0.1"
+        ? [request.nextUrl.origin]
+        : [],
+    signInUrl: "/sign-in",
+    signUpUrl: "/sign-up",
+  };
+});
 
 export default async function proxy(
   request: NextRequest,
