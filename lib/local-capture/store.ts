@@ -1,14 +1,15 @@
-import { resolveCommitDestination } from "./thread-destination";
+import { resolveCommitDestination, titleFromText } from "./thread-destination";
 import type {
   CaptureLocation,
   CaptureStore,
   CommitOptions,
   LocalCapture,
   LocalThread,
+  SyncBatchApplication,
 } from "./types";
 
 const DB_NAME = "walking-thoughts";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const DRAFT_KEY = "composer";
 
 type CaptureStoreGlobals = typeof globalThis & {
@@ -124,6 +125,77 @@ export function createMemoryCaptureStore(
       draft = "";
       return capture;
     },
+    async markSyncing(ids) {
+      const idSet = new Set(ids);
+      captures = captures.map((capture) =>
+        idSet.has(capture.id)
+          ? {
+              ...capture,
+              status: "syncing",
+              syncReason: null,
+              syncRetryable: undefined,
+            }
+          : capture,
+      );
+    },
+    async restoreSavedLocally(ids) {
+      const idSet = new Set(ids);
+      captures = captures.map((capture) =>
+        idSet.has(capture.id)
+          ? {
+              ...capture,
+              status: "saved_locally",
+              syncReason: null,
+              syncRetryable: undefined,
+            }
+          : capture,
+      );
+    },
+    async applySyncBatch(batch: SyncBatchApplication) {
+      const byId = new Map(captures.map((capture) => [capture.id, capture]));
+      for (const result of batch.results) {
+        const current = byId.get(result.id);
+        if (!current) continue;
+        const next: LocalCapture = {
+          ...current,
+          status: "complete",
+          threadId: result.threadId,
+          sequence: result.sequence,
+          syncReason: null,
+          syncRetryable: undefined,
+        };
+        byId.set(result.id, next);
+        if (!threads.some((thread) => thread.id === result.threadId)) {
+          threads = upsertThread(threads, {
+            id: result.threadId,
+            title: titleFromText(current.text),
+            revision: result.sequence,
+            updatedAt: current.createdAt,
+          });
+        } else {
+          threads = threads.map((thread) =>
+            thread.id === result.threadId
+              ? {
+                  ...thread,
+                  revision: Math.max(thread.revision, result.sequence),
+                  updatedAt: current.createdAt,
+                }
+              : thread,
+          );
+        }
+      }
+      for (const failure of batch.failures) {
+        const current = byId.get(failure.id);
+        if (!current) continue;
+        byId.set(failure.id, {
+          ...current,
+          status: "needs_attention",
+          syncReason: failure.reason,
+          syncRetryable: failure.retryable,
+        });
+      }
+      captures = [...byId.values()];
+    },
   };
 }
 
@@ -150,11 +222,7 @@ function openDatabase(): Promise<IDBDatabase> {
           const cursor = cursorRequest.result;
           if (!cursor) return;
           const value = cursor.value as LocalCapture;
-          cursor.update({
-            ...value,
-            threadId: value.threadId ?? null,
-            sequence: value.sequence ?? 1,
-          });
+          cursor.update(normalizeCapture(value));
           cursor.continue();
         };
       }
@@ -188,7 +256,33 @@ function normalizeCapture(value: LocalCapture): LocalCapture {
     ...value,
     threadId: value.threadId ?? null,
     sequence: value.sequence ?? 1,
+    status: value.status ?? "saved_locally",
+    syncReason: value.syncReason ?? null,
   };
+}
+
+async function rewriteCaptureStatuses(
+  ids: string[],
+  patch: Pick<LocalCapture, "status" | "syncReason" | "syncRetryable">,
+): Promise<void> {
+  const idSet = new Set(ids);
+  const db = await openDatabase();
+  try {
+    const existing = (
+      (await requestToPromise(
+        db.transaction("captures", "readonly").objectStore("captures").getAll(),
+      )) as LocalCapture[]
+    ).map(normalizeCapture);
+    const transaction = db.transaction("captures", "readwrite");
+    const store = transaction.objectStore("captures");
+    for (const capture of existing) {
+      if (!idSet.has(capture.id)) continue;
+      store.put({ ...capture, ...patch });
+    }
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
 }
 
 export function createIdbCaptureStore(): CaptureStore {
@@ -311,6 +405,95 @@ export function createIdbCaptureStore(): CaptureStore {
         }
         await transactionDone(transaction);
         return capture;
+      } finally {
+        db.close();
+      }
+    },
+
+    async markSyncing(ids) {
+      await rewriteCaptureStatuses(ids, {
+        status: "syncing",
+        syncReason: null,
+        syncRetryable: undefined,
+      });
+    },
+
+    async restoreSavedLocally(ids) {
+      await rewriteCaptureStatuses(ids, {
+        status: "saved_locally",
+        syncReason: null,
+        syncRetryable: undefined,
+      });
+    },
+
+    async applySyncBatch(batch: SyncBatchApplication) {
+      const db = await openDatabase();
+      try {
+        const existingCaptures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const existingThreads = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").getAll(),
+        )) as LocalThread[];
+        const byId = new Map(
+          existingCaptures.map((capture) => [capture.id, capture]),
+        );
+        let threads = [...existingThreads];
+
+        for (const result of batch.results) {
+          const current = byId.get(result.id);
+          if (!current) continue;
+          byId.set(result.id, {
+            ...current,
+            status: "complete",
+            threadId: result.threadId,
+            sequence: result.sequence,
+            syncReason: null,
+            syncRetryable: undefined,
+          });
+          if (!threads.some((thread) => thread.id === result.threadId)) {
+            threads = upsertThread(threads, {
+              id: result.threadId,
+              title: titleFromText(current.text),
+              revision: result.sequence,
+              updatedAt: current.createdAt,
+            });
+          } else {
+            threads = threads.map((thread) =>
+              thread.id === result.threadId
+                ? {
+                    ...thread,
+                    revision: Math.max(thread.revision, result.sequence),
+                    updatedAt: current.createdAt,
+                  }
+                : thread,
+            );
+          }
+        }
+
+        for (const failure of batch.failures) {
+          const current = byId.get(failure.id);
+          if (!current) continue;
+          byId.set(failure.id, {
+            ...current,
+            status: "needs_attention",
+            syncReason: failure.reason,
+            syncRetryable: failure.retryable,
+          });
+        }
+
+        const transaction = db.transaction(["captures", "threads"], "readwrite");
+        const captureStore = transaction.objectStore("captures");
+        const threadStore = transaction.objectStore("threads");
+        for (const capture of byId.values()) {
+          captureStore.put(capture);
+        }
+        for (const thread of threads) {
+          threadStore.put(thread);
+        }
+        await transactionDone(transaction);
       } finally {
         db.close();
       }

@@ -12,11 +12,13 @@ import {
 } from "@/lib/local-capture/persistence";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
+  CaptureSyncStatus,
   LocalCapture,
   LocalThread,
   PersistenceResult,
   ThreadDestination,
 } from "@/lib/local-capture/types";
+import { synchronizePendingCaptures } from "@/lib/sync/client";
 
 function destinationValue(destination: ThreadDestination): string {
   if (destination.type === "thread") return destination.threadId;
@@ -27,6 +29,19 @@ function destinationFromValue(value: string): ThreadDestination {
   if (value === "inbox") return { type: "inbox" };
   if (value === "new_thread") return { type: "new_thread" };
   return { type: "thread", threadId: value };
+}
+
+function statusLabel(status: CaptureSyncStatus): string {
+  switch (status) {
+    case "saved_locally":
+      return "Saved locally";
+    case "syncing":
+      return "Syncing";
+    case "complete":
+      return "Complete";
+    case "needs_attention":
+      return "Needs attention";
+  }
 }
 
 type ThreadView = {
@@ -46,7 +61,9 @@ export function CaptureComposer() {
   const [persistence, setPersistence] = useState<PersistenceResult | null>(null);
   const [ready, setReady] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isSyncing, setIsSyncing] = useState(false);
   const draftSaveGeneration = useRef(0);
+  const syncGeneration = useRef(0);
 
   async function refreshLists() {
     const store = getCaptureStore();
@@ -60,6 +77,26 @@ export function CaptureComposer() {
     setInbox(nextInbox);
     setRecentThreads(recent);
     setThreads(threadViews);
+  }
+
+  async function runForegroundSync() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const generation = ++syncGeneration.current;
+    setIsSyncing(true);
+    try {
+      await synchronizePendingCaptures(getCaptureStore());
+      if (generation === syncGeneration.current) {
+        await refreshLists();
+      }
+    } catch {
+      if (generation === syncGeneration.current) {
+        setError("Synchronization needs attention");
+      }
+    } finally {
+      if (generation === syncGeneration.current) {
+        setIsSyncing(false);
+      }
+    }
   }
 
   useEffect(() => {
@@ -86,6 +123,23 @@ export function CaptureComposer() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const start = window.setTimeout(() => {
+      void runForegroundSync();
+    }, 0);
+    const onOnline = () => {
+      void runForegroundSync();
+    };
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.clearTimeout(start);
+      window.removeEventListener("online", onOnline);
+    };
+    // Foreground sync should arm once the composer is ready and on reconnect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runForegroundSync closes over latest store helpers
+  }, [ready]);
 
   useEffect(() => {
     if (!ready || isPending) return;
@@ -155,6 +209,8 @@ export function CaptureComposer() {
       } catch {
         setPersistence("not_persisted");
       }
+
+      void runForegroundSync();
     });
   }
 
@@ -202,6 +258,22 @@ export function CaptureComposer() {
         </button>
       </div>
 
+      <div className="capture-sync-bar">
+        <p className="capture-persistence" role="status">
+          {isSyncing
+            ? "Foreground sync running…"
+            : "Foreground sync when open and online (background is best effort)"}
+        </p>
+        <button
+          type="button"
+          className="capture-retry"
+          onClick={() => void runForegroundSync()}
+          disabled={!ready || isSyncing}
+        >
+          Retry sync
+        </button>
+      </div>
+
       {error ? (
         <p className="capture-error" role="alert">
           {error}
@@ -220,7 +292,7 @@ export function CaptureComposer() {
           <ul className="capture-list">
             {inbox.map((capture) => (
               <li key={capture.id}>
-                <CaptureEntry capture={capture} />
+                <CaptureEntry capture={capture} onRetry={() => void runForegroundSync()} />
               </li>
             ))}
           </ul>
@@ -240,7 +312,7 @@ export function CaptureComposer() {
           <ul className="capture-list">
             {captures.map((capture) => (
               <li key={capture.id}>
-                <CaptureEntry capture={capture} />
+                <CaptureEntry capture={capture} onRetry={() => void runForegroundSync()} />
               </li>
             ))}
           </ul>
@@ -250,17 +322,35 @@ export function CaptureComposer() {
   );
 }
 
-function CaptureEntry({ capture }: { capture: LocalCapture }) {
+function CaptureEntry({
+  capture,
+  onRetry,
+}: {
+  capture: LocalCapture;
+  onRetry: () => void;
+}) {
   return (
     <article className="capture-entry" aria-label={capture.text}>
       <div className="capture-entry-meta">
-        <span className="capture-status">Saved locally</span>
+        <span className={`capture-status status-${capture.status}`}>
+          {statusLabel(capture.status)}
+        </span>
         <span className="capture-sequence">#{capture.sequence}</span>
         <time dateTime={capture.createdAt}>
           {new Date(capture.createdAt).toLocaleString()}
         </time>
       </div>
       <p>{capture.text}</p>
+      {capture.status === "needs_attention" ? (
+        <div className="capture-attention">
+          <span>{capture.syncReason ?? "Synchronization failed"}</span>
+          {capture.syncRetryable !== false ? (
+            <button type="button" className="capture-retry" onClick={onRetry}>
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

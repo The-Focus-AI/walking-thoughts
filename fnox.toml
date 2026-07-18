@@ -54,6 +54,12 @@ value = "NEXT_PUBLIC_APP_URL"
 if_missing = "ignore"
 description = "Canonical application URL for the selected environment"
 
+[secrets.DATABASE_URL]
+provider = "op"
+value = "DATABASE_URL"
+if_missing = "ignore"
+description = "Neon Postgres connection string for synchronized Threads"
+
 [secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
 default = "/sign-in"
 description = "Clerk sign-in route"

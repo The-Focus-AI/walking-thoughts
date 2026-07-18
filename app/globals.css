@@ -301,6 +301,48 @@ h1 {
   text-transform: uppercase;
 }
 
+.capture-status.status-syncing {
+  color: var(--sun);
+}
+
+.capture-status.status-complete {
+  color: var(--moss);
+}
+
+.capture-status.status-needs_attention {
+  color: #f0b4a0;
+}
+
+.capture-sync-bar,
+.capture-attention {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.capture-attention {
+  color: #f0b4a0;
+  font-size: 0.82rem;
+}
+
+.capture-retry {
+  min-height: 2.4rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.capture-retry:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .capture-sequence {
   color: var(--muted);
 }

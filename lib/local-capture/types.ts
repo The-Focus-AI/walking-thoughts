@@ -16,20 +16,43 @@ export type LocalThread = {
   updatedAt: string;
 };
 
+export type CaptureSyncStatus =
+  | "saved_locally"
+  | "syncing"
+  | "complete"
+  | "needs_attention";
+
 export type LocalCapture = {
   id: string;
   text: string;
   createdAt: string;
   location: CaptureLocation | null;
-  status: "saved_locally";
+  status: CaptureSyncStatus;
   threadId: string | null;
   sequence: number;
+  syncReason?: string | null;
+  syncRetryable?: boolean;
 };
 
 export type PersistenceResult = "persisted" | "not_persisted" | "unsupported";
 
 export type CommitOptions = {
   destination?: ThreadDestination;
+};
+
+export type SyncBatchApplication = {
+  results: Array<{
+    id: string;
+    threadId: string;
+    sequence: number;
+    status: "complete";
+  }>;
+  failures: Array<{
+    id: string;
+    status: "needs_attention";
+    reason: string;
+    retryable: boolean;
+  }>;
 };
 
 export type CaptureStore = {
@@ -46,4 +69,7 @@ export type CaptureStore = {
     location: CaptureLocation | null,
     options?: CommitOptions,
   ): Promise<LocalCapture>;
+  markSyncing(ids: string[]): Promise<void>;
+  restoreSavedLocally(ids: string[]): Promise<void>;
+  applySyncBatch(batch: SyncBatchApplication): Promise<void>;
 };
