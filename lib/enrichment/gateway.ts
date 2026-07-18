@@ -5,7 +5,7 @@ import {
 } from "./system-instruction";
 import type { GatewayClient, GatewayGenerateInput } from "./types";
 
-export const DEFAULT_GATEWAY_MODEL = "anthropic/claude-sonnet-4.5";
+export const DEFAULT_GATEWAY_MODEL = "anthropic/claude-sonnet-5";
 
 type GatewayGlobals = typeof globalThis & {
   __WT_GATEWAY__?: GatewayClient;

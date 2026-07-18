@@ -76,7 +76,7 @@ description = "Vercel AI Gateway API key for Enrichments"
 provider = "op"
 value = "AI_GATEWAY_MODEL"
 if_missing = "ignore"
-description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-4.5)"
+description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-5)"
 
 [secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
 default = "/sign-in"

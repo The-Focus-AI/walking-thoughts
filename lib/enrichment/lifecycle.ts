@@ -67,7 +67,7 @@ export function initialState(): LifecycleState {
   return {
     connectivity: "offline",
     nextId: 1,
-    selectedModel: "anthropic/claude-sonnet-4.5",
+    selectedModel: "anthropic/claude-sonnet-5",
     failNext: null,
     threads: {},
     jobs: [],

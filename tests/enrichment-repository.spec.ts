@@ -135,7 +135,7 @@ test("frozen basis history excludes Captures appended after the job was queued",
       text: entry.text,
     })),
     targetCaptureIds: ["cap-1"],
-    model: "anthropic/claude-sonnet-4.5",
+    model: "anthropic/claude-sonnet-5",
     status: "queued",
   });
 
