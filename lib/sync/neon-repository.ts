@@ -154,5 +154,14 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       }
       return result;
     },
+
+    async updateThreadTitle(userId, threadId, title) {
+      await ensure();
+      await sql`
+        UPDATE sync_threads
+        SET title = ${title}
+        WHERE user_id = ${userId} AND id = ${threadId}
+      `;
+    },
   };
 }

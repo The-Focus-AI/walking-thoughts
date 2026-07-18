@@ -19,6 +19,7 @@ export type LocalThread = {
 export type CaptureSyncStatus =
   | "saved_locally"
   | "syncing"
+  | "enriching"
   | "complete"
   | "needs_attention";
 
@@ -78,6 +79,17 @@ export type SyncBatchApplication = {
   }>;
 };
 
+export type EnrichmentBatchApplication = {
+  results: Array<{
+    id: string;
+    threadId: string;
+    status: "complete" | "enriching" | "needs_attention";
+    reason?: string;
+    retryable?: boolean;
+    threadTitle?: string;
+  }>;
+};
+
 export type CaptureStore = {
   getDraft(): Promise<string>;
   setDraft(text: string): Promise<void>;
@@ -95,6 +107,7 @@ export type CaptureStore = {
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
   applySyncBatch(batch: SyncBatchApplication): Promise<void>;
+  applyEnrichmentBatch(batch: EnrichmentBatchApplication): Promise<void>;
   updateAttachment(
     captureId: string,
     attachmentId: string,

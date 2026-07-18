@@ -3,6 +3,7 @@ import type { CaptureLocation } from "@/lib/local-capture/types";
 export type SyncCaptureStatus =
   | "saved_locally"
   | "syncing"
+  | "enriching"
   | "complete"
   | "needs_attention";
 
@@ -56,4 +57,9 @@ export type ThreadRepository = {
     captures: SyncCapturePayload[],
   ): Promise<SyncBatchResponse>;
   listThreads(userId: string): Promise<ServerThread[]>;
+  updateThreadTitle?(
+    userId: string,
+    threadId: string,
+    title: string,
+  ): Promise<void>;
 };

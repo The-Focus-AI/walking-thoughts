@@ -17,6 +17,7 @@
   "dependencies": {
     "@clerk/nextjs": "latest",
     "@neondatabase/serverless": "^1.1.0",
+    "ai": "^7.0.31",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"

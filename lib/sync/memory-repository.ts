@@ -164,5 +164,13 @@ export function createMemoryThreadRepository(
         } satisfies ServerThread;
       });
     },
+
+    async updateThreadTitle(userId, threadId, title) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return;
+      db.threads.set(key, { ...existing, title });
+    },
   };
 }
