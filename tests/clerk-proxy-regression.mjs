@@ -5,6 +5,9 @@ const port = "3104";
 const url = `http://${host}:${port}/offline`;
 const environment = {
   ...process.env,
+  VERCEL_ENV: "preview",
+  NEXT_PUBLIC_APP_URL: `http://${host}:${port}`,
+  CLERK_AUTHORIZED_PARTIES: `http://${host}:${port}`,
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: [
     "pk",
     "test",
