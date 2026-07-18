@@ -29,6 +29,7 @@ import type {
   PersistenceResult,
   ThreadDestination,
 } from "@/lib/local-capture/types";
+import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
 import { synchronizePendingMedia } from "@/lib/sync/media-client";
 
@@ -49,6 +50,8 @@ function statusLabel(status: CaptureSyncStatus): string {
       return "Saved locally";
     case "syncing":
       return "Syncing";
+    case "enriching":
+      return "Enriching";
     case "complete":
       return "Complete";
     case "needs_attention":
@@ -110,6 +113,9 @@ export function CaptureComposer() {
     try {
       await synchronizePendingMedia(getCaptureStore());
       await synchronizePendingCaptures(getCaptureStore());
+      await enrichPendingCaptures(getCaptureStore(), undefined, {
+        retryFailed: true,
+      });
       if (generation === syncGeneration.current) {
         await refreshLists();
       }

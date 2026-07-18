@@ -10,6 +10,7 @@ import type {
   CaptureLocation,
   CaptureStore,
   CommitOptions,
+  EnrichmentBatchApplication,
   LocalAttachment,
   LocalCapture,
   LocalThread,
@@ -280,7 +281,7 @@ export function createMemoryCaptureStore(
         if (!current) continue;
         const next: LocalCapture = {
           ...current,
-          status: "complete",
+          status: "enriching",
           threadId: result.threadId,
           sequence: result.sequence,
           syncReason: null,
@@ -315,6 +316,27 @@ export function createMemoryCaptureStore(
           syncReason: failure.reason,
           syncRetryable: failure.retryable,
         });
+      }
+      captures = [...byId.values()];
+    },
+    async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
+      const byId = new Map(captures.map((capture) => [capture.id, capture]));
+      for (const result of batch.results) {
+        const current = byId.get(result.id);
+        if (!current) continue;
+        byId.set(result.id, {
+          ...current,
+          status: result.status,
+          syncReason: result.reason ?? null,
+          syncRetryable: result.retryable,
+        });
+        if (result.threadTitle) {
+          threads = threads.map((thread) =>
+            thread.id === result.threadId
+              ? { ...thread, title: result.threadTitle as string }
+              : thread,
+          );
+        }
       }
       captures = [...byId.values()];
     },
@@ -829,7 +851,7 @@ export function createIdbCaptureStore(): CaptureStore {
           if (!current) continue;
           byId.set(result.id, {
             ...current,
-            status: "complete",
+            status: "enriching",
             threadId: result.threadId,
             sequence: result.sequence,
             syncReason: null,
@@ -864,6 +886,55 @@ export function createIdbCaptureStore(): CaptureStore {
             syncReason: failure.reason,
             syncRetryable: failure.retryable,
           });
+        }
+
+        const transaction = db.transaction(["captures", "threads"], "readwrite");
+        const captureStore = transaction.objectStore("captures");
+        const threadStore = transaction.objectStore("threads");
+        for (const capture of byId.values()) {
+          captureStore.put(capture);
+        }
+        for (const thread of threads) {
+          threadStore.put(thread);
+        }
+        await transactionDone(transaction);
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
+      const db = await openDatabase();
+      try {
+        const existingCaptures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const existingThreads = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").getAll(),
+        )) as LocalThread[];
+        const byId = new Map(
+          existingCaptures.map((capture) => [capture.id, capture]),
+        );
+        let threads = [...existingThreads];
+
+        for (const result of batch.results) {
+          const current = byId.get(result.id);
+          if (!current) continue;
+          byId.set(result.id, {
+            ...current,
+            status: result.status,
+            syncReason: result.reason ?? null,
+            syncRetryable: result.retryable,
+          });
+          if (result.threadTitle) {
+            threads = threads.map((thread) =>
+              thread.id === result.threadId
+                ? { ...thread, title: result.threadTitle as string }
+                : thread,
+            );
+          }
         }
 
         const transaction = db.transaction(["captures", "threads"], "readwrite");

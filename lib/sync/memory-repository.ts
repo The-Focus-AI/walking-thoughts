@@ -382,5 +382,13 @@ export function createMemoryThreadRepository(
       db.purgeOps.set(opKey, result);
       return result;
     },
+
+    async updateThreadTitle(userId, threadId, title) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return;
+      db.threads.set(key, { ...existing, title });
+    },
   };
 }
