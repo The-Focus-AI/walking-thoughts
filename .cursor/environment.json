@@ -1,0 +1,4 @@
+{
+  "name": "walking-thoughts",
+  "install": "bash .cursor/install.sh"
+}
