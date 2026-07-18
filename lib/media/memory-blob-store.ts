@@ -19,6 +19,11 @@ export type PrivateBlobStore = {
     input: BlobPutInput,
   ): Promise<{ attachmentId: string; duplicate: boolean }>;
   get(userId: string, attachmentId: string): Promise<BlobObject | null>;
+  /** Idempotent: missing objects return deleted=false. */
+  delete?(
+    userId: string,
+    attachmentId: string,
+  ): Promise<{ deleted: boolean }>;
   existsForOtherUser?(userId: string, attachmentId: string): Promise<boolean>;
 };
 
@@ -68,6 +73,11 @@ export function createMemoryBlobStore(
     },
     async get(userId, attachmentId) {
       return state().objects.get(`${userId}:${attachmentId}`) ?? null;
+    },
+    async delete(userId, attachmentId) {
+      const key = `${userId}:${attachmentId}`;
+      const existed = state().objects.delete(key);
+      return { deleted: existed };
     },
     async existsForOtherUser(userId, attachmentId) {
       for (const object of state().objects.values()) {
