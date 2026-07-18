@@ -6,7 +6,7 @@ test-results/
 .env
 .env.local
 .env.*.local
-.fnox/env
+.fnox/
 .webreel/
 *.tsbuildinfo
 .vercel

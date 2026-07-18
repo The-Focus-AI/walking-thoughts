@@ -17,7 +17,10 @@ mise dev
 The shell is available at `http://localhost:3000`. Without Clerk configuration
 it deliberately shows **Secure setup required** and private APIs return `503`.
 Declare secrets in 1Password through `fnox.toml`; never put their values in the
-repository.
+repository or a local `.env` file. `mise run setup` retrieves the project-scoped
+service-account token from the `thefocus` vault into the protected,
+gitignored `.fnox/env` bootstrap file. Interactive shells may use
+`fnox activate`; non-interactive commands should use `fnox exec -- <command>`.
 
 ## Environments
 

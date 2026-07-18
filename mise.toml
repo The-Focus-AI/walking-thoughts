@@ -14,18 +14,18 @@ ripgrep = "latest"
 _.file = ".fnox/env"
 
 [tasks.setup]
-description = "Create the protected local fnox bootstrap file"
+description = "First-time onboarding: pull the scoped 1Password service-account token"
 run = '''
 set -euo pipefail
-mkdir -p .fnox
-chmod 700 .fnox
-if [ ! -f .fnox/env ]; then
-  touch .fnox/env
-  chmod 600 .fnox/env
-  echo "Created .fnox/env. Add the scoped OP_SERVICE_ACCOUNT_TOKEN when provisioned."
-else
-  echo ".fnox/env already exists"
+mkdir -p .fnox && chmod 700 .fnox
+if [ -s .fnox/env ]; then
+  echo "✓ .fnox/env already contains the project bootstrap token — skipping"
+  exit 0
 fi
+TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
+printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
+chmod 600 .fnox/env
+echo "✓ .fnox/env written. Open a new shell tab or use 'fnox exec -- <command>'."
 '''
 
 [tasks.install]
@@ -39,7 +39,7 @@ skills experimental_install
 
 [tasks.dev]
 description = "Run the Walking Thoughts development server"
-run = "pnpm dev"
+run = "fnox exec -- pnpm dev"
 
 [tasks.lint]
 description = "Lint and typecheck the application"
@@ -79,6 +79,17 @@ run = "fnox check"
 [tasks."secrets:list"]
 description = "List declared fnox secrets without values"
 run = "fnox list"
+
+[tasks."secrets:rotate-token"]
+description = "Re-pull the scoped 1Password service-account token"
+run = '''
+set -euo pipefail
+mkdir -p .fnox && chmod 700 .fnox
+TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
+printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
+chmod 600 .fnox/env
+echo "✓ .fnox/env refreshed."
+'''
 
 [tasks."vercel:sync"]
 description = "Push fnox-resolved configuration to a Vercel environment"

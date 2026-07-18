@@ -57,3 +57,15 @@ description = "Canonical application URL for the selected environment"
 [secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
 default = "/sign-in"
 description = "Clerk sign-in route"
+
+[secrets.NEXT_PUBLIC_CLERK_SIGN_UP_URL]
+default = "/sign-up"
+description = "Clerk sign-up route"
+
+[secrets.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL]
+default = "/"
+description = "Route after a successful sign-in"
+
+[secrets.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL]
+default = "/"
+description = "Route after a successful sign-up"
