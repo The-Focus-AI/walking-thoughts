@@ -54,7 +54,9 @@ mise deploy
 The public browser seam verifies the install manifest, active service worker,
 offline reload, and secret-safe health response at `/api/health`. It also
 verifies offline text Capture draft recovery, local commit without blocking on
-location, durable restart, and quota-failure draft preservation. When the
+location, durable restart, and quota-failure draft preservation. It also covers
+Inbox defaults, sticky Thread destinations, inactivity reset, append-only
+corrections, and deterministic Thread ordering. When the
 preview Clerk keys plus `CLERK_E2E_ALLOWED_EMAIL` and
 `CLERK_E2E_DISALLOWED_EMAIL` are present, it also verifies anonymous redirect,
 the allowed identity, rejection of a different identity, and offline fallback
