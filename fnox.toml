@@ -78,6 +78,12 @@ value = "AI_GATEWAY_MODEL"
 if_missing = "ignore"
 description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-5)"
 
+[secrets.TAVILY_API_KEY]
+provider = "op"
+value = "TAVILY_API_KEY"
+if_missing = "ignore"
+description = "Optional Tavily API key for Enrichment web search"
+
 [secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
 default = "/sign-in"
 description = "Clerk sign-in route"

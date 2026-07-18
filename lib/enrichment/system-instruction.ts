@@ -1,13 +1,19 @@
+import type { CaptureLocation } from "@/lib/local-capture/types";
+import type { NearbyPlace } from "./place";
+import type { FrozenHistoryEntry } from "./types";
+
 export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "You are Walking Thoughts, a trail companion that turns outdoor Captures into useful Enrichments.",
-  "Infer a useful task from the Thread history (identify, explain, summarize, suggest a next step).",
+  "Infer a useful task from the Thread history (identify, explain, summarize, transcript lookup, or research).",
+  "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
+  "Use provided web search results for identification, explanation, podcast transcript lookup, and research; cite sources by title and URL.",
   "Favor a reasonable action over asking questions; state assumptions briefly.",
   "Ask only when the work genuinely cannot continue without an answer.",
-  "Keep replies concise and grounded in the provided history.",
+  "Keep replies concise and grounded in the provided history, media, place, and sources.",
 ].join(" ");
 
 export function getEnrichmentSystemInstruction(
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: Record<string, string | undefined> = process.env,
 ): string {
   const configured = environment.ENRICHMENT_SYSTEM_INSTRUCTION?.trim();
   return configured && configured.length > 0
@@ -15,14 +21,39 @@ export function getEnrichmentSystemInstruction(
     : DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION;
 }
 
+function formatLocation(
+  location: CaptureLocation | null | undefined,
+  place: NearbyPlace | null,
+): string {
+  if (!location) return "location: unavailable";
+  const coords = `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)} (±${location.accuracy}m)`;
+  if (place?.name) return `location: ${coords}; nearby place: ${place.name}`;
+  return `location: ${coords}`;
+}
+
 export function buildEnrichmentPrompt(input: {
   threadTitle: string;
-  history: Array<{ kind: string; text: string; id: string }>;
+  history: FrozenHistoryEntry[];
   targetCaptureIds: string[];
   requestTitle: boolean;
+  placesByCaptureId?: Record<string, NearbyPlace | null>;
 }): string {
   const historyBlock = input.history
-    .map((entry) => `- [${entry.kind} ${entry.id}] ${entry.text}`)
+    .map((entry) => {
+      if (entry.kind === "enrichment") {
+        return `- [enrichment ${entry.id}] ${entry.text}`;
+      }
+      const place = input.placesByCaptureId?.[entry.id] ?? null;
+      const when = entry.createdAt ? ` at ${entry.createdAt}` : "";
+      const where = formatLocation(entry.location, place);
+      const media =
+        entry.attachments && entry.attachments.length > 0
+          ? `; media: ${entry.attachments
+              .map((attachment) => `${attachment.kind}:${attachment.fileName}`)
+              .join(", ")}`
+          : "";
+      return `- [capture ${entry.id}${when}; ${where}${media}] ${entry.text}`;
+    })
     .join("\n");
   const targets = input.targetCaptureIds.join(", ");
   const titleLine = input.requestTitle
@@ -32,6 +63,7 @@ export function buildEnrichmentPrompt(input: {
   return [
     `Thread title: ${input.threadTitle}`,
     `Pending Capture ids for this Enrichment: ${targets}`,
+    "Search the web when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",
     "Complete Thread history at the frozen basis:",
     historyBlock || "(empty)",
     titleLine,

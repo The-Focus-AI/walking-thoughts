@@ -39,6 +39,7 @@ import type {
   ThreadDestination,
 } from "@/lib/local-capture/types";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
+import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
 import {
   getMediaTransport,
@@ -74,7 +75,26 @@ function statusLabel(status: CaptureSyncStatus): string {
 type ThreadView = {
   thread: LocalThread;
   captures: LocalCapture[];
+  enrichments: ThreadEnrichment[];
 };
+
+async function fetchThreadEnrichments(
+  threadId: string,
+): Promise<ThreadEnrichment[]> {
+  try {
+    const headers: Record<string, string> = {};
+    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
+    if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
+    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
+      headers,
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
+    return body.enrichments ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
@@ -111,7 +131,11 @@ export function CaptureComposer() {
       store.listRecentThreads(),
     ]);
     const threadViews = await Promise.all(
-      recent.map(async (thread) => store.listThread(thread.id)),
+      recent.map(async (thread) => {
+        const view = await store.listThread(thread.id);
+        const enrichments = await fetchThreadEnrichments(thread.id);
+        return { ...view, enrichments };
+      }),
     );
     setInbox(nextInbox);
     setRecentThreads(recent);
@@ -607,7 +631,7 @@ export function CaptureComposer() {
         </section>
       ) : null}
 
-      {threads.map(({ thread, captures }) => (
+      {threads.map(({ thread, captures, enrichments }) => (
         <section
           key={thread.id}
           className="capture-section"
@@ -628,10 +652,48 @@ export function CaptureComposer() {
                 />
               </li>
             ))}
+            {enrichments.map((enrichment) => (
+              <li key={enrichment.id}>
+                <EnrichmentEntry enrichment={enrichment} />
+              </li>
+            ))}
           </ul>
         </section>
       ))}
     </div>
+  );
+}
+
+function EnrichmentEntry({ enrichment }: { enrichment: ThreadEnrichment }) {
+  return (
+    <article
+      className="capture-entry enrichment-entry"
+      aria-label={`Enrichment ${enrichment.model}`}
+    >
+      <div className="capture-entry-meta">
+        <span className="capture-status status-complete">Enrichment</span>
+        <time dateTime={enrichment.createdAt}>
+          {new Date(enrichment.createdAt).toLocaleString()}
+        </time>
+        <span className="enrichment-model">{enrichment.model}</span>
+      </div>
+      <p className="capture-text">{enrichment.text}</p>
+      {enrichment.sources.length > 0 ? (
+        <ul className="enrichment-sources" aria-label="Sources">
+          {enrichment.sources.map((source: EnrichmentSource) => (
+            <li key={`${source.url}-${source.retrievedAt}`}>
+              <a href={source.url} target="_blank" rel="noreferrer">
+                {source.title}
+              </a>
+              <span className="enrichment-source-meta">
+                {" "}
+                · retrieved {new Date(source.retrievedAt).toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
   );
 }
 
