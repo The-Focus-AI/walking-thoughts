@@ -1,0 +1,40 @@
+name: Close shipped tickets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/close-shipped-tickets.yml"
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: "Comma-separated issue numbers to close"
+        required: true
+        default: "9,12,15,17,28"
+
+permissions:
+  issues: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUES: ${{ inputs.issues || '9,12,15,17,28' }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra NUMS <<< "$ISSUES"
+          for n in "${NUMS[@]}"; do
+            n="$(echo "$n" | tr -d '[:space:]')"
+            [ -z "$n" ] && continue
+            state="$(gh issue view "$n" --repo "$GITHUB_REPOSITORY" --json state --jq .state)"
+            if [ "$state" = "CLOSED" ]; then
+              echo "#$n already closed"
+              continue
+            fi
+            gh issue close "$n" --repo "$GITHUB_REPOSITORY" \
+              --comment "Closed after the implementing PR merged to main."
+            echo "Closed #$n"
+          done
