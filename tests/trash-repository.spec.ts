@@ -243,6 +243,57 @@ test("trashing a Thread hides its history until restore; purge removes Neon rows
   expect(unrelatedStillListed.map((thread) => thread.id)).toEqual(["thread-b"]);
 });
 
+test("restore after the retention deadline fails; purge before deadline is a no-op", async () => {
+  const repository = await seedCapture("user_a", {
+    id: "cap-deadline",
+    text: "Deadline check",
+  });
+  const blobs = createMemoryBlobStore(NS);
+  await blobs.put({
+    userId: "user_a",
+    attachmentId: "att-deadline",
+    mimeType: "image/jpeg",
+    bytes: new Uint8Array([1]),
+    operationId: "op-deadline",
+  });
+
+  await repository.applyTrashMutations("user_a", [
+    {
+      action: "trash",
+      kind: "capture",
+      targetId: "cap-deadline",
+      trashedAt: "2026-07-01T00:00:00.000Z",
+      attachmentIds: ["att-deadline"],
+      idempotencyKey: "trash-deadline",
+    },
+  ]);
+
+  const early = await purgeExpiredTrash(repository, blobs, {
+    userId: "user_a",
+    now: "2026-07-15T00:00:00.000Z",
+    operationId: "purge-early",
+  });
+  expect(early.purged).toEqual([]);
+  expect(await repository.listTrash("user_a")).toHaveLength(1);
+  expect(await blobs.get("user_a", "att-deadline")).not.toBeNull();
+
+  const lateRestore = await repository.applyTrashMutations("user_a", [
+    {
+      action: "restore",
+      kind: "capture",
+      targetId: "cap-deadline",
+      idempotencyKey: "restore-late",
+      now: "2026-08-01T00:00:00.000Z",
+    },
+  ]);
+  expect(lateRestore.failures).toEqual([
+    expect.objectContaining({
+      idempotencyKey: "restore-late",
+      reason: "trash_expired",
+    }),
+  ]);
+});
+
 test("trash and restore mutations are idempotent on replay", async () => {
   const repository = await seedCapture("user_a", {
     id: "cap-1",

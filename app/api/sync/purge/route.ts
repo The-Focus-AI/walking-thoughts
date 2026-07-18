@@ -17,8 +17,9 @@ export async function POST(request: Request) {
   }
 
   const now = body.now ?? new Date().toISOString();
+  // Bucket by UTC day so naive same-day retries share an idempotency key.
   const operationId =
-    body.operationId ?? `purge:${access.userId}:${now}`;
+    body.operationId ?? `purge:${access.userId}:${now.slice(0, 10)}`;
 
   const result = await purgeExpiredTrash(
     getThreadRepository(),

@@ -94,6 +94,7 @@ function toMutation(record: LocalTrashRecord): TrashMutation {
     trashedAt: record.trashedAt,
     attachmentIds: record.attachmentIds,
     idempotencyKey: record.idempotencyKey,
+    now: new Date().toISOString(),
   };
 }
 

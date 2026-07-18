@@ -374,11 +374,14 @@ export function createMemoryCaptureStore(
       ];
       return record;
     },
-    async restoreFromTrash(kind, targetId) {
+    async restoreFromTrash(kind, targetId, now = createTimestamp()) {
       const existing = trash.find(
         (item) => item.kind === kind && item.targetId === targetId,
       );
       if (!existing) return null;
+      if (existing.expiresAt <= now) {
+        throw new Error("trash_expired");
+      }
       if (existing.syncStatus === "saved_locally" && existing.pendingAction === "trash") {
         trash = trash.filter(
           (item) => !(item.kind === kind && item.targetId === targetId),
@@ -536,7 +539,11 @@ async function readAllTrash(db: IDBDatabase): Promise<LocalTrashRecord[]> {
   const rows = (await requestToPromise(
     db.transaction("trash", "readonly").objectStore("trash").getAll(),
   )) as StoredLocalTrash[];
-  return rows.map(({ id: _id, ...record }) => record);
+  return rows.map((row) => {
+    const { id, ...record } = row;
+    void id;
+    return record;
+  });
 }
 
 async function writeAllTrash(
@@ -962,7 +969,7 @@ export function createIdbCaptureStore(): CaptureStore {
       }
     },
 
-    async restoreFromTrash(kind, targetId) {
+    async restoreFromTrash(kind, targetId, now = createTimestamp()) {
       const db = await openDatabase();
       try {
         const trash = await readAllTrash(db);
@@ -970,6 +977,9 @@ export function createIdbCaptureStore(): CaptureStore {
           (item) => item.kind === kind && item.targetId === targetId,
         );
         if (!existing) return null;
+        if (existing.expiresAt <= now) {
+          throw new Error("trash_expired");
+        }
         if (
           existing.syncStatus === "saved_locally" &&
           existing.pendingAction === "trash"

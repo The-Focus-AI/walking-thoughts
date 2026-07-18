@@ -68,6 +68,8 @@ export type TrashMutation = {
   trashedAt?: string;
   attachmentIds?: string[];
   idempotencyKey: string;
+  /** Optional clock for restore-before-deadline checks (tests / workers). */
+  now?: string;
 };
 
 export type TrashMutationResult = {

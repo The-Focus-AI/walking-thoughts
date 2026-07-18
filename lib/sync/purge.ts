@@ -12,21 +12,12 @@ export async function purgeExpiredTrash(
     input.operationId,
   );
 
-  if (!result.duplicate) {
-    for (const target of result.purged) {
-      for (const attachmentId of target.attachmentIds) {
-        if (blobs.delete) {
-          await blobs.delete(input.userId, attachmentId);
-        }
-      }
-    }
-  } else {
-    // Replay still ensures media stays gone without touching unrelated objects.
-    for (const target of result.purged) {
-      for (const attachmentId of target.attachmentIds) {
-        if (blobs.delete) {
-          await blobs.delete(input.userId, attachmentId);
-        }
+  // Replay still deletes listed media so duplicate deliveries stay idempotent
+  // without touching unrelated objects.
+  for (const target of result.purged) {
+    for (const attachmentId of target.attachmentIds) {
+      if (blobs.delete) {
+        await blobs.delete(input.userId, attachmentId);
       }
     }
   }

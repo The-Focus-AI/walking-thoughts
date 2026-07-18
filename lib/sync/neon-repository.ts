@@ -174,6 +174,21 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       return (await loadTrashOp(userId, mutation.idempotencyKey)) ?? result;
     }
 
+    const existing = (await sql`
+      SELECT expires_at
+      FROM sync_trash
+      WHERE user_id = ${userId}
+        AND kind = ${mutation.kind}
+        AND target_id = ${mutation.targetId}
+      LIMIT 1
+    `) as Array<{ expires_at: string }>;
+    if (existing[0]) {
+      const now = mutation.now ?? new Date().toISOString();
+      if (isExpired(existing[0].expires_at, now)) {
+        throw new Error("trash_expired");
+      }
+    }
+
     await sql`
       DELETE FROM sync_trash
       WHERE user_id = ${userId}
@@ -450,7 +465,6 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         });
       }
 
-      const result: PurgeExpiredResult = { purged, duplicate: false };
       await sql`
         INSERT INTO sync_purge_ops (user_id, operation_id, purged)
         VALUES (${userId}, ${operationId}, ${JSON.stringify(purged)})
@@ -465,7 +479,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       return {
         purged: stored[0]?.purged ?? purged,
         duplicate: false,
-      };
+      } satisfies PurgeExpiredResult;
     },
   };
 }

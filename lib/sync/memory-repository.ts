@@ -81,12 +81,11 @@ function collectAttachmentIds(
   if (provided && provided.length > 0) {
     return [...new Set(provided)];
   }
-  if (kind === "capture") {
-    return [];
-  }
-  // Thread trash with no client attachment list still purges nothing extra.
+  // Server has no attachment index yet; rely on client-supplied ids.
+  // When omitted, still return a stable empty list (no invented media keys).
   void db;
   void userId;
+  void kind;
   void targetId;
   return [];
 }
@@ -147,6 +146,13 @@ function applyTrash(
 
   // restore
   const key = trashKey(userId, mutation.kind, mutation.targetId);
+  const existing = db.trash.get(key);
+  if (existing) {
+    const now = mutation.now ?? new Date().toISOString();
+    if (isExpired(existing.expiresAt, now)) {
+      throw new Error("trash_expired");
+    }
+  }
   db.trash.delete(key);
   const result: TrashMutationResult = {
     idempotencyKey: mutation.idempotencyKey,
@@ -347,7 +353,11 @@ export function createMemoryThreadRepository(
       const db = state();
       return [...db.trash.values()]
         .filter((record) => record.userId === userId)
-        .map(({ userId: _userId, ...record }) => record)
+        .map((entry) => {
+          const { userId: trashUserId, ...record } = entry;
+          void trashUserId;
+          return record;
+        })
         .sort((a, b) =>
           a.trashedAt < b.trashedAt ? 1 : a.trashedAt > b.trashedAt ? -1 : 0,
         );

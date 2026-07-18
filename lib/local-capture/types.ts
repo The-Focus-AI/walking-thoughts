@@ -139,6 +139,7 @@ export type CaptureStore = {
   restoreFromTrash(
     kind: LocalTrashKind,
     targetId: string,
+    now?: string,
   ): Promise<LocalTrashRecord | null>;
   listTrash(): Promise<LocalTrashRecord[]>;
   listPendingTrashMutations(): Promise<LocalTrashRecord[]>;
