@@ -98,10 +98,7 @@ test.describe("offline text Captures", () => {
     await page.evaluate(() => {
       const current = (
         globalThis as typeof globalThis & {
-          __WT_CAPTURE_STORE__?: {
-            getDraft(): Promise<string>;
-            setDraft(text: string): Promise<void>;
-            list(): Promise<unknown[]>;
+          __WT_CAPTURE_STORE__?: Record<string, unknown> & {
             commit(text: string, location: unknown): Promise<unknown>;
           };
         }
@@ -116,9 +113,7 @@ test.describe("offline text Captures", () => {
           __WT_CAPTURE_STORE__: typeof current;
         }
       ).__WT_CAPTURE_STORE__ = {
-        getDraft: () => current.getDraft(),
-        setDraft: (text) => current.setDraft(text),
-        list: () => current.list(),
+        ...current,
         commit: async () => {
           throw new DOMException(
             "The quota has been exceeded.",
