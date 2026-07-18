@@ -313,6 +313,25 @@ h1 {
   color: #f0b4a0;
 }
 
+.enrichment-entry {
+  border-left-color: rgba(120, 170, 210, 0.75);
+}
+
+.enrichment-model {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.enrichment-sources {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.enrichment-sources a {
+  color: var(--sun);
+}
+
 .capture-sync-bar,
 .capture-attention {
   display: flex;
