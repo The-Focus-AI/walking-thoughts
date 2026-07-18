@@ -29,11 +29,16 @@ repository.
   production instance with live keys, custom Clerk domain, Dashboard identity
   allowlist, and `CLERK_AUTHORIZED_PARTIES` locked to the production app origin.
 
-Use `mise run vercel:sync -- --env preview` before preview deployment and
-`mise run vercel:sync -- --env production` before production deployment. The
-task selects the matching fnox profile so credentials cannot cross environment
+Use `mise run vercel:sync -- --env preview` before opening or updating the PR
+and `mise run vercel:sync -- --env production` before merging it. The task
+selects the matching fnox profile so credentials cannot cross environment
 boundaries. Vercel receives resolved environment variables; fnox does not run
 in Vercel builds or functions.
+
+Deployments are PR-only. A branch push creates its Preview through Vercel's Git
+integration, and merging the approved PR to `main` creates Production. Do not
+run `vercel deploy` directly. `mise deploy` validates the application and the
+current PR's Preview check; it does not create a deployment.
 
 ## Verification
 

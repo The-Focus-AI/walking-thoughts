@@ -4,6 +4,9 @@ Follow `/Users/wschenk/The-Focus-AI/standards/AGENTS.md` and its relevant
 `best-practices` files before tooling, security, deployment, or broad project
 changes. Use mise for every project tool, pnpm for JavaScript packages, fnox and
 dedicated 1Password vaults for secrets, and Vercel for this Next.js application.
+Never deploy to Vercel directly from the CLI. Branch pushes create Preview
+deployments through the Git integration; only merging an approved pull request
+to `main` may create a Production deployment.
 
 Read `CONTEXT.md`, `docs/adr/`, the originating GitHub ticket, `mise.toml`, and
 `fnox.toml` before implementation. Preserve the canonical domain terms Capture,
