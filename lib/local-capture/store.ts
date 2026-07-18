@@ -1,15 +1,22 @@
+import {
+  createIdbMediaStore,
+  createMemoryMediaStore,
+  type MediaStore,
+} from "./media-store";
 import { resolveCommitDestination, titleFromText } from "./thread-destination";
 import type {
+  AttachmentInput,
   CaptureLocation,
   CaptureStore,
   CommitOptions,
+  LocalAttachment,
   LocalCapture,
   LocalThread,
   SyncBatchApplication,
 } from "./types";
 
 const DB_NAME = "walking-thoughts";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const DRAFT_KEY = "composer";
 
 type CaptureStoreGlobals = typeof globalThis & {
@@ -40,13 +47,57 @@ function oldestBySequence(captures: LocalCapture[]): LocalCapture[] {
   return [...captures].sort((a, b) => a.sequence - b.sequence);
 }
 
+function toBlob(bytes: AttachmentInput["bytes"], mimeType: string): Blob {
+  if (bytes instanceof Blob) return bytes;
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  // Copy into a fresh ArrayBuffer-backed Uint8Array for BlobPart typing.
+  const copy = new Uint8Array(view.byteLength);
+  copy.set(view);
+  return new Blob([copy], { type: mimeType });
+}
+
+async function persistAttachments(
+  mediaStore: MediaStore,
+  captureId: string,
+  inputs: AttachmentInput[],
+): Promise<LocalAttachment[]> {
+  const writtenKeys: string[] = [];
+  try {
+    const attachments: LocalAttachment[] = [];
+    for (const input of inputs) {
+      const id = input.id ?? createId();
+      const localObjectKey = `${captureId}/${id}`;
+      const blob = toBlob(input.bytes, input.mimeType);
+      await mediaStore.put(localObjectKey, blob);
+      writtenKeys.push(localObjectKey);
+      attachments.push({
+        id,
+        kind: input.kind,
+        mimeType: input.mimeType,
+        fileName: input.fileName,
+        byteLength: blob.size,
+        localObjectKey,
+        remoteObjectKey: null,
+        syncStatus: "saved_locally",
+      });
+    }
+    return attachments;
+  } catch (error) {
+    await Promise.allSettled(
+      writtenKeys.map((key) => mediaStore.delete(key)),
+    );
+    throw error;
+  }
+}
+
 function buildCaptureBase(
   text: string,
   location: CaptureLocation | null,
-): Omit<LocalCapture, "threadId" | "sequence"> {
+  attachmentCount: number,
+): Omit<LocalCapture, "threadId" | "sequence" | "attachments"> {
   const normalized = normalizeText(text);
-  if (!normalized) {
-    throw new Error("Capture text is required");
+  if (!normalized && attachmentCount === 0) {
+    throw new Error("Capture text or media is required");
   }
 
   return {
@@ -67,11 +118,13 @@ export function createMemoryCaptureStore(
     draft?: string;
     captures?: LocalCapture[];
     threads?: LocalThread[];
+    mediaStore?: MediaStore;
   } = {},
 ): CaptureStore {
   let draft = seed.draft ?? "";
   let captures = [...(seed.captures ?? [])];
   let threads = [...(seed.threads ?? [])];
+  const mediaStore = seed.mediaStore ?? createMemoryMediaStore();
 
   return {
     async getDraft() {
@@ -104,10 +157,16 @@ export function createMemoryCaptureStore(
       };
     },
     async commit(text, location, options: CommitOptions = {}) {
-      const base = buildCaptureBase(text, location);
+      const inputs = options.attachments ?? [];
+      const base = buildCaptureBase(text, location, inputs.length);
+      const attachments = await persistAttachments(
+        mediaStore,
+        base.id,
+        inputs,
+      );
       const resolved = resolveCommitDestination({
         destination: options.destination ?? { type: "inbox" },
-        text: base.text,
+        text: base.text || attachments[0]?.fileName || "Capture",
         captures,
         threads,
         createId,
@@ -120,6 +179,7 @@ export function createMemoryCaptureStore(
         ...base,
         threadId: resolved.threadId,
         sequence: resolved.sequence,
+        attachments,
       };
       captures = [capture, ...captures];
       draft = "";
@@ -196,6 +256,19 @@ export function createMemoryCaptureStore(
       }
       captures = [...byId.values()];
     },
+    async updateAttachment(captureId, attachmentId, patch) {
+      captures = captures.map((capture) => {
+        if (capture.id !== captureId) return capture;
+        return {
+          ...capture,
+          attachments: capture.attachments.map((attachment) =>
+            attachment.id === attachmentId
+              ? { ...attachment, ...patch }
+              : attachment,
+          ),
+        };
+      });
+    },
   };
 }
 
@@ -258,6 +331,7 @@ function normalizeCapture(value: LocalCapture): LocalCapture {
     sequence: value.sequence ?? 1,
     status: value.status ?? "saved_locally",
     syncReason: value.syncReason ?? null,
+    attachments: value.attachments ?? [],
   };
 }
 
@@ -367,7 +441,10 @@ export function createIdbCaptureStore(): CaptureStore {
     },
 
     async commit(text, location: CaptureLocation | null, options: CommitOptions = {}) {
-      const base = buildCaptureBase(text, location);
+      const inputs = options.attachments ?? [];
+      const base = buildCaptureBase(text, location, inputs.length);
+      const mediaStore = createIdbMediaStore();
+      const attachments = await persistAttachments(mediaStore, base.id, inputs);
       const db = await openDatabase();
       try {
         const existingThreads = (await requestToPromise(
@@ -381,7 +458,7 @@ export function createIdbCaptureStore(): CaptureStore {
 
         const resolved = resolveCommitDestination({
           destination: options.destination ?? { type: "inbox" },
-          text: base.text,
+          text: base.text || attachments[0]?.fileName || "Capture",
           captures: existingCaptures,
           threads: existingThreads,
           createId,
@@ -392,6 +469,7 @@ export function createIdbCaptureStore(): CaptureStore {
           ...base,
           threadId: resolved.threadId,
           sequence: resolved.sequence,
+          attachments,
         };
 
         const transaction = db.transaction(
@@ -405,6 +483,13 @@ export function createIdbCaptureStore(): CaptureStore {
         }
         await transactionDone(transaction);
         return capture;
+      } catch (error) {
+        await Promise.allSettled(
+          attachments.map((attachment) =>
+            mediaStore.delete(attachment.localObjectKey),
+          ),
+        );
+        throw error;
       } finally {
         db.close();
       }
@@ -493,6 +578,29 @@ export function createIdbCaptureStore(): CaptureStore {
         for (const thread of threads) {
           threadStore.put(thread);
         }
+        await transactionDone(transaction);
+      } finally {
+        db.close();
+      }
+    },
+
+    async updateAttachment(captureId, attachmentId, patch) {
+      const db = await openDatabase();
+      try {
+        const existing = (await requestToPromise(
+          db.transaction("captures", "readonly").objectStore("captures").get(captureId),
+        )) as LocalCapture | undefined;
+        if (!existing) return;
+        const next = normalizeCapture({
+          ...existing,
+          attachments: (existing.attachments ?? []).map((attachment) =>
+            attachment.id === attachmentId
+              ? { ...attachment, ...patch }
+              : attachment,
+          ),
+        });
+        const transaction = db.transaction("captures", "readwrite");
+        transaction.objectStore("captures").put(next);
         await transactionDone(transaction);
       } finally {
         db.close();

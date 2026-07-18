@@ -12,13 +12,16 @@ import {
 } from "@/lib/local-capture/persistence";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
+  AttachmentInput,
   CaptureSyncStatus,
   LocalCapture,
-  LocalThread,
+  MediaKind,
   PersistenceResult,
   ThreadDestination,
+  LocalThread,
 } from "@/lib/local-capture/types";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
+import { synchronizePendingMedia } from "@/lib/sync/media-client";
 
 function destinationValue(destination: ThreadDestination): string {
   if (destination.type === "thread") return destination.threadId;
@@ -62,8 +65,13 @@ export function CaptureComposer() {
   const [ready, setReady] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<AttachmentInput[]>(
+    [],
+  );
   const draftSaveGeneration = useRef(0);
   const syncGeneration = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshLists() {
     const store = getCaptureStore();
@@ -84,6 +92,7 @@ export function CaptureComposer() {
     const generation = ++syncGeneration.current;
     setIsSyncing(true);
     try {
+      await synchronizePendingMedia(getCaptureStore());
       await synchronizePendingCaptures(getCaptureStore());
       if (generation === syncGeneration.current) {
         await refreshLists();
@@ -172,10 +181,31 @@ export function CaptureComposer() {
     setDestinationState(getDestinationSession().get());
   }
 
+  function kindFromMime(mimeType: string): MediaKind {
+    if (mimeType.startsWith("audio/")) return "audio";
+    if (mimeType.startsWith("video/")) return "video";
+    return "image";
+  }
+
+  async function onFilesSelected(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    const next: AttachmentInput[] = [];
+    for (const file of Array.from(fileList)) {
+      next.push({
+        kind: kindFromMime(file.type || "application/octet-stream"),
+        mimeType: file.type || "application/octet-stream",
+        fileName: file.name || "attachment",
+        bytes: file,
+      });
+    }
+    setPendingAttachments((current) => [...current, ...next]);
+  }
+
   function commit() {
     const text = draft.trim();
     const draftSnapshot = draft;
-    if (!text || isPending) return;
+    const attachmentsSnapshot = pendingAttachments;
+    if ((!text && attachmentsSnapshot.length === 0) || isPending) return;
 
     setError(null);
     draftSaveGeneration.current += 1;
@@ -187,6 +217,7 @@ export function CaptureComposer() {
         const location = readAvailableLocation();
         const capture = await store.commit(text, location, {
           destination: session.get(),
+          attachments: attachmentsSnapshot,
         });
         session.rememberCommit(capture);
         setDestinationState(session.get());
@@ -194,10 +225,12 @@ export function CaptureComposer() {
         setError("Could not save Capture");
         const preserved = await store.getDraft().catch(() => draftSnapshot);
         setDraft(preserved || draftSnapshot);
+        setPendingAttachments(attachmentsSnapshot);
         return;
       }
 
       setDraft("");
+      setPendingAttachments([]);
       try {
         await refreshLists();
       } catch {
@@ -248,11 +281,77 @@ export function CaptureComposer() {
             rows={4}
             disabled={!ready || isPending}
           />
+          <div className="capture-media-actions">
+            <button
+              type="button"
+              className="capture-retry"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={!ready || isPending}
+            >
+              Take photo
+            </button>
+            <button
+              type="button"
+              className="capture-retry"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!ready || isPending}
+            >
+              Add media
+            </button>
+            <input
+              ref={cameraInputRef}
+              className="capture-file-input"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              aria-label="Take photo"
+              onChange={(event) => {
+                void onFilesSelected(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <input
+              ref={fileInputRef}
+              className="capture-file-input"
+              type="file"
+              accept="image/*,audio/*,video/*"
+              multiple
+              aria-label="Choose existing media"
+              onChange={(event) => {
+                void onFilesSelected(event.target.files);
+                event.target.value = "";
+              }}
+            />
+          </div>
+          {pendingAttachments.length > 0 ? (
+            <ul className="capture-attachment-drafts" aria-label="Selected media">
+              {pendingAttachments.map((attachment, index) => (
+                <li key={`${attachment.fileName}-${index}`}>
+                  {attachment.fileName}
+                  <button
+                    type="button"
+                    className="capture-retry"
+                    onClick={() =>
+                      setPendingAttachments((current) =>
+                        current.filter((_, itemIndex) => itemIndex !== index),
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <button
           type="button"
           onClick={commit}
-          disabled={!ready || isPending || draft.trim().length === 0}
+          disabled={
+            !ready ||
+            isPending ||
+            (draft.trim().length === 0 && pendingAttachments.length === 0)
+          }
         >
           Capture
         </button>
@@ -329,8 +428,13 @@ function CaptureEntry({
   capture: LocalCapture;
   onRetry: () => void;
 }) {
+  const label =
+    capture.text ||
+    capture.attachments.map((attachment) => attachment.fileName).join(", ") ||
+    "Capture";
+
   return (
-    <article className="capture-entry" aria-label={capture.text}>
+    <article className="capture-entry" aria-label={label}>
       <div className="capture-entry-meta">
         <span className={`capture-status status-${capture.status}`}>
           {statusLabel(capture.status)}
@@ -340,7 +444,17 @@ function CaptureEntry({
           {new Date(capture.createdAt).toLocaleString()}
         </time>
       </div>
-      <p>{capture.text}</p>
+      {capture.text ? <p>{capture.text}</p> : null}
+      {capture.attachments.length > 0 ? (
+        <ul className="capture-attachments" aria-label="Attachments">
+          {capture.attachments.map((attachment) => (
+            <li key={attachment.id}>
+              {attachment.fileName} · {attachment.kind} ·{" "}
+              {statusLabel(attachment.syncStatus)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {capture.status === "needs_attention" ? (
         <div className="capture-attention">
           <span>{capture.syncReason ?? "Synchronization failed"}</span>

@@ -24,7 +24,7 @@ test("memory Capture store rejects empty commits without clearing the draft", as
   const store = createMemoryCaptureStore({ draft: "   " });
 
   await expect(store.commit("   ", null)).rejects.toThrow(
-    "Capture text is required",
+    "Capture text or media is required",
   );
   await expect(store.getDraft()).resolves.toBe("   ");
   await expect(store.list()).resolves.toEqual([]);
