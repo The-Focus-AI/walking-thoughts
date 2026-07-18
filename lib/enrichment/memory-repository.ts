@@ -1,6 +1,7 @@
 import { createMemoryThreadRepository } from "@/lib/sync/memory-repository";
 import type { ThreadRepository } from "@/lib/sync/types";
 import type {
+  EnrichmentHistoryEntry,
   EnrichmentJob,
   EnrichmentRepository,
   EnrichmentThreadSnapshot,
@@ -42,6 +43,52 @@ function jobKey(userId: string, idempotencyKey: string): string {
   return `${userId}:${idempotencyKey}`;
 }
 
+function buildSnapshot(
+  userId: string,
+  thread: Awaited<ReturnType<ThreadRepository["listThreads"]>>[number],
+  db: MemoryEnrichmentState,
+): EnrichmentThreadSnapshot {
+  const forThread = [...db.enrichments.entries()]
+    .filter(([key]) => key.startsWith(`${userId}:`))
+    .map(([, entry]) => entry)
+    .filter((entry) => entry.threadId === thread.id);
+
+  const captureEntries = thread.captures.map((capture) => ({
+    entry: {
+      id: capture.id,
+      kind: "capture" as const,
+      text: capture.text,
+      sequence: capture.sequence,
+      includedBy: db.includedBy.get(`${userId}:${capture.id}`) ?? null,
+      createdAt: capture.createdAt,
+      location: capture.location,
+      attachments: capture.attachments ?? [],
+    } satisfies EnrichmentHistoryEntry,
+    order: capture.sequence,
+  }));
+  const enrichmentEntries = forThread.map((entry, index) => ({
+    entry: {
+      id: entry.id,
+      kind: "enrichment" as const,
+      text: entry.text,
+      model: entry.model,
+      basisRevision: entry.basisRevision,
+      sources: entry.sources ?? [],
+    } satisfies EnrichmentHistoryEntry,
+    order: entry.basisRevision + 0.5 + index * 0.001,
+  }));
+
+  return {
+    id: thread.id,
+    title: thread.title,
+    revision: thread.revision,
+    enrichmentCount: forThread.length,
+    entries: [...captureEntries, ...enrichmentEntries]
+      .sort((a, b) => a.order - b.order)
+      .map((item) => item.entry),
+  };
+}
+
 export function createMemoryEnrichmentRepository(
   namespace = "default",
   threadRepository: ThreadRepository = createMemoryThreadRepository(namespace),
@@ -52,61 +99,15 @@ export function createMemoryEnrichmentRepository(
     async listPendingThreads(userId) {
       const threads = await threadRepository.listThreads(userId);
       const db = state();
-      return threads.map((thread) => {
-        const forThread = [...db.enrichments.entries()]
-          .filter(([key]) => key.startsWith(`${userId}:`))
-          .map(([, entry]) => entry)
-          .filter((entry) => entry.threadId === thread.id);
-        const captureEntries = thread.captures.map((capture) => ({
-          id: capture.id,
-          kind: "capture" as const,
-          text: capture.text,
-          sequence: capture.sequence,
-          includedBy: db.includedBy.get(`${userId}:${capture.id}`) ?? null,
-          order: capture.sequence,
-        }));
-        const enrichmentEntries = forThread.map((entry, index) => ({
-          id: entry.id,
-          kind: "enrichment" as const,
-          text: entry.text,
-          model: entry.model,
-          basisRevision: entry.basisRevision,
-          order: entry.basisRevision + 0.5 + index * 0.001,
-        }));
-        const entries = [...captureEntries, ...enrichmentEntries]
-          .sort((a, b) => a.order - b.order)
-          .map((entry) => {
-            const { order, sequence, ...rest } = entry as typeof entry & {
-              order: number;
-              sequence?: number;
-            };
-            void order;
-            if (rest.kind === "capture") {
-              return {
-                id: rest.id,
-                kind: "capture" as const,
-                text: rest.text,
-                sequence: sequence ?? 0,
-                includedBy: (rest as { includedBy: string | null }).includedBy,
-              };
-            }
-            return {
-              id: rest.id,
-              kind: "enrichment" as const,
-              text: rest.text,
-              model: (rest as { model: string }).model,
-              basisRevision: (rest as { basisRevision: number }).basisRevision,
-            };
-          });
+      return threads.map((thread) => buildSnapshot(userId, thread, db));
+    },
 
-        return {
-          id: thread.id,
-          title: thread.title,
-          revision: thread.revision,
-          enrichmentCount: forThread.length,
-          entries,
-        } satisfies EnrichmentThreadSnapshot;
-      });
+    async listThreadEnrichments(userId, threadId) {
+      return [...state().enrichments.entries()]
+        .filter(([key]) => key.startsWith(`${userId}:`))
+        .map(([, entry]) => entry)
+        .filter((entry) => entry.threadId === threadId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
     },
 
     async getOrCreateJob(userId, job) {
@@ -190,6 +191,7 @@ export function createMemoryEnrichmentRepository(
           targetCaptureIds: [...job.targetCaptureIds],
           createdAt: new Date().toISOString(),
           title: enrichment.title,
+          sources: enrichment.sources ?? [],
         };
         db.enrichments.set(`${userId}:${enrichmentId}`, stored);
         if (enrichment.title && threadRepository.updateThreadTitle) {

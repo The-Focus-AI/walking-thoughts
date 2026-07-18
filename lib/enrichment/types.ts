@@ -1,9 +1,26 @@
+import type { CaptureLocation, MediaKind } from "@/lib/local-capture/types";
+import type { WebSearchClient, WebSearchResult } from "./search";
+
 export type EnrichmentJobStatus = "queued" | "running" | "failed" | "complete";
+
+export type EnrichmentSource = {
+  title: string;
+  url: string;
+  retrievedAt: string;
+};
 
 export type FrozenHistoryEntry = {
   id: string;
   kind: "capture" | "enrichment";
   text: string;
+  createdAt?: string;
+  location?: CaptureLocation | null;
+  attachments?: Array<{
+    id: string;
+    kind: MediaKind;
+    mimeType: string;
+    fileName: string;
+  }>;
 };
 
 export type EnrichmentJob = {
@@ -31,6 +48,7 @@ export type ThreadEnrichment = {
   targetCaptureIds: string[];
   createdAt: string;
   title?: string | null;
+  sources: EnrichmentSource[];
 };
 
 export type EnrichmentCaptureResult = {
@@ -48,10 +66,19 @@ export type EnrichmentBatchResponse = {
   jobs: EnrichmentJob[];
 };
 
+export type GatewayMediaPart = {
+  attachmentId: string;
+  kind: MediaKind;
+  mimeType: string;
+  fileName: string;
+  bytes: Uint8Array;
+};
+
 export type GatewayGeneration = {
   text: string;
   model: string;
   title: string | null;
+  sources: EnrichmentSource[];
 };
 
 export type GatewayGenerateInput = {
@@ -60,6 +87,8 @@ export type GatewayGenerateInput = {
   prompt: string;
   /** When true, ask the model for a short Thread title. */
   requestTitle: boolean;
+  media: GatewayMediaPart[];
+  search?: WebSearchClient;
 };
 
 export type GatewayClient = {
@@ -73,6 +102,14 @@ export type EnrichmentHistoryEntry =
       text: string;
       sequence: number;
       includedBy: string | null;
+      createdAt: string;
+      location: CaptureLocation | null;
+      attachments: Array<{
+        id: string;
+        kind: MediaKind;
+        mimeType: string;
+        fileName: string;
+      }>;
     }
   | {
       id: string;
@@ -80,6 +117,7 @@ export type EnrichmentHistoryEntry =
       text: string;
       model: string;
       basisRevision: number;
+      sources: EnrichmentSource[];
     };
 
 export type EnrichmentThreadSnapshot = {
@@ -92,6 +130,10 @@ export type EnrichmentThreadSnapshot = {
 
 export type EnrichmentRepository = {
   listPendingThreads(userId: string): Promise<EnrichmentThreadSnapshot[]>;
+  listThreadEnrichments(
+    userId: string,
+    threadId: string,
+  ): Promise<ThreadEnrichment[]>;
   getOrCreateJob(
     userId: string,
     job: Omit<EnrichmentJob, "status" | "attempts" | "error"> & {
@@ -112,7 +154,10 @@ export type EnrichmentRepository = {
       text: string;
       model: string;
       title: string | null;
+      sources: EnrichmentSource[];
     },
   ): Promise<{ job: EnrichmentJob; enrichment: ThreadEnrichment; created: boolean }>;
   requeueFailed(userId: string, jobId?: string): Promise<number>;
 };
+
+export type { WebSearchResult };

@@ -74,6 +74,12 @@ function toPayload(capture: LocalCapture): SyncCapturePayload {
     threadId: capture.threadId,
     sequence: capture.sequence,
     idempotencyKey: capture.id,
+    attachments: capture.attachments.map((attachment) => ({
+      id: attachment.id,
+      kind: attachment.kind,
+      mimeType: attachment.mimeType,
+      fileName: attachment.fileName,
+    })),
   };
 }
 

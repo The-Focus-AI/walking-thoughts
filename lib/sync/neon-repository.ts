@@ -38,8 +38,13 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           location JSONB,
           sequence INTEGER NOT NULL,
           idempotency_key TEXT NOT NULL,
+          attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
           UNIQUE (user_id, idempotency_key)
         )
+      `;
+      await sql`
+        ALTER TABLE sync_captures
+        ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_trash (
@@ -256,7 +261,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           `;
           await sql`
             INSERT INTO sync_captures (
-              id, user_id, thread_id, text, created_at, location, sequence, idempotency_key
+              id, user_id, thread_id, text, created_at, location, sequence,
+              idempotency_key, attachments
             )
             VALUES (
               ${payload.id},
@@ -266,7 +272,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
               ${payload.createdAt},
               ${JSON.stringify(payload.location)},
               ${payload.sequence},
-              ${payload.idempotencyKey}
+              ${payload.idempotencyKey},
+              ${JSON.stringify(payload.attachments ?? [])}
             )
             ON CONFLICT (id) DO NOTHING
           `;
@@ -312,7 +319,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       const result = [];
       for (const thread of threads) {
         const captures = (await sql`
-          SELECT id, text, created_at, location, sequence
+          SELECT id, text, created_at, location, sequence, attachments
           FROM sync_captures
           WHERE user_id = ${userId} AND thread_id = ${thread.id}
             AND NOT EXISTS (
@@ -328,6 +335,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           created_at: string;
           location: SyncCapturePayload["location"];
           sequence: number;
+          attachments: SyncCapturePayload["attachments"];
         }>;
         if (captures.length === 0) continue;
         result.push({
@@ -341,6 +349,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
             createdAt: capture.created_at,
             location: capture.location,
             sequence: capture.sequence,
+            attachments: capture.attachments ?? [],
           })),
         });
       }
