@@ -7,6 +7,12 @@
       "skillPath": "skills/engineering/ask-matt/SKILL.md",
       "computedHash": "0f843160e34a24f5bd12cdc7de7d40951e77fbdc05ce8f891b37ca32eac2c44d"
     },
+    "browser-automation": {
+      "source": "The-Focus-AI/chrome-driver",
+      "sourceType": "github",
+      "skillPath": "skills/browser-automation/SKILL.md",
+      "computedHash": "2d11976a004bf5aae104118992504d303e5a14ac9bf03fc9f05700286486ba51"
+    },
     "code-review": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -30,6 +36,78 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/domain-modeling/SKILL.md",
       "computedHash": "363cb0f53b0b431e7c00086ad1f823500b7e1b70b5616ee969c979f0934e9e6e"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "781bd6d3f9b19f8c9af6b53d8d0e4876d0183841b565db34ca7092ffa412d111"
+    },
+    "firecrawl": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-cli/SKILL.md",
+      "computedHash": "cfdc1b0733b7317c70ae30158e3e48a71c53099d355f43b685a020bb706e9426"
+    },
+    "firecrawl-agent": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-agent/SKILL.md",
+      "computedHash": "cd56d2fae177ac801d440b4ddf1fcd06d4456841a850b7a31572c4ebf5e0e356"
+    },
+    "firecrawl-crawl": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-crawl/SKILL.md",
+      "computedHash": "bf3882a8c3d9f1c4caf4b487b81f925f8986f5c98d28326e74c71dd8cd5faf70"
+    },
+    "firecrawl-download": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-download/SKILL.md",
+      "computedHash": "82c403305fc798c1a29883f660a794cadce62416cf4391a02e1218ca7a6e831b"
+    },
+    "firecrawl-interact": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-interact/SKILL.md",
+      "computedHash": "48a002789b87838d6bf2748915e653f0b0e1eb31ab183212dd522a95725a2ee3"
+    },
+    "firecrawl-map": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-map/SKILL.md",
+      "computedHash": "80d4843983b4bd103e10e8e38e0b458b1478309eec3328227309a33792e2bc61"
+    },
+    "firecrawl-monitor": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-monitor/SKILL.md",
+      "computedHash": "23c03ad57564b31f737d777e6f9857d724e659fa50f35a773a19a854b4873c64"
+    },
+    "firecrawl-parse": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-parse/SKILL.md",
+      "computedHash": "c2902b8c18234d03556f5c1d70650a01bcbc58ed11a41f3608f99e381fe77314"
+    },
+    "firecrawl-scrape": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-scrape/SKILL.md",
+      "computedHash": "5bf99d661215f0e1bb06700ba42aedf62b0a777cb099525044e5b619a380d83e"
+    },
+    "firecrawl-search": {
+      "source": "firecrawl/cli",
+      "sourceType": "github",
+      "skillPath": "skills/firecrawl-search/SKILL.md",
+      "computedHash": "57c6d1777f0574de182e7569f36f6fb60eb1912a3db3942dd03092f6e2e5054b"
+    },
+    "focus-ai-brand": {
+      "source": "The-Focus-AI/focus-ai-brand",
+      "sourceType": "github",
+      "skillPath": "skills/focus-ai-brand/SKILL.md",
+      "computedHash": "9d7c7ef2c9dd47c6f717a43cb47865b45912bfbf03064b6afc8a6f23c7579407"
     },
     "grill-me": {
       "source": "mattpocock/skills",
@@ -67,6 +145,18 @@
       "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
       "computedHash": "66e8a50c83c3c724fcfe0769701b665c56cec220cc4f49cc1aee8bdfc07de94a"
     },
+    "nano-banana-imagegen": {
+      "source": "The-Focus-AI/nano-banana-cli",
+      "sourceType": "github",
+      "skillPath": "skills/nano-banana-imagegen/SKILL.md",
+      "computedHash": "19e800f65a5425b7cc56e2f523e4163bb7359bbbaedb172e1d8c2b2a296350ee"
+    },
+    "nano-banana-videogen": {
+      "source": "The-Focus-AI/nano-banana-cli",
+      "sourceType": "github",
+      "skillPath": "skills/nano-banana-videogen/SKILL.md",
+      "computedHash": "887e73a48b6d571924361b23dfa4b287d5682cddea9c3a49d7788e4e504e9147"
+    },
     "prototype": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -79,6 +169,12 @@
       "skillPath": "skills/engineering/research/SKILL.md",
       "computedHash": "bd3e2c6826671d82c86ed0da3dac3370ebcf63b0fe847f91bb444e1fb7dac21b"
     },
+    "research-methodology": {
+      "source": "The-Focus-AI/focus-agents",
+      "sourceType": "github",
+      "skillPath": "skills/research-methodology/SKILL.md",
+      "computedHash": "c15bd4ffa0e707b348060838d98531ab609676248d8ff8197003718e759a07c2"
+    },
     "resolving-merge-conflicts": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -90,6 +186,12 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/setup-matt-pocock-skills/SKILL.md",
       "computedHash": "74e894a3509e2676d4cdb771c8eace087092430635e845e02a9cc2f757c552a4"
+    },
+    "swiss-design": {
+      "source": "zeke/swiss-design-skill",
+      "sourceType": "github",
+      "skillPath": "swiss-design/SKILL.md",
+      "computedHash": "06219489ab5db1655af37ddb3efc84242961b9a9ad1fb5a4885c58e8eedf34f3"
     },
     "tdd": {
       "source": "mattpocock/skills",
@@ -126,6 +228,12 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/wayfinder/SKILL.md",
       "computedHash": "c9e18cefd77b6b5b0ee35f59ce2fd96359aa2d2f02e3479e12c873c5402d9d43"
+    },
+    "webreel": {
+      "source": "vercel-labs/webreel",
+      "sourceType": "github",
+      "skillPath": "skills/webreel/SKILL.md",
+      "computedHash": "9acf843b0d7baf0afed49309127b4ded8d6c45ce43c9603492e048ba76e5d2d9"
     },
     "writing-great-skills": {
       "source": "mattpocock/skills",

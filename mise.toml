@@ -1,3 +1,132 @@
 [tools]
 codex = "latest"
-node = "25"
+fnox = "latest"
+node = "24"
+pnpm = "latest"
+"npm:vercel" = "latest"
+"npm:skills" = "1.5.13"
+gh = "latest"
+jq = "latest"
+ripgrep = "latest"
+"npm:clerk" = "latest"
+
+[env]
+_.file = ".fnox/env"
+
+[tasks.setup]
+description = "First-time onboarding: pull the scoped 1Password service-account token"
+run = '''
+set -euo pipefail
+mkdir -p .fnox && chmod 700 .fnox
+if [ -s .fnox/env ]; then
+  echo "✓ .fnox/env already contains the project bootstrap token — skipping"
+  exit 0
+fi
+TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
+printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
+chmod 600 .fnox/env
+echo "✓ .fnox/env written. Open a new shell tab or use 'fnox exec -- <command>'."
+'''
+
+[tasks.install]
+description = "Install project dependencies and locked agent skills"
+run = '''
+set -euo pipefail
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium-headless-shell
+skills experimental_install
+'''
+
+[tasks.dev]
+description = "Run the Walking Thoughts development server"
+run = "fnox exec -- pnpm dev"
+
+[tasks.lint]
+description = "Lint and typecheck the application"
+run = '''
+set -euo pipefail
+pnpm lint
+pnpm typecheck
+'''
+
+[tasks.test]
+description = "Run public-surface browser tests"
+run = "pnpm test"
+
+[tasks.build]
+description = "Create the production Next.js build"
+run = "pnpm build"
+
+[tasks.deploy]
+description = "Verify the application and its PR-based Vercel Preview"
+depends = ["lint", "test", "build"]
+run = '''
+set -euo pipefail
+PR_URL=$(gh pr view --json url --jq '.url')
+VERCEL_STATE=$(gh pr view --json statusCheckRollup --jq '.statusCheckRollup[] | select(.context == "Vercel") | .state' | tail -n 1)
+if [ "$VERCEL_STATE" != "SUCCESS" ]; then
+  echo "Vercel Preview is not successful for $PR_URL (state: ${VERCEL_STATE:-missing})"
+  exit 1
+fi
+echo "Vercel Preview is successful for $PR_URL"
+echo "Production deploys only when this approved PR merges to main."
+'''
+
+[tasks."secrets:check"]
+description = "Verify declared fnox secrets"
+run = "fnox check"
+
+[tasks."secrets:list"]
+description = "List declared fnox secrets without values"
+run = "fnox list"
+
+[tasks."secrets:rotate-token"]
+description = "Re-pull the scoped 1Password service-account token"
+run = '''
+set -euo pipefail
+mkdir -p .fnox && chmod 700 .fnox
+TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
+printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
+chmod 600 .fnox/env
+echo "✓ .fnox/env refreshed."
+'''
+
+[tasks."vercel:sync"]
+description = "Push fnox-resolved configuration to a Vercel environment"
+usage = '''
+flag "-e --env <env>" help="production | preview | development" default="production"
+'''
+run = '''
+set -euo pipefail
+ENV="${usage_env:-production}"
+case "$ENV" in
+  production) PROFILE="prod" ;;
+  preview) PROFILE="preview" ;;
+  development) PROFILE="default" ;;
+  *) echo "Invalid Vercel environment: $ENV"; exit 2 ;;
+esac
+SECRETS_JSON=$(fnox export --profile "$PROFILE" -f json --if-missing ignore)
+KEYS=$(printf '%s' "$SECRETS_JSON" | jq -r '.secrets | keys[]')
+for KEY in $KEYS; do
+  VALUE=$(printf '%s' "$SECRETS_JSON" | jq -r --arg key "$KEY" '.secrets[$key]')
+  if [ -z "$VALUE" ] || [ "$VALUE" = "null" ]; then
+    echo "$KEY skipped (empty)"
+    continue
+  fi
+  vercel env rm "$KEY" "$ENV" --yes >/dev/null 2>&1 || true
+  vercel env add "$KEY" "$ENV" --value "$VALUE" --yes >/dev/null
+  echo "$KEY synced to $ENV"
+done
+'''
+
+[tasks."vercel:preview"]
+description = "Verify the current PR's Git-integrated Vercel Preview"
+run = "mise run deploy"
+
+[tasks."vercel:deploy"]
+description = "Explain the PR-only Production deployment policy"
+run = '''
+echo "Direct Vercel deployments are disabled."
+echo "Merge an approved PR to main; Vercel's Git integration deploys Production."
+exit 2
+'''

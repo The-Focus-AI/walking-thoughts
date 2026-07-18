@@ -1,0 +1,54 @@
+{
+  "$schema": "https://webreel.dev/schema/v1.json",
+  "outDir": "videos",
+  "baseUrl": "http://127.0.0.1:3103",
+  "defaultDelay": 500,
+  "theme": {
+    "cursor": {
+      "hotspot": "center",
+      "size": 28
+    },
+    "hud": {
+      "background": "rgba(23, 35, 27, 0.9)",
+      "color": "#f2f1e8",
+      "fontSize": 34,
+      "borderRadius": 14,
+      "position": "bottom"
+    }
+  },
+  "videos": {
+    "walking-thoughts-foundation": {
+      "url": "/",
+      "viewport": { "width": 412, "height": 916 },
+      "waitFor": ".status-ready",
+      "output": "walking-thoughts-foundation.mp4",
+      "fps": 30,
+      "quality": 82,
+      "steps": [
+        {
+          "action": "pause",
+          "ms": 900,
+          "description": "Let the offline-ready state settle."
+        },
+        {
+          "action": "moveTo",
+          "selector": ".capture-card",
+          "delay": 900
+        },
+        {
+          "action": "moveTo",
+          "text": "Ready offline",
+          "delay": 900
+        },
+        {
+          "action": "screenshot",
+          "output": "videos/walking-thoughts-foundation.png"
+        },
+        {
+          "action": "pause",
+          "ms": 900
+        }
+      ]
+    }
+  }
+}
