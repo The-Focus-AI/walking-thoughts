@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
   use: {
-    baseURL: "http://127.0.0.1:3103",
+    baseURL: "http://localhost:3103",
     serviceWorkers: "allow",
     trace: "retain-on-failure",
   },
@@ -36,7 +36,7 @@ export default defineConfig({
       NEXT_PUBLIC_APP_URL:
         process.env.NEXT_PUBLIC_APP_URL ?? "http://127.0.0.1:3103",
     },
-    url: "http://127.0.0.1:3103/offline",
+    url: "http://localhost:3103/offline",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
