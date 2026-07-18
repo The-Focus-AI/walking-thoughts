@@ -266,13 +266,27 @@ export function createIdbPackStore(): PackStore {
         throw new Error("staging_empty");
       }
       const assetIds = await this.listAssetIds("staging");
-      await this.clearSlot("active");
-      await this.writeManifest("active", stagingManifest);
+      // Copy into active first so a crash cannot wipe the verified pack.
       for (const assetId of assetIds) {
         const bytes = await this.getAsset("staging", assetId);
         if (bytes) {
           await this.putAsset("active", assetId, bytes);
         }
+      }
+      await this.writeManifest("active", stagingManifest);
+      const keep = new Set(stagingManifest.assets.map((asset) => asset.id));
+      const activeIds = await this.listAssetIds("active");
+      const db = await openDatabase();
+      try {
+        const transaction = db.transaction("assets", "readwrite");
+        for (const assetId of activeIds) {
+          if (!keep.has(assetId)) {
+            transaction.objectStore("assets").delete(assetKey("active", assetId));
+          }
+        }
+        await transactionDone(transaction);
+      } finally {
+        db.close();
       }
       await this.clearSlot("staging");
       await this.writeProgress(null);
