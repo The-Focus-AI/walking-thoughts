@@ -16,10 +16,13 @@ Collaborative plans, specs, reports, proposals, memos, and drafts default to
 Proof. Existing repository Markdown remains local unless the user explicitly
 asks to move or share it.
 
-Implement one unblocked `ready-for-agent` ticket at a time. Use TDD at the
-public seams named by the spec, run typechecking regularly, and run the two-axis
-code review before committing. Never commit secrets or weaken authentication to
-make local development or tests pass.
+Implement one unblocked frontier ticket at a time. Before any implementation,
+claim it with `mise run issue:claim -- <n>` so `in-progress` is set — that label
+is the multi-agent mutex (see `docs/agents/issue-workflow.md`). Never start a
+ticket that already has `in-progress`. Use TDD at the public seams named by the
+spec, run typechecking regularly, and run the two-axis code review before
+committing. Never commit secrets or weaken authentication to make local
+development or tests pass.
 
 ## Cursor Cloud specific instructions
 

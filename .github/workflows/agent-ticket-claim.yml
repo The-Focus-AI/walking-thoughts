@@ -1,0 +1,81 @@
+name: Agent ticket claim
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: read
+  contents: read
+
+jobs:
+  claim-check:
+    if: startsWith(github.head_ref, 'cursor/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure claim label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/issue.sh ensure-labels
+
+      - name: Claim referenced ticket or reject collision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TEXT="${PR_TITLE}"$'\n'"${PR_BODY}"
+          mapfile -t ISSUES < <(printf '%s' "$TEXT" | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++')
+          if [ "${#ISSUES[@]}" -eq 0 ]; then
+            echo "cursor/* PRs must reference a GitHub issue (e.g. title ends with (#28))."
+            exit 1
+          fi
+
+          PRIMARY="${ISSUES[0]}"
+          echo "Primary ticket: #$PRIMARY"
+
+          # Bootstrap labels on the issue side.
+          gh label list --limit 200 >/dev/null
+
+          LABELS="$(gh issue view "$PRIMARY" --json labels --jq '[.labels[].name] | join(",")')"
+          STATE="$(gh issue view "$PRIMARY" --json state --jq '.state')"
+          if [ "$STATE" != "OPEN" ]; then
+            echo "Referenced issue #$PRIMARY is $STATE; open a live ticket or drop the reference."
+            exit 1
+          fi
+
+          if [[ ",$LABELS," == *",in-progress,"* ]]; then
+            echo "Issue #$PRIMARY already claimed (in-progress)."
+          else
+            if [[ ",$LABELS," != *",ready-for-agent,"* ]]; then
+              echo "WARN: #$PRIMARY is not labeled ready-for-agent; claiming anyway because this PR referenced it."
+            fi
+            gh issue edit "$PRIMARY" --add-label "in-progress"
+            echo "Claimed #$PRIMARY via in-progress."
+          fi
+
+          # Collision: another open cursor/* PR already points at the same primary issue.
+          OTHER="$(gh pr list --state open --json number,title,headRefName,body \
+            | jq -r --argjson self "$PR_NUMBER" --arg issue "$PRIMARY" '
+              [
+                .[]
+                | select(.number != $self)
+                | select(.headRefName | startswith("cursor/"))
+                | select((.title + "\n" + (.body // "")) | test("#" + $issue + "\\b"))
+                | "#" + (.number|tostring) + " " + .title
+              ] | join("\n")
+            ')"
+          if [ -n "$OTHER" ]; then
+            echo "Another open agent PR already references #$PRIMARY:"
+            echo "$OTHER"
+            echo "Only one agent may work a claimed ticket. Release the claim or close the other PR."
+            exit 1
+          fi
+
+          echo "Claim OK for #$PRIMARY (PR #$PR_NUMBER)."
