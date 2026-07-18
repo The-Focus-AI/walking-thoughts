@@ -1,0 +1,28 @@
+name: Ensure issue labels
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ensure-issue-labels.yml"
+      - "scripts/issue.sh"
+      - "docs/agents/issue-workflow.md"
+  pull_request:
+    paths:
+      - ".github/workflows/ensure-issue-labels.yml"
+      - "scripts/issue.sh"
+      - "docs/agents/issue-workflow.md"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  ensure-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create missing triage and claim labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/issue.sh ensure-labels

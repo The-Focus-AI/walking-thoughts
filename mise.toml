@@ -134,3 +134,23 @@ echo "Direct Vercel deployments are disabled."
 echo "Merge an approved PR to main; Vercel's Git integration deploys Production."
 exit 2
 '''
+
+[tasks."issue:ensure-labels"]
+description = "Create triage and in-progress labels if missing"
+run = "bash scripts/issue.sh ensure-labels"
+
+[tasks."issue:frontier"]
+description = "List unblocked, unclaimed ready-for-agent tickets"
+run = "bash scripts/issue.sh frontier"
+
+[tasks."issue:claim"]
+description = "Claim a frontier ticket with the in-progress label"
+run = "bash scripts/issue.sh claim"
+
+[tasks."issue:release"]
+description = "Release an in-progress claim so another agent can take it"
+run = "bash scripts/issue.sh release"
+
+[tasks."issue:status"]
+description = "Show labels and assignees for an issue"
+run = "bash scripts/issue.sh status"
