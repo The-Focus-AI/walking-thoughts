@@ -1,6 +1,10 @@
 name: Close shipped tickets
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/close-shipped-tickets.yml"
   workflow_dispatch:
     inputs:
       issues:
@@ -18,7 +22,7 @@ jobs:
       - name: Close issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUES: ${{ inputs.issues }}
+          ISSUES: ${{ inputs.issues || '9,12,15,17,28' }}
         run: |
           set -euo pipefail
           IFS=',' read -ra NUMS <<< "$ISSUES"
