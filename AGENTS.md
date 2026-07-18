@@ -37,3 +37,17 @@ Clerk/fnox flows will not.
 Use `mise` for all project tools. Do not run direct Vercel deploy commands.
 After dependency changes, prefer `mise run install` / `mise install` rather than
 ad-hoc global package managers.
+
+Run/verify commands live in `mise.toml` (`mise run lint|test|build|dev`) and
+`README.md`. Two non-obvious runtime notes:
+
+- `mise run test` runs `pnpm test` without `fnox`, so only the public-surface
+  seam runs and the authenticated Clerk tests in `tests/auth.spec.ts` skip. To
+  run the full authenticated boundary suite, resolve the preview identities:
+  `fnox exec --profile preview -- pnpm test`. `mise run dev` already wraps
+  `fnox exec` (default vault) and serves at `http://localhost:3000`; anonymous
+  requests 307-redirect to `/sign-in` and `/api/health` returns `200` once the
+  Clerk secrets resolve.
+- The allowed identity is a real email, so manual browser sign-in cannot
+  complete the emailed code; the authenticated flow is exercised programmatically
+  by the preview-profile Playwright suite via Clerk testing tokens.
