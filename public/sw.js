@@ -1,4 +1,4 @@
-const CACHE_NAME = "walking-thoughts-shell-v2";
+const CACHE_NAME = "walking-thoughts-shell-v3";
 const SHELL = [
   "/offline",
   "/manifest.webmanifest",

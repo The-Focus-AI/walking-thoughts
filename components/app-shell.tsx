@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { CaptureComposer } from "@/components/capture-composer";
 import { OfflineReadiness } from "@/components/offline-readiness";
 
 type AppShellProps = {
@@ -31,16 +32,6 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           to add context when you reconnect.
         </p>
 
-        <div className="capture-card" aria-label="Capture preview">
-          <div>
-            <span className="capture-label">New Capture</span>
-            <p>What did you notice?</p>
-          </div>
-          <button type="button" disabled>
-            Capture
-          </button>
-        </div>
-
         {configurationRequired ? (
           <aside className="configuration-note" role="status">
             <strong>Secure setup required</strong>
@@ -49,7 +40,9 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
               Captures can begin.
             </span>
           </aside>
-        ) : null}
+        ) : (
+          <CaptureComposer />
+        )}
       </section>
 
       <footer>
