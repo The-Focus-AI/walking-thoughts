@@ -58,7 +58,8 @@ location, durable restart, and quota-failure draft preservation. It also covers
 Inbox defaults, sticky Thread destinations, inactivity reset, append-only
 corrections, and deterministic Thread ordering. Synchronization covers
 idempotent outbox replay, Inbox-to-Thread promotion, and Complete /
-Needs attention status. When the
+Needs attention status. Mixed-media Captures cover local durable
+attachments, private media sync, and authenticated media access. When the
 preview Clerk keys plus `CLERK_E2E_ALLOWED_EMAIL` and
 `CLERK_E2E_DISALLOWED_EMAIL` are present, it also verifies anonymous redirect,
 the allowed identity, rejection of a different identity, and offline fallback

@@ -60,6 +60,12 @@ value = "DATABASE_URL"
 if_missing = "ignore"
 description = "Neon Postgres connection string for synchronized Threads"
 
+[secrets.BLOB_READ_WRITE_TOKEN]
+provider = "op"
+value = "BLOB_READ_WRITE_TOKEN"
+if_missing = "ignore"
+description = "Vercel Blob read/write token for private media"
+
 [secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
 default = "/sign-in"
 description = "Clerk sign-in route"

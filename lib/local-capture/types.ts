@@ -22,6 +22,27 @@ export type CaptureSyncStatus =
   | "complete"
   | "needs_attention";
 
+export type MediaKind = "image" | "audio" | "video";
+
+export type LocalAttachment = {
+  id: string;
+  kind: MediaKind;
+  mimeType: string;
+  fileName: string;
+  byteLength: number;
+  localObjectKey: string;
+  remoteObjectKey?: string | null;
+  syncStatus: CaptureSyncStatus;
+};
+
+export type AttachmentInput = {
+  id?: string;
+  kind: MediaKind;
+  mimeType: string;
+  fileName: string;
+  bytes: ArrayBuffer | Uint8Array | Blob;
+};
+
 export type LocalCapture = {
   id: string;
   text: string;
@@ -30,6 +51,7 @@ export type LocalCapture = {
   status: CaptureSyncStatus;
   threadId: string | null;
   sequence: number;
+  attachments: LocalAttachment[];
   syncReason?: string | null;
   syncRetryable?: boolean;
 };
@@ -38,6 +60,7 @@ export type PersistenceResult = "persisted" | "not_persisted" | "unsupported";
 
 export type CommitOptions = {
   destination?: ThreadDestination;
+  attachments?: AttachmentInput[];
 };
 
 export type SyncBatchApplication = {
@@ -72,4 +95,9 @@ export type CaptureStore = {
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
   applySyncBatch(batch: SyncBatchApplication): Promise<void>;
+  updateAttachment(
+    captureId: string,
+    attachmentId: string,
+    patch: Partial<LocalAttachment>,
+  ): Promise<void>;
 };
