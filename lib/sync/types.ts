@@ -50,10 +50,70 @@ export type ServerThread = {
   }>;
 };
 
+export type TrashKind = "capture" | "thread";
+
+export type TrashRecord = {
+  kind: TrashKind;
+  targetId: string;
+  trashedAt: string;
+  expiresAt: string;
+  attachmentIds: string[];
+};
+
+export type TrashMutation = {
+  action: "trash" | "restore";
+  kind: TrashKind;
+  targetId: string;
+  /** Required for trash; ignored for restore. */
+  trashedAt?: string;
+  attachmentIds?: string[];
+  idempotencyKey: string;
+};
+
+export type TrashMutationResult = {
+  idempotencyKey: string;
+  status: "complete";
+  /** Present while trashed; null after restore. */
+  record: TrashRecord | null;
+};
+
+export type TrashMutationFailure = {
+  idempotencyKey: string;
+  status: "needs_attention";
+  reason: string;
+  retryable: boolean;
+};
+
+export type TrashBatchResponse = {
+  results: TrashMutationResult[];
+  failures: TrashMutationFailure[];
+};
+
+export type PurgeTarget = {
+  kind: TrashKind;
+  targetId: string;
+  attachmentIds: string[];
+};
+
+export type PurgeExpiredResult = {
+  purged: PurgeTarget[];
+  duplicate: boolean;
+};
+
 export type ThreadRepository = {
   upsertCaptures(
     userId: string,
     captures: SyncCapturePayload[],
   ): Promise<SyncBatchResponse>;
   listThreads(userId: string): Promise<ServerThread[]>;
+  applyTrashMutations(
+    userId: string,
+    mutations: TrashMutation[],
+  ): Promise<TrashBatchResponse>;
+  listTrash(userId: string): Promise<TrashRecord[]>;
+  purgeExpired(
+    userId: string,
+    now: string,
+    operationId: string,
+  ): Promise<PurgeExpiredResult>;
 };

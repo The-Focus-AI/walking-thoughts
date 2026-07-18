@@ -1,3 +1,4 @@
+import { expiresAtFrom } from "@/lib/sync/trash";
 import {
   createIdbMediaStore,
   createMemoryMediaStore,
@@ -12,12 +13,46 @@ import type {
   LocalAttachment,
   LocalCapture,
   LocalThread,
+  LocalTrashKind,
+  LocalTrashRecord,
   SyncBatchApplication,
+  TrashSyncApplication,
 } from "./types";
 
 const DB_NAME = "walking-thoughts";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const DRAFT_KEY = "composer";
+
+function trashMapKey(kind: LocalTrashKind, targetId: string): string {
+  return `${kind}:${targetId}`;
+}
+
+function activeTrash(records: LocalTrashRecord[]): LocalTrashRecord[] {
+  return records.filter((record) => record.pendingAction !== "restore");
+}
+
+function isHiddenByTrash(
+  trash: LocalTrashRecord[],
+  kind: LocalTrashKind,
+  targetId: string,
+): boolean {
+  return activeTrash(trash).some(
+    (record) => record.kind === kind && record.targetId === targetId,
+  );
+}
+
+function attachmentIdsForCapture(capture: LocalCapture | undefined): string[] {
+  return capture?.attachments.map((attachment) => attachment.id) ?? [];
+}
+
+function attachmentIdsForThread(
+  captures: LocalCapture[],
+  threadId: string,
+): string[] {
+  return captures
+    .filter((capture) => capture.threadId === threadId)
+    .flatMap((capture) => attachmentIdsForCapture(capture));
+}
 
 type CaptureStoreGlobals = typeof globalThis & {
   __WT_CAPTURE_STORE__?: CaptureStore;
@@ -118,13 +153,35 @@ export function createMemoryCaptureStore(
     draft?: string;
     captures?: LocalCapture[];
     threads?: LocalThread[];
+    trash?: LocalTrashRecord[];
     mediaStore?: MediaStore;
   } = {},
 ): CaptureStore {
   let draft = seed.draft ?? "";
   let captures = [...(seed.captures ?? [])];
   let threads = [...(seed.threads ?? [])];
+  let trash = [...(seed.trash ?? [])];
   const mediaStore = seed.mediaStore ?? createMemoryMediaStore();
+
+  function visibleCaptures(): LocalCapture[] {
+    return captures.filter(
+      (capture) =>
+        !isHiddenByTrash(trash, "capture", capture.id) &&
+        !(
+          capture.threadId &&
+          isHiddenByTrash(trash, "thread", capture.threadId)
+        ),
+    );
+  }
+
+  function visibleThreads(): LocalThread[] {
+    const visible = visibleCaptures();
+    return threads.filter(
+      (thread) =>
+        !isHiddenByTrash(trash, "thread", thread.id) &&
+        visible.some((capture) => capture.threadId === thread.id),
+    );
+  }
 
   return {
     async getDraft() {
@@ -134,17 +191,22 @@ export function createMemoryCaptureStore(
       draft = text;
     },
     async list() {
-      return newestFirst(captures);
+      return newestFirst(visibleCaptures());
     },
     async listInbox() {
-      return newestFirst(captures.filter((capture) => capture.threadId === null));
+      return newestFirst(
+        visibleCaptures().filter((capture) => capture.threadId === null),
+      );
     },
     async listRecentThreads() {
-      return [...threads].sort((a, b) =>
+      return [...visibleThreads()].sort((a, b) =>
         a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
       );
     },
     async listThread(threadId) {
+      if (isHiddenByTrash(trash, "thread", threadId)) {
+        throw new Error("Thread not found");
+      }
       const thread = threads.find((item) => item.id === threadId);
       if (!thread) {
         throw new Error("Thread not found");
@@ -152,7 +214,7 @@ export function createMemoryCaptureStore(
       return {
         thread,
         captures: oldestBySequence(
-          captures.filter((capture) => capture.threadId === threadId),
+          visibleCaptures().filter((capture) => capture.threadId === threadId),
         ),
       };
     },
@@ -269,6 +331,161 @@ export function createMemoryCaptureStore(
         };
       });
     },
+    async trashCapture(captureId, trashedAt = createTimestamp()) {
+      const capture = captures.find((item) => item.id === captureId);
+      if (!capture) throw new Error("Capture not found");
+      const record: LocalTrashRecord = {
+        kind: "capture",
+        targetId: captureId,
+        trashedAt,
+        expiresAt: expiresAtFrom(trashedAt),
+        attachmentIds: attachmentIdsForCapture(capture),
+        syncStatus: "saved_locally",
+        pendingAction: "trash",
+        idempotencyKey: `trash:capture:${captureId}:${trashedAt}`,
+      };
+      trash = [
+        record,
+        ...trash.filter(
+          (item) => !(item.kind === "capture" && item.targetId === captureId),
+        ),
+      ];
+      return record;
+    },
+    async trashThread(threadId, trashedAt = createTimestamp()) {
+      if (!threads.some((thread) => thread.id === threadId)) {
+        throw new Error("Thread not found");
+      }
+      const record: LocalTrashRecord = {
+        kind: "thread",
+        targetId: threadId,
+        trashedAt,
+        expiresAt: expiresAtFrom(trashedAt),
+        attachmentIds: attachmentIdsForThread(captures, threadId),
+        syncStatus: "saved_locally",
+        pendingAction: "trash",
+        idempotencyKey: `trash:thread:${threadId}:${trashedAt}`,
+      };
+      trash = [
+        record,
+        ...trash.filter(
+          (item) => !(item.kind === "thread" && item.targetId === threadId),
+        ),
+      ];
+      return record;
+    },
+    async restoreFromTrash(kind, targetId) {
+      const existing = trash.find(
+        (item) => item.kind === kind && item.targetId === targetId,
+      );
+      if (!existing) return null;
+      if (existing.syncStatus === "saved_locally" && existing.pendingAction === "trash") {
+        trash = trash.filter(
+          (item) => !(item.kind === kind && item.targetId === targetId),
+        );
+        return null;
+      }
+      const record: LocalTrashRecord = {
+        ...existing,
+        syncStatus: "saved_locally",
+        pendingAction: "restore",
+        idempotencyKey: `restore:${kind}:${targetId}:${createTimestamp()}`,
+      };
+      trash = trash.map((item) =>
+        item.kind === kind && item.targetId === targetId ? record : item,
+      );
+      return record;
+    },
+    async listTrash() {
+      return activeTrash(trash).sort((a, b) =>
+        a.trashedAt < b.trashedAt ? 1 : a.trashedAt > b.trashedAt ? -1 : 0,
+      );
+    },
+    async listPendingTrashMutations() {
+      return trash.filter(
+        (item) =>
+          item.pendingAction !== null &&
+          (item.syncStatus === "saved_locally" ||
+            item.syncStatus === "needs_attention"),
+      );
+    },
+    async markTrashSyncing(idempotencyKeys) {
+      const keys = new Set(idempotencyKeys);
+      trash = trash.map((item) =>
+        keys.has(item.idempotencyKey)
+          ? { ...item, syncStatus: "syncing" }
+          : item,
+      );
+    },
+    async restoreTrashSavedLocally(idempotencyKeys) {
+      const keys = new Set(idempotencyKeys);
+      trash = trash.map((item) =>
+        keys.has(item.idempotencyKey)
+          ? { ...item, syncStatus: "saved_locally" }
+          : item,
+      );
+    },
+    async applyTrashSyncBatch(batch: TrashSyncApplication) {
+      for (const result of batch.results) {
+        if (result.record === null) {
+          trash = trash.filter(
+            (item) => item.idempotencyKey !== result.idempotencyKey,
+          );
+          continue;
+        }
+        const next: LocalTrashRecord = {
+          kind: result.record.kind,
+          targetId: result.record.targetId,
+          trashedAt: result.record.trashedAt,
+          expiresAt: result.record.expiresAt,
+          attachmentIds: result.record.attachmentIds,
+          syncStatus: "complete",
+          pendingAction: null,
+          idempotencyKey: result.idempotencyKey,
+        };
+        trash = [
+          next,
+          ...trash.filter(
+            (item) =>
+              item.idempotencyKey !== result.idempotencyKey &&
+              !(
+                item.kind === next.kind && item.targetId === next.targetId
+              ),
+          ),
+        ];
+      }
+      for (const failure of batch.failures) {
+        trash = trash.map((item) =>
+          item.idempotencyKey === failure.idempotencyKey
+            ? { ...item, syncStatus: "needs_attention" }
+            : item,
+        );
+      }
+    },
+    async applyRemoteTrash(records) {
+      const remoteKeys = new Set(
+        records.map((record) => trashMapKey(record.kind, record.targetId)),
+      );
+      const pendingLocal = trash.filter(
+        (item) =>
+          item.pendingAction !== null &&
+          (item.syncStatus === "saved_locally" ||
+            item.syncStatus === "needs_attention" ||
+            item.syncStatus === "syncing"),
+      );
+      const remoteRecords: LocalTrashRecord[] = records.map((record) => ({
+        ...record,
+        syncStatus: "complete",
+        pendingAction: null,
+        idempotencyKey: `remote:${record.kind}:${record.targetId}:${record.trashedAt}`,
+      }));
+      trash = [
+        ...pendingLocal.filter(
+          (item) => !remoteKeys.has(trashMapKey(item.kind, item.targetId)),
+        ),
+        ...remoteRecords,
+      ];
+    },
   };
 }
 
@@ -285,6 +502,9 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("threads")) {
         db.createObjectStore("threads", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("trash")) {
+        db.createObjectStore("trash", { keyPath: "id" });
       }
 
       const transaction = request.transaction;
@@ -304,6 +524,32 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onerror = () =>
       reject(request.error ?? new Error("IndexedDB open failed"));
   });
+}
+
+type StoredLocalTrash = LocalTrashRecord & { id: string };
+
+function toStoredTrash(record: LocalTrashRecord): StoredLocalTrash {
+  return { ...record, id: trashMapKey(record.kind, record.targetId) };
+}
+
+async function readAllTrash(db: IDBDatabase): Promise<LocalTrashRecord[]> {
+  const rows = (await requestToPromise(
+    db.transaction("trash", "readonly").objectStore("trash").getAll(),
+  )) as StoredLocalTrash[];
+  return rows.map(({ id: _id, ...record }) => record);
+}
+
+async function writeAllTrash(
+  db: IDBDatabase,
+  records: LocalTrashRecord[],
+): Promise<void> {
+  const transaction = db.transaction("trash", "readwrite");
+  const store = transaction.objectStore("trash");
+  store.clear();
+  for (const record of records) {
+    store.put(toStoredTrash(record));
+  }
+  await transactionDone(transaction);
 }
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -387,10 +633,21 @@ export function createIdbCaptureStore(): CaptureStore {
     async list() {
       const db = await openDatabase();
       try {
-        const captures = await requestToPromise(
-          db.transaction("captures", "readonly").objectStore("captures").getAll(),
+        const captures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const trash = await readAllTrash(db);
+        const visible = captures.filter(
+          (capture) =>
+            !isHiddenByTrash(trash, "capture", capture.id) &&
+            !(
+              capture.threadId &&
+              isHiddenByTrash(trash, "thread", capture.threadId)
+            ),
         );
-        return newestFirst((captures as LocalCapture[]).map(normalizeCapture));
+        return newestFirst(visible);
       } finally {
         db.close();
       }
@@ -404,12 +661,37 @@ export function createIdbCaptureStore(): CaptureStore {
     async listRecentThreads() {
       const db = await openDatabase();
       try {
-        const threads = await requestToPromise(
+        const threads = (await requestToPromise(
           db.transaction("threads", "readonly").objectStore("threads").getAll(),
+        )) as LocalThread[];
+        const trash = await readAllTrash(db);
+        const captures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const visibleCaptureThreadIds = new Set(
+          captures
+            .filter(
+              (capture) =>
+                !isHiddenByTrash(trash, "capture", capture.id) &&
+                !(
+                  capture.threadId &&
+                  isHiddenByTrash(trash, "thread", capture.threadId)
+                ),
+            )
+            .map((capture) => capture.threadId)
+            .filter((threadId): threadId is string => threadId !== null),
         );
-        return [...(threads as LocalThread[])].sort((a, b) =>
-          a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
-        );
+        return threads
+          .filter(
+            (thread) =>
+              !isHiddenByTrash(trash, "thread", thread.id) &&
+              visibleCaptureThreadIds.has(thread.id),
+          )
+          .sort((a, b) =>
+            a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
+          );
       } finally {
         db.close();
       }
@@ -418,6 +700,10 @@ export function createIdbCaptureStore(): CaptureStore {
     async listThread(threadId) {
       const db = await openDatabase();
       try {
+        const trash = await readAllTrash(db);
+        if (isHiddenByTrash(trash, "thread", threadId)) {
+          throw new Error("Thread not found");
+        }
         const thread = (await requestToPromise(
           db.transaction("threads", "readonly").objectStore("threads").get(threadId),
         )) as LocalThread | undefined;
@@ -432,7 +718,11 @@ export function createIdbCaptureStore(): CaptureStore {
           captures: oldestBySequence(
             (captures as LocalCapture[])
               .map(normalizeCapture)
-              .filter((capture) => capture.threadId === threadId),
+              .filter(
+                (capture) =>
+                  capture.threadId === threadId &&
+                  !isHiddenByTrash(trash, "capture", capture.id),
+              ),
           ),
         };
       } finally {
@@ -602,6 +892,244 @@ export function createIdbCaptureStore(): CaptureStore {
         const transaction = db.transaction("captures", "readwrite");
         transaction.objectStore("captures").put(next);
         await transactionDone(transaction);
+      } finally {
+        db.close();
+      }
+    },
+
+    async trashCapture(captureId, trashedAt = createTimestamp()) {
+      const db = await openDatabase();
+      try {
+        const capture = (await requestToPromise(
+          db.transaction("captures", "readonly").objectStore("captures").get(captureId),
+        )) as LocalCapture | undefined;
+        if (!capture) throw new Error("Capture not found");
+        const trash = await readAllTrash(db);
+        const record: LocalTrashRecord = {
+          kind: "capture",
+          targetId: captureId,
+          trashedAt,
+          expiresAt: expiresAtFrom(trashedAt),
+          attachmentIds: attachmentIdsForCapture(normalizeCapture(capture)),
+          syncStatus: "saved_locally",
+          pendingAction: "trash",
+          idempotencyKey: `trash:capture:${captureId}:${trashedAt}`,
+        };
+        await writeAllTrash(db, [
+          record,
+          ...trash.filter(
+            (item) => !(item.kind === "capture" && item.targetId === captureId),
+          ),
+        ]);
+        return record;
+      } finally {
+        db.close();
+      }
+    },
+
+    async trashThread(threadId, trashedAt = createTimestamp()) {
+      const db = await openDatabase();
+      try {
+        const thread = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").get(threadId),
+        )) as LocalThread | undefined;
+        if (!thread) throw new Error("Thread not found");
+        const captures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const trash = await readAllTrash(db);
+        const record: LocalTrashRecord = {
+          kind: "thread",
+          targetId: threadId,
+          trashedAt,
+          expiresAt: expiresAtFrom(trashedAt),
+          attachmentIds: attachmentIdsForThread(captures, threadId),
+          syncStatus: "saved_locally",
+          pendingAction: "trash",
+          idempotencyKey: `trash:thread:${threadId}:${trashedAt}`,
+        };
+        await writeAllTrash(db, [
+          record,
+          ...trash.filter(
+            (item) => !(item.kind === "thread" && item.targetId === threadId),
+          ),
+        ]);
+        return record;
+      } finally {
+        db.close();
+      }
+    },
+
+    async restoreFromTrash(kind, targetId) {
+      const db = await openDatabase();
+      try {
+        const trash = await readAllTrash(db);
+        const existing = trash.find(
+          (item) => item.kind === kind && item.targetId === targetId,
+        );
+        if (!existing) return null;
+        if (
+          existing.syncStatus === "saved_locally" &&
+          existing.pendingAction === "trash"
+        ) {
+          await writeAllTrash(
+            db,
+            trash.filter(
+              (item) => !(item.kind === kind && item.targetId === targetId),
+            ),
+          );
+          return null;
+        }
+        const record: LocalTrashRecord = {
+          ...existing,
+          syncStatus: "saved_locally",
+          pendingAction: "restore",
+          idempotencyKey: `restore:${kind}:${targetId}:${createTimestamp()}`,
+        };
+        await writeAllTrash(
+          db,
+          trash.map((item) =>
+            item.kind === kind && item.targetId === targetId ? record : item,
+          ),
+        );
+        return record;
+      } finally {
+        db.close();
+      }
+    },
+
+    async listTrash() {
+      const db = await openDatabase();
+      try {
+        return activeTrash(await readAllTrash(db)).sort((a, b) =>
+          a.trashedAt < b.trashedAt ? 1 : a.trashedAt > b.trashedAt ? -1 : 0,
+        );
+      } finally {
+        db.close();
+      }
+    },
+
+    async listPendingTrashMutations() {
+      const db = await openDatabase();
+      try {
+        return (await readAllTrash(db)).filter(
+          (item) =>
+            item.pendingAction !== null &&
+            (item.syncStatus === "saved_locally" ||
+              item.syncStatus === "needs_attention"),
+        );
+      } finally {
+        db.close();
+      }
+    },
+
+    async markTrashSyncing(idempotencyKeys) {
+      const db = await openDatabase();
+      try {
+        const keys = new Set(idempotencyKeys);
+        const trash = await readAllTrash(db);
+        await writeAllTrash(
+          db,
+          trash.map((item) =>
+            keys.has(item.idempotencyKey)
+              ? { ...item, syncStatus: "syncing" }
+              : item,
+          ),
+        );
+      } finally {
+        db.close();
+      }
+    },
+
+    async restoreTrashSavedLocally(idempotencyKeys) {
+      const db = await openDatabase();
+      try {
+        const keys = new Set(idempotencyKeys);
+        const trash = await readAllTrash(db);
+        await writeAllTrash(
+          db,
+          trash.map((item) =>
+            keys.has(item.idempotencyKey)
+              ? { ...item, syncStatus: "saved_locally" }
+              : item,
+          ),
+        );
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyTrashSyncBatch(batch: TrashSyncApplication) {
+      const db = await openDatabase();
+      try {
+        let trash = await readAllTrash(db);
+        for (const result of batch.results) {
+          if (result.record === null) {
+            trash = trash.filter(
+              (item) => item.idempotencyKey !== result.idempotencyKey,
+            );
+            continue;
+          }
+          const next: LocalTrashRecord = {
+            kind: result.record.kind,
+            targetId: result.record.targetId,
+            trashedAt: result.record.trashedAt,
+            expiresAt: result.record.expiresAt,
+            attachmentIds: result.record.attachmentIds,
+            syncStatus: "complete",
+            pendingAction: null,
+            idempotencyKey: result.idempotencyKey,
+          };
+          trash = [
+            next,
+            ...trash.filter(
+              (item) =>
+                item.idempotencyKey !== result.idempotencyKey &&
+                !(item.kind === next.kind && item.targetId === next.targetId),
+            ),
+          ];
+        }
+        for (const failure of batch.failures) {
+          trash = trash.map((item) =>
+            item.idempotencyKey === failure.idempotencyKey
+              ? { ...item, syncStatus: "needs_attention" }
+              : item,
+          );
+        }
+        await writeAllTrash(db, trash);
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyRemoteTrash(records) {
+      const db = await openDatabase();
+      try {
+        const trash = await readAllTrash(db);
+        const remoteKeys = new Set(
+          records.map((record) => trashMapKey(record.kind, record.targetId)),
+        );
+        const pendingLocal = trash.filter(
+          (item) =>
+            item.pendingAction !== null &&
+            (item.syncStatus === "saved_locally" ||
+              item.syncStatus === "needs_attention" ||
+              item.syncStatus === "syncing"),
+        );
+        const remoteRecords: LocalTrashRecord[] = records.map((record) => ({
+          ...record,
+          syncStatus: "complete",
+          pendingAction: null,
+          idempotencyKey: `remote:${record.kind}:${record.targetId}:${record.trashedAt}`,
+        }));
+        await writeAllTrash(db, [
+          ...pendingLocal.filter(
+            (item) => !remoteKeys.has(trashMapKey(item.kind, item.targetId)),
+          ),
+          ...remoteRecords,
+        ]);
       } finally {
         db.close();
       }

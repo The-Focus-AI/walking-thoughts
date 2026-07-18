@@ -78,6 +78,40 @@ export type SyncBatchApplication = {
   }>;
 };
 
+export type LocalTrashKind = "capture" | "thread";
+
+export type LocalTrashRecord = {
+  kind: LocalTrashKind;
+  targetId: string;
+  trashedAt: string;
+  expiresAt: string;
+  attachmentIds: string[];
+  syncStatus: CaptureSyncStatus;
+  /** Local outbox action waiting to sync; null when settled with server. */
+  pendingAction: "trash" | "restore" | null;
+  idempotencyKey: string;
+};
+
+export type TrashSyncApplication = {
+  results: Array<{
+    idempotencyKey: string;
+    status: "complete";
+    record: {
+      kind: LocalTrashKind;
+      targetId: string;
+      trashedAt: string;
+      expiresAt: string;
+      attachmentIds: string[];
+    } | null;
+  }>;
+  failures: Array<{
+    idempotencyKey: string;
+    status: "needs_attention";
+    reason: string;
+    retryable: boolean;
+  }>;
+};
+
 export type CaptureStore = {
   getDraft(): Promise<string>;
   setDraft(text: string): Promise<void>;
@@ -100,4 +134,22 @@ export type CaptureStore = {
     attachmentId: string,
     patch: Partial<LocalAttachment>,
   ): Promise<void>;
+  trashCapture(captureId: string, trashedAt?: string): Promise<LocalTrashRecord>;
+  trashThread(threadId: string, trashedAt?: string): Promise<LocalTrashRecord>;
+  restoreFromTrash(
+    kind: LocalTrashKind,
+    targetId: string,
+  ): Promise<LocalTrashRecord | null>;
+  listTrash(): Promise<LocalTrashRecord[]>;
+  listPendingTrashMutations(): Promise<LocalTrashRecord[]>;
+  markTrashSyncing(idempotencyKeys: string[]): Promise<void>;
+  restoreTrashSavedLocally(idempotencyKeys: string[]): Promise<void>;
+  applyTrashSyncBatch(batch: TrashSyncApplication): Promise<void>;
+  applyRemoteTrash(records: Array<{
+    kind: LocalTrashKind;
+    targetId: string;
+    trashedAt: string;
+    expiresAt: string;
+    attachmentIds: string[];
+  }>): Promise<void>;
 };

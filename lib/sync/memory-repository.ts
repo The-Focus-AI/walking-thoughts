@@ -1,10 +1,17 @@
 import { titleFromText } from "@/lib/local-capture/thread-destination";
+import { expiresAtFrom, isExpired } from "./trash";
 import type {
+  PurgeExpiredResult,
+  PurgeTarget,
   ServerThread,
   SyncBatchResponse,
   SyncCapturePayload,
   SyncCaptureResult,
   ThreadRepository,
+  TrashBatchResponse,
+  TrashMutation,
+  TrashMutationResult,
+  TrashRecord,
 } from "./types";
 
 type StoredCapture = SyncCapturePayload & { userId: string };
@@ -21,6 +28,9 @@ type MemoryState = {
   threads: Map<string, StoredThread>;
   /** idempotencyKey -> capture id */
   idempotency: Map<string, string>;
+  trash: Map<string, TrashRecord & { userId: string }>;
+  trashOps: Map<string, TrashMutationResult>;
+  purgeOps: Map<string, PurgeExpiredResult>;
 };
 
 function createState(): MemoryState {
@@ -28,6 +38,9 @@ function createState(): MemoryState {
     captures: new Map(),
     threads: new Map(),
     idempotency: new Map(),
+    trash: new Map(),
+    trashOps: new Map(),
+    purgeOps: new Map(),
   };
 }
 
@@ -43,6 +56,142 @@ function stateFor(namespace: string): MemoryState {
 
 export function resetMemoryThreadRepository(namespace = "default"): void {
   states.set(namespace, createState());
+}
+
+function trashKey(userId: string, kind: string, targetId: string): string {
+  return `${userId}:${kind}:${targetId}`;
+}
+
+function isTrashed(
+  db: MemoryState,
+  userId: string,
+  kind: "capture" | "thread",
+  targetId: string,
+): boolean {
+  return db.trash.has(trashKey(userId, kind, targetId));
+}
+
+function collectAttachmentIds(
+  db: MemoryState,
+  userId: string,
+  kind: "capture" | "thread",
+  targetId: string,
+  provided: string[] | undefined,
+): string[] {
+  if (provided && provided.length > 0) {
+    return [...new Set(provided)];
+  }
+  if (kind === "capture") {
+    return [];
+  }
+  // Thread trash with no client attachment list still purges nothing extra.
+  void db;
+  void userId;
+  void targetId;
+  return [];
+}
+
+function applyTrash(
+  db: MemoryState,
+  userId: string,
+  mutation: TrashMutation,
+): TrashMutationResult {
+  const opKey = `${userId}:${mutation.idempotencyKey}`;
+  const prior = db.trashOps.get(opKey);
+  if (prior) return prior;
+
+  if (mutation.action === "trash") {
+    if (!mutation.trashedAt) {
+      throw new Error("trashedAt_required");
+    }
+    const key = trashKey(userId, mutation.kind, mutation.targetId);
+    const existing = db.trash.get(key);
+    if (existing) {
+      const result: TrashMutationResult = {
+        idempotencyKey: mutation.idempotencyKey,
+        status: "complete",
+        record: {
+          kind: existing.kind,
+          targetId: existing.targetId,
+          trashedAt: existing.trashedAt,
+          expiresAt: existing.expiresAt,
+          attachmentIds: existing.attachmentIds,
+        },
+      };
+      db.trashOps.set(opKey, result);
+      return result;
+    }
+
+    const record: TrashRecord = {
+      kind: mutation.kind,
+      targetId: mutation.targetId,
+      trashedAt: mutation.trashedAt,
+      expiresAt: expiresAtFrom(mutation.trashedAt),
+      attachmentIds: collectAttachmentIds(
+        db,
+        userId,
+        mutation.kind,
+        mutation.targetId,
+        mutation.attachmentIds,
+      ),
+    };
+    db.trash.set(key, { ...record, userId });
+    const result: TrashMutationResult = {
+      idempotencyKey: mutation.idempotencyKey,
+      status: "complete",
+      record,
+    };
+    db.trashOps.set(opKey, result);
+    return result;
+  }
+
+  // restore
+  const key = trashKey(userId, mutation.kind, mutation.targetId);
+  db.trash.delete(key);
+  const result: TrashMutationResult = {
+    idempotencyKey: mutation.idempotencyKey,
+    status: "complete",
+    record: null,
+  };
+  db.trashOps.set(opKey, result);
+  return result;
+}
+
+function permanentlyRemove(
+  db: MemoryState,
+  userId: string,
+  record: TrashRecord & { userId: string },
+): PurgeTarget {
+  if (record.kind === "capture") {
+    const existing = db.captures.get(`${userId}:${record.targetId}`);
+    db.captures.delete(`${userId}:${record.targetId}`);
+    if (existing?.threadId) {
+      const remaining = [...db.captures.values()].some(
+        (capture) =>
+          capture.userId === userId && capture.threadId === existing.threadId,
+      );
+      if (!remaining) {
+        db.threads.delete(`${userId}:${existing.threadId}`);
+      }
+    }
+  } else {
+    const captureIds = [...db.captures.values()]
+      .filter(
+        (capture) =>
+          capture.userId === userId && capture.threadId === record.targetId,
+      )
+      .map((capture) => capture.id);
+    for (const captureId of captureIds) {
+      db.captures.delete(`${userId}:${captureId}`);
+    }
+    db.threads.delete(`${userId}:${record.targetId}`);
+  }
+  db.trash.delete(trashKey(userId, record.kind, record.targetId));
+  return {
+    kind: record.kind,
+    targetId: record.targetId,
+    attachmentIds: [...record.attachmentIds],
+  };
 }
 
 export function createMemoryThreadRepository(
@@ -136,33 +285,92 @@ export function createMemoryThreadRepository(
     async listThreads(userId) {
       const db = state();
       const threads = [...db.threads.values()]
-        .filter((thread) => thread.userId === userId)
+        .filter(
+          (thread) =>
+            thread.userId === userId &&
+            !isTrashed(db, userId, "thread", thread.id),
+        )
         .sort((a, b) =>
           a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
         );
 
-      return threads.map((thread) => {
-        const captures = [...db.captures.values()]
-          .filter(
-            (capture) =>
-              capture.userId === userId && capture.threadId === thread.id,
-          )
-          .sort((a, b) => a.sequence - b.sequence)
-          .map((capture) => ({
-            id: capture.id,
-            text: capture.text,
-            createdAt: capture.createdAt,
-            location: capture.location,
-            sequence: capture.sequence,
-          }));
-        return {
-          id: thread.id,
-          title: thread.title,
-          revision: thread.revision,
-          updatedAt: thread.updatedAt,
-          captures,
-        } satisfies ServerThread;
-      });
+      return threads
+        .map((thread) => {
+          const captures = [...db.captures.values()]
+            .filter(
+              (capture) =>
+                capture.userId === userId &&
+                capture.threadId === thread.id &&
+                !isTrashed(db, userId, "capture", capture.id),
+            )
+            .sort((a, b) => a.sequence - b.sequence)
+            .map((capture) => ({
+              id: capture.id,
+              text: capture.text,
+              createdAt: capture.createdAt,
+              location: capture.location,
+              sequence: capture.sequence,
+            }));
+          return {
+            id: thread.id,
+            title: thread.title,
+            revision: thread.revision,
+            updatedAt: thread.updatedAt,
+            captures,
+          } satisfies ServerThread;
+        })
+        .filter((thread) => thread.captures.length > 0);
+    },
+
+    async applyTrashMutations(userId, mutations) {
+      const db = state();
+      const results: TrashMutationResult[] = [];
+      const failures: TrashBatchResponse["failures"] = [];
+
+      for (const mutation of mutations) {
+        try {
+          results.push(applyTrash(db, userId, mutation));
+        } catch (error) {
+          failures.push({
+            idempotencyKey: mutation.idempotencyKey,
+            status: "needs_attention",
+            reason: error instanceof Error ? error.message : "trash_failed",
+            retryable: true,
+          });
+        }
+      }
+
+      return { results, failures };
+    },
+
+    async listTrash(userId) {
+      const db = state();
+      return [...db.trash.values()]
+        .filter((record) => record.userId === userId)
+        .map(({ userId: _userId, ...record }) => record)
+        .sort((a, b) =>
+          a.trashedAt < b.trashedAt ? 1 : a.trashedAt > b.trashedAt ? -1 : 0,
+        );
+    },
+
+    async purgeExpired(userId, now, operationId) {
+      const db = state();
+      const opKey = `${userId}:${operationId}`;
+      const prior = db.purgeOps.get(opKey);
+      if (prior) {
+        return { ...prior, duplicate: true };
+      }
+
+      const expired = [...db.trash.values()].filter(
+        (record) =>
+          record.userId === userId && isExpired(record.expiresAt, now),
+      );
+      const purged: PurgeTarget[] = expired.map((record) =>
+        permanentlyRemove(db, userId, record),
+      );
+      const result: PurgeExpiredResult = { purged, duplicate: false };
+      db.purgeOps.set(opKey, result);
+      return result;
     },
   };
 }
