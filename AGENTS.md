@@ -20,3 +20,20 @@ Implement one unblocked `ready-for-agent` ticket at a time. Use TDD at the
 public seams named by the spec, run typechecking regularly, and run the two-axis
 code review before committing. Never commit secrets or weaken authentication to
 make local development or tests pass.
+
+## Cursor Cloud specific instructions
+
+`.cursor/environment.json` runs `.cursor/install.sh` on each machine boot. That
+script installs mise and the 1Password CLI (`op`), activates mise shims on
+`PATH`, runs `mise install`, bootstraps `.fnox/env` when possible, then runs
+`mise run install`.
+
+For secret access, add `OP_SERVICE_ACCOUNT_TOKEN` (the Walking Thoughts
+project-scoped 1Password service-account token) in the Cursor Cloud Secrets tab
+for this environment. The install script writes it to gitignored `.fnox/env`.
+Without that token, lint/build/test of public surfaces still work; authenticated
+Clerk/fnox flows will not.
+
+Use `mise` for all project tools. Do not run direct Vercel deploy commands.
+After dependency changes, prefer `mise run install` / `mise install` rather than
+ad-hoc global package managers.

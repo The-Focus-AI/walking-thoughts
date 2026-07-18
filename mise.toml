@@ -10,6 +10,10 @@ jq = "latest"
 ripgrep = "latest"
 "npm:clerk" = "latest"
 
+# Tasks use bash features (pipefail). Keep inline task shell on bash.
+[settings]
+unix_default_inline_shell_args = "bash -c -o errexit"
+
 [env]
 _.file = ".fnox/env"
 
