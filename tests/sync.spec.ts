@@ -129,7 +129,7 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
   await context.setOffline(true);
   await page.getByLabel("Capture text").fill("Airplane-mode observation");
   await page.getByRole("button", { name: "Capture" }).click();
-  await expect(page.getByText("Saved locally")).toBeVisible();
+  await expect(page.getByText("Saved locally").first()).toBeVisible();
 
   await context.setOffline(false);
   await page.getByRole("button", { name: "Retry sync" }).click();

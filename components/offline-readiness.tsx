@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const CACHE_NAME = "walking-thoughts-shell-v6";
+const CACHE_NAME = "walking-thoughts-shell-v7";
 
 async function cacheLoadedShell(): Promise<void> {
   const cache = await caches.open(CACHE_NAME);

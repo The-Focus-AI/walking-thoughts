@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  OutdoorCaptureDock,
+  type CaptureMode,
+} from "@/components/outdoor-capture-dock";
 import { getDestinationSession } from "@/lib/local-capture/destination";
 import {
   prefetchLocation,
@@ -10,15 +14,20 @@ import {
   persistenceLabel,
   requestPersistentStorage,
 } from "@/lib/local-capture/persistence";
+import {
+  AUDIO_LIMIT_MS,
+  VIDEO_LIMIT_MS,
+  createRecorder,
+} from "@/lib/local-capture/recording";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
   AttachmentInput,
   CaptureSyncStatus,
   LocalCapture,
+  LocalThread,
   MediaKind,
   PersistenceResult,
   ThreadDestination,
-  LocalThread,
 } from "@/lib/local-capture/types";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
 import { synchronizePendingMedia } from "@/lib/sync/media-client";
@@ -68,10 +77,17 @@ export function CaptureComposer() {
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentInput[]>(
     [],
   );
+  const [mode, setMode] = useState<CaptureMode>("type");
+  const [recordingLabel, setRecordingLabel] = useState<string | null>(null);
+  const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
+  const [online, setOnline] = useState(
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
   const draftSaveGeneration = useRef(0);
   const syncGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const recordAbortRef = useRef<AbortController | null>(null);
 
   async function refreshLists() {
     const store = getCaptureStore();
@@ -139,12 +155,16 @@ export function CaptureComposer() {
       void runForegroundSync();
     }, 0);
     const onOnline = () => {
+      setOnline(true);
       void runForegroundSync();
     };
+    const onOffline = () => setOnline(false);
     window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
     return () => {
       window.clearTimeout(start);
       window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
     };
     // Foreground sync should arm once the composer is ready and on reconnect.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runForegroundSync closes over latest store helpers
@@ -201,13 +221,15 @@ export function CaptureComposer() {
     setPendingAttachments((current) => [...current, ...next]);
   }
 
-  function commit() {
-    const text = draft.trim();
+  function commitWithAttachments(
+    text: string,
+    attachmentsSnapshot: AttachmentInput[],
+  ) {
     const draftSnapshot = draft;
-    const attachmentsSnapshot = pendingAttachments;
     if ((!text && attachmentsSnapshot.length === 0) || isPending) return;
 
     setError(null);
+    setSaveConfirmation(null);
     draftSaveGeneration.current += 1;
     syncDestinationFromSession();
     startTransition(async () => {
@@ -221,6 +243,7 @@ export function CaptureComposer() {
         });
         session.rememberCommit(capture);
         setDestinationState(session.get());
+        setSaveConfirmation("Saved locally");
       } catch {
         setError("Could not save Capture");
         const preserved = await store.getDraft().catch(() => draftSnapshot);
@@ -247,11 +270,81 @@ export function CaptureComposer() {
     });
   }
 
+  function commit() {
+    commitWithAttachments(draft.trim(), pendingAttachments);
+  }
+
+  async function commitRecording(kind: "audio" | "video") {
+    setError(null);
+    setRecordingLabel(kind === "audio" ? "Recording audio…" : "Recording video…");
+    const controller = new AbortController();
+    recordAbortRef.current = controller;
+    try {
+      const result = await createRecorder().record(kind, {
+        signal: controller.signal,
+        maxMs: kind === "audio" ? AUDIO_LIMIT_MS : VIDEO_LIMIT_MS,
+      });
+      if (result.bytes.size === 0) {
+        setRecordingLabel(null);
+        return;
+      }
+      if (result.hitLimit) {
+        setRecordingLabel(
+          kind === "audio"
+            ? "Audio hit the 10-minute limit"
+            : "Video hit the 2-minute limit",
+        );
+      } else {
+        setRecordingLabel(null);
+      }
+      commitWithAttachments("", [
+        {
+          kind: result.kind,
+          mimeType: result.mimeType,
+          fileName: result.fileName,
+          bytes: result.bytes,
+        },
+      ]);
+    } catch {
+      setError(`Could not record ${kind}`);
+      setRecordingLabel(null);
+    } finally {
+      recordAbortRef.current = null;
+    }
+  }
+
+  function onModeChange(next: CaptureMode) {
+    setMode(next);
+    if (next === "photo") {
+      cameraInputRef.current?.click();
+    }
+  }
+
+  const gps = readAvailableLocation();
+  const destinationLabel =
+    destination.type === "inbox"
+      ? "Inbox"
+      : destination.type === "new_thread"
+        ? "New Thread"
+        : recentThreads.find((thread) => thread.id === destination.threadId)
+            ?.title || "Thread";
+
   return (
     <div className="capture-workspace">
-      <div className="capture-card" aria-label="New Capture">
+      <div className="capture-card outdoor-card" aria-label="New Capture">
+        <OutdoorCaptureDock
+          mode={mode}
+          onChange={onModeChange}
+          disabled={!ready || isPending}
+        />
+        <p className="outdoor-status" role="status">
+          <span>Destination: {destinationLabel}</span>
+          <span>GPS: {gps ? "available" : "unavailable"}</span>
+          <span>{online ? "Online" : "Offline · local save"}</span>
+          {saveConfirmation ? <span>{saveConfirmation}</span> : null}
+        </p>
         <div className="capture-composer">
-          <span className="capture-label">New Capture</span>
+          <span className="capture-label">Outdoor Quick Capture</span>
           <label className="capture-field-label" htmlFor="capture-destination">
             Destination
           </label>
@@ -270,26 +363,63 @@ export function CaptureComposer() {
               </option>
             ))}
           </select>
-          <label className="capture-field-label" htmlFor="capture-text">
-            Capture text
-          </label>
-          <textarea
-            id="capture-text"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="What did you notice?"
-            rows={4}
-            disabled={!ready || isPending}
-          />
-          <div className="capture-media-actions">
+
+          {mode === "type" ? (
+            <>
+              <label className="capture-field-label" htmlFor="capture-text">
+                Capture text
+              </label>
+              <textarea
+                id="capture-text"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="What did you notice?"
+                rows={4}
+                disabled={!ready || isPending}
+              />
+            </>
+          ) : null}
+
+          {mode === "audio" ? (
             <button
               type="button"
-              className="capture-retry"
-              onClick={() => cameraInputRef.current?.click()}
+              className="outdoor-hold"
+              aria-label="Hold to record audio"
               disabled={!ready || isPending}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                void commitRecording("audio");
+              }}
+              onPointerUp={() => recordAbortRef.current?.abort()}
+              onPointerLeave={() => recordAbortRef.current?.abort()}
             >
-              Take photo
+              {recordingLabel ?? "Hold to record audio (max 10 min)"}
             </button>
+          ) : null}
+
+          {mode === "video" ? (
+            <button
+              type="button"
+              className="outdoor-hold"
+              aria-label="Record video"
+              disabled={!ready || isPending}
+              onClick={() => {
+                if (recordAbortRef.current) {
+                  recordAbortRef.current.abort();
+                  return;
+                }
+                void commitRecording("video");
+              }}
+            >
+              {recordingLabel ?? "Record video (max 2 min)"}
+            </button>
+          ) : null}
+
+          {mode === "photo" ? (
+            <p className="capture-persistence">Camera opener is one tap away.</p>
+          ) : null}
+
+          <div className="capture-media-actions">
             <button
               type="button"
               className="capture-retry"
@@ -308,6 +438,7 @@ export function CaptureComposer() {
               onChange={(event) => {
                 void onFilesSelected(event.target.files);
                 event.target.value = "";
+                setMode("type");
               }}
             />
             <input
@@ -344,17 +475,19 @@ export function CaptureComposer() {
             </ul>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={commit}
-          disabled={
-            !ready ||
-            isPending ||
-            (draft.trim().length === 0 && pendingAttachments.length === 0)
-          }
-        >
-          Capture
-        </button>
+        {mode === "type" || pendingAttachments.length > 0 ? (
+          <button
+            type="button"
+            onClick={commit}
+            disabled={
+              !ready ||
+              isPending ||
+              (draft.trim().length === 0 && pendingAttachments.length === 0)
+            }
+          >
+            Capture
+          </button>
+        ) : null}
       </div>
 
       <div className="capture-sync-bar">
