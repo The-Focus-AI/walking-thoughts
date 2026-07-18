@@ -19,10 +19,19 @@ import {
   VIDEO_LIMIT_MS,
   createRecorder,
 } from "@/lib/local-capture/recording";
+import {
+  canOfferLocalRemoval,
+  mediaAvailability,
+  mediaAvailabilityLabel,
+  removeLocalOriginal,
+  restoreLocalOriginal,
+} from "@/lib/local-capture/local-media-retention";
+import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
   AttachmentInput,
   CaptureSyncStatus,
+  LocalAttachment,
   LocalCapture,
   LocalThread,
   MediaKind,
@@ -31,7 +40,10 @@ import type {
 } from "@/lib/local-capture/types";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
-import { synchronizePendingMedia } from "@/lib/sync/media-client";
+import {
+  getMediaTransport,
+  synchronizePendingMedia,
+} from "@/lib/sync/media-client";
 
 function destinationValue(destination: ThreadDestination): string {
   if (destination.type === "thread") return destination.threadId;
@@ -127,6 +139,59 @@ export function CaptureComposer() {
       if (generation === syncGeneration.current) {
         setIsSyncing(false);
       }
+    }
+  }
+
+  async function onRemoveLocalMedia(
+    captureId: string,
+    attachmentId: string,
+  ) {
+    const transport = getMediaTransport();
+    if (!transport.verify || !transport.download) {
+      setError("Media verification is unavailable");
+      return;
+    }
+    try {
+      await removeLocalOriginal({
+        store: getCaptureStore(),
+        mediaStore: createIdbMediaStore(),
+        captureId,
+        attachmentId,
+        remote: {
+          verify: (id) => transport.verify!(id),
+          download: (id) => transport.download!(id),
+        },
+      });
+      await refreshLists();
+    } catch {
+      setError("Could not remove local media until the server copy is verified");
+    }
+  }
+
+  async function onRestoreLocalMedia(
+    captureId: string,
+    attachmentId: string,
+  ) {
+    const transport = getMediaTransport();
+    if (!transport.download) {
+      setError("Media download is unavailable");
+      return;
+    }
+    try {
+      await restoreLocalOriginal({
+        store: getCaptureStore(),
+        mediaStore: createIdbMediaStore(),
+        captureId,
+        attachmentId,
+        remote: {
+          verify: async (id) =>
+            transport.verify ? transport.verify(id) : true,
+          download: (id) => transport.download!(id),
+        },
+      });
+      await refreshLists();
+    } catch {
+      setError("Could not restore media from the private server copy");
     }
   }
 
@@ -530,7 +595,12 @@ export function CaptureComposer() {
           <ul className="capture-list">
             {inbox.map((capture) => (
               <li key={capture.id}>
-                <CaptureEntry capture={capture} onRetry={() => void runForegroundSync()} />
+                <CaptureEntry
+                  capture={capture}
+                  onRetry={() => void runForegroundSync()}
+                  onRemoveLocalMedia={onRemoveLocalMedia}
+                  onRestoreLocalMedia={onRestoreLocalMedia}
+                />
               </li>
             ))}
           </ul>
@@ -550,7 +620,12 @@ export function CaptureComposer() {
           <ul className="capture-list">
             {captures.map((capture) => (
               <li key={capture.id}>
-                <CaptureEntry capture={capture} onRetry={() => void runForegroundSync()} />
+                <CaptureEntry
+                  capture={capture}
+                  onRetry={() => void runForegroundSync()}
+                  onRemoveLocalMedia={onRemoveLocalMedia}
+                  onRestoreLocalMedia={onRestoreLocalMedia}
+                />
               </li>
             ))}
           </ul>
@@ -563,9 +638,13 @@ export function CaptureComposer() {
 function CaptureEntry({
   capture,
   onRetry,
+  onRemoveLocalMedia,
+  onRestoreLocalMedia,
 }: {
   capture: LocalCapture;
   onRetry: () => void;
+  onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
+  onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
 }) {
   const label =
     capture.text ||
@@ -587,10 +666,13 @@ function CaptureEntry({
       {capture.attachments.length > 0 ? (
         <ul className="capture-attachments" aria-label="Attachments">
           {capture.attachments.map((attachment) => (
-            <li key={attachment.id}>
-              {attachment.fileName} · {attachment.kind} ·{" "}
-              {statusLabel(attachment.syncStatus)}
-            </li>
+            <AttachmentRow
+              key={attachment.id}
+              captureId={capture.id}
+              attachment={attachment}
+              onRemoveLocalMedia={onRemoveLocalMedia}
+              onRestoreLocalMedia={onRestoreLocalMedia}
+            />
           ))}
         </ul>
       ) : null}
@@ -605,5 +687,50 @@ function CaptureEntry({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function AttachmentRow({
+  captureId,
+  attachment,
+  onRemoveLocalMedia,
+  onRestoreLocalMedia,
+}: {
+  captureId: string;
+  attachment: LocalAttachment;
+  onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
+  onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
+}) {
+  const availability = mediaAvailability(attachment);
+  const offerRemove = canOfferLocalRemoval(attachment);
+
+  return (
+    <li>
+      <span>
+        {attachment.fileName} · {attachment.kind} ·{" "}
+        {statusLabel(attachment.syncStatus)} ·{" "}
+        <span className={`media-availability availability-${availability}`}>
+          {mediaAvailabilityLabel(availability)}
+        </span>
+      </span>
+      {offerRemove ? (
+        <button
+          type="button"
+          className="media-remove-local"
+          onClick={() => onRemoveLocalMedia(captureId, attachment.id)}
+        >
+          Remove from device
+        </button>
+      ) : null}
+      {availability === "online_only" ? (
+        <button
+          type="button"
+          className="media-restore-local"
+          onClick={() => onRestoreLocalMedia(captureId, attachment.id)}
+        >
+          Download to device
+        </button>
+      ) : null}
+    </li>
   );
 }

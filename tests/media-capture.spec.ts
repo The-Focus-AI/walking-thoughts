@@ -32,7 +32,7 @@ test("mixed-media commit stores original bytes before Capture succeeds", async (
     byteLength: bytes.byteLength,
   });
 
-  const stored = await media.get(capture.attachments[0]!.localObjectKey);
+  const stored = await media.get(capture.attachments[0]!.localObjectKey!);
   expect(stored).not.toBeNull();
   expect(new Uint8Array(await stored!.arrayBuffer())).toEqual(bytes);
 });

@@ -31,7 +31,10 @@ export type LocalAttachment = {
   mimeType: string;
   fileName: string;
   byteLength: number;
-  localObjectKey: string;
+  /** Null after the user explicitly removes the local original. */
+  localObjectKey: string | null;
+  /** Small retained preview so Threads stay understandable offline. */
+  thumbnailObjectKey?: string | null;
   remoteObjectKey?: string | null;
   syncStatus: CaptureSyncStatus;
 };

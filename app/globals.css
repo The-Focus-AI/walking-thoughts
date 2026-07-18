@@ -377,6 +377,30 @@ h1 {
   justify-content: space-between;
 }
 
+.media-availability {
+  color: var(--ink);
+}
+
+.availability-online_only {
+  color: var(--muted);
+}
+
+.availability-error {
+  color: #b42318;
+}
+
+.media-remove-local,
+.media-restore-local {
+  border: 1px solid rgba(20, 24, 22, 0.18);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
 .outdoor-card {
   border-color: rgba(244, 207, 114, 0.35);
   background:
