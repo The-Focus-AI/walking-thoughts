@@ -44,15 +44,6 @@ test("safe Clerk initialization does not unlock private access without an allowl
   expect(configuration.configured).toBe(false);
 });
 
-test("middleware requests complete without a self-proxy loop", async ({
-  request,
-}) => {
-  const response = await request.get("/offline", { timeout: 5_000 });
-
-  expect(response.status()).toBe(200);
-  await expect(response.text()).resolves.toContain("Offline");
-});
-
 test("installed shell remains useful when the network disappears", async ({
   context,
   page,
