@@ -13,6 +13,10 @@ import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getCaptureStore } from "@/lib/local-capture/store";
+import {
+  chronologicalThreadEntries,
+  type ThreadTimelineEntry,
+} from "@/lib/local-capture/thread-timeline";
 import type {
   AttachmentInput,
   LocalCapture,
@@ -55,30 +59,8 @@ type ThreadContext = {
   enrichments: ThreadEnrichment[];
 };
 
-type ThreadEntry =
-  | { kind: "capture"; capture: LocalCapture }
-  | { kind: "enrichment"; enrichment: ThreadEnrichment };
-
-/**
- * The append-only Thread stream in order: each Enrichment follows the
- * highest-sequence Capture its recorded basis revision included.
- */
-function chronologicalEntries(context: ThreadContext): ThreadEntry[] {
-  const entries: Array<{ at: number; tiebreak: number; entry: ThreadEntry }> = [
-    ...context.captures.map((capture) => ({
-      at: capture.sequence,
-      tiebreak: 0,
-      entry: { kind: "capture" as const, capture },
-    })),
-    ...context.enrichments.map((enrichment) => ({
-      at: enrichment.basisRevision,
-      tiebreak: 1,
-      entry: { kind: "enrichment" as const, enrichment },
-    })),
-  ];
-  return entries
-    .sort((a, b) => a.at - b.at || a.tiebreak - b.tiebreak)
-    .map((item) => item.entry);
+function chronologicalEntries(context: ThreadContext): ThreadTimelineEntry[] {
+  return chronologicalThreadEntries(context.captures, context.enrichments);
 }
 
 export type MapJournalHook = {

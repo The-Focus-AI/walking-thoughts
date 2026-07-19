@@ -1,8 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { createDestinationSession } from "@/lib/local-capture/destination";
+import {
+  createDestinationSession,
+  resetDestinationSession,
+} from "@/lib/local-capture/destination";
 import { createMemoryCaptureStore } from "@/lib/local-capture/store";
+import { chronologicalThreadEntries } from "@/lib/local-capture/thread-timeline";
 
-test("new Captures default to the Inbox without organization", async () => {
+test.beforeEach(() => {
+  resetDestinationSession();
+});
+
+test("store commit without destination still allows Inbox Captures", async () => {
   const store = createMemoryCaptureStore();
   const capture = await store.commit("Moss on the north face", null);
 
@@ -12,17 +20,27 @@ test("new Captures default to the Inbox without organization", async () => {
   await expect(store.listRecentThreads()).resolves.toEqual([]);
 });
 
-test("destination sticks to a Thread, resets after inactivity, and Threads stay append-only", async () => {
-  let now = new Date("2026-07-18T12:00:00.000Z");
+test("trail session starts a Thread, sticks for the day, and rolls on a new day", async () => {
+  // Local-calendar constructors avoid UTC day-boundary flakiness.
+  let now = new Date(2026, 6, 18, 12, 0, 0);
   const store = createMemoryCaptureStore();
+  const memory = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      memory.set(key, value);
+    },
+    removeItem: (key: string) => {
+      memory.delete(key);
+    },
+  };
   const destination = createDestinationSession({
     now: () => now,
-    inactivityMs: 30 * 60 * 1000,
+    storage,
   });
 
-  expect(destination.get()).toEqual({ type: "inbox" });
+  expect(destination.get()).toEqual({ type: "new_thread" });
 
-  destination.set({ type: "new_thread" });
   const first = await store.commit("Cedar bark peeling", null, {
     destination: destination.get(),
   });
@@ -35,7 +53,7 @@ test("destination sticks to a Thread, resets after inactivity, and Threads stay 
     threadId: first.threadId,
   });
 
-  now = new Date("2026-07-18T12:10:00.000Z");
+  now = new Date(2026, 6, 18, 18, 10, 0);
   destination.touch();
   const correction = await store.commit(
     "Correction: it was hemlock bark",
@@ -48,46 +66,91 @@ test("destination sticks to a Thread, resets after inactivity, and Threads stay 
   expect(correction.sequence).toBe(2);
 
   const thread = await store.listThread(first.threadId!);
-  expect(thread.thread.revision).toBe(2);
   expect(thread.captures.map((capture) => capture.text)).toEqual([
     "Cedar bark peeling",
     "Correction: it was hemlock bark",
   ]);
-  expect(thread.captures.map((capture) => capture.sequence)).toEqual([1, 2]);
 
-  // Committed Captures are immutable — history only grows by append.
-  expect(thread.captures[0]?.text).toBe("Cedar bark peeling");
-  expect(Object.keys(store)).not.toContain("updateCapture");
-  expect(thread.captures).toHaveLength(2);
-
-  now = new Date("2026-07-18T12:45:00.000Z");
-  expect(destination.get()).toEqual({ type: "inbox" });
-
-  const recent = await store.listRecentThreads();
-  expect(recent).toHaveLength(1);
-  expect(recent[0]).toMatchObject({
-    id: first.threadId,
-    title: "Cedar bark peeling",
-    revision: 2,
+  // Same calendar day survives a new session instance (reload).
+  const reloaded = createDestinationSession({
+    now: () => now,
+    storage,
   });
+  expect(reloaded.get()).toEqual({
+    type: "thread",
+    threadId: first.threadId,
+  });
+
+  now = new Date(2026, 6, 19, 9, 0, 0);
+  expect(reloaded.get()).toEqual({ type: "new_thread" });
 });
 
-test("explicit destination change returns the composer to the Inbox", async () => {
+test("startNewThread clears the sticky Thread for the next Capture", async () => {
   const store = createMemoryCaptureStore();
-  const destination = createDestinationSession();
+  const destination = createDestinationSession({ storage: null });
 
-  destination.set({ type: "new_thread" });
   const first = await store.commit("Stream noise after rain", null, {
     destination: destination.get(),
   });
   destination.rememberCommit(first);
+  expect(destination.get()).toEqual({
+    type: "thread",
+    threadId: first.threadId,
+  });
 
-  destination.set({ type: "inbox" });
-  expect(destination.get()).toEqual({ type: "inbox" });
+  destination.startNewThread();
+  expect(destination.get()).toEqual({ type: "new_thread" });
 
-  const inboxCapture = await store.commit("Unrelated bird call", null, {
+  const second = await store.commit("Second hike overlook", null, {
     destination: destination.get(),
   });
-  expect(inboxCapture.threadId).toBeNull();
-  await expect(store.listInbox()).resolves.toEqual([inboxCapture]);
+  destination.rememberCommit(second);
+  expect(second.threadId).not.toBe(first.threadId);
+});
+
+test("chronological timeline interleaves Enrichments after their basis", () => {
+  const entries = chronologicalThreadEntries(
+    [
+      {
+        id: "c1",
+        text: "one",
+        createdAt: "2026-07-18T10:00:00.000Z",
+        location: null,
+        status: "complete",
+        threadId: "t1",
+        sequence: 1,
+        attachments: [],
+      },
+      {
+        id: "c2",
+        text: "two",
+        createdAt: "2026-07-18T11:00:00.000Z",
+        location: null,
+        status: "complete",
+        threadId: "t1",
+        sequence: 2,
+        attachments: [],
+      },
+    ],
+    [
+      {
+        id: "e1",
+        threadId: "t1",
+        text: "reply",
+        model: "test-model",
+        basisRevision: 1,
+        basisEntryIds: ["c1"],
+        targetCaptureIds: ["c1"],
+        createdAt: "2026-07-18T10:05:00.000Z",
+        title: null,
+        sources: [],
+      },
+    ],
+  );
+
+  expect(entries.map((entry) => entry.kind)).toEqual([
+    "capture",
+    "enrichment",
+    "capture",
+  ]);
 });

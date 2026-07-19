@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   OutdoorCaptureDock,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/local-capture/local-media-retention";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
+import { chronologicalThreadEntries } from "@/lib/local-capture/thread-timeline";
 import type {
   AttachmentInput,
   LocalAttachment,
@@ -56,17 +58,6 @@ import {
   synchronizePendingMedia,
 } from "@/lib/sync/media-client";
 
-function destinationValue(destination: ThreadDestination): string {
-  if (destination.type === "thread") return destination.threadId;
-  return destination.type;
-}
-
-function destinationFromValue(value: string): ThreadDestination {
-  if (value === "inbox") return { type: "inbox" };
-  if (value === "new_thread") return { type: "new_thread" };
-  return { type: "thread", threadId: value };
-}
-
 type ThreadView = {
   thread: LocalThread;
   captures: LocalCapture[];
@@ -79,7 +70,7 @@ export function CaptureComposer() {
   const [threads, setThreads] = useState<ThreadView[]>([]);
   const [recentThreads, setRecentThreads] = useState<LocalThread[]>([]);
   const [destination, setDestinationState] = useState<ThreadDestination>({
-    type: "inbox",
+    type: "new_thread",
   });
   const [error, setError] = useState<string | null>(null);
   const [persistence, setPersistence] = useState<PersistenceResult | null>(null);
@@ -287,13 +278,17 @@ export function CaptureComposer() {
     return () => window.clearTimeout(handle);
   }, [draft, ready, isPending]);
 
-  function onDestinationChange(value: string) {
-    const next = destinationFromValue(value);
-    getDestinationSession().set(next);
+  function syncDestinationFromSession() {
     setDestinationState(getDestinationSession().get());
   }
 
-  function syncDestinationFromSession() {
+  function onStartNewThread() {
+    getDestinationSession().startNewThread();
+    setDestinationState(getDestinationSession().get());
+  }
+
+  function onContinueThread(threadId: string) {
+    getDestinationSession().set({ type: "thread", threadId });
     setDestinationState(getDestinationSession().get());
   }
 
@@ -417,175 +412,166 @@ export function CaptureComposer() {
   }
 
   const gps = readAvailableLocation();
-  const destinationLabel =
-    destination.type === "inbox"
-      ? "Inbox"
-      : destination.type === "new_thread"
-        ? "New Thread"
-        : recentThreads.find((thread) => thread.id === destination.threadId)
-            ?.title || "Thread";
+  const activeThreadId =
+    destination.type === "thread" ? destination.threadId : null;
+  const activeView =
+    threads.find((view) => view.thread.id === activeThreadId) ?? null;
+  const timeline = activeView
+    ? chronologicalThreadEntries(activeView.captures, activeView.enrichments)
+    : [];
+  const isEnriching = Boolean(
+    activeView?.captures.some((capture) => capture.status === "enriching"),
+  );
+  const trailTitle = activeView?.thread.title ?? "Today's hike";
+  const trailStatus =
+    destination.type === "thread"
+      ? `Adding to “${trailTitle}”`
+      : "First Capture starts today's Thread";
+
+  const composer = (
+    <div className="capture-card outdoor-card" aria-label="New Capture">
+      <OutdoorCaptureDock
+        mode={mode}
+        onChange={onModeChange}
+        disabled={!ready || isPending}
+      />
+      <p className="outdoor-status" role="status">
+        <span>{trailStatus}</span>
+        <span>GPS: {gps ? "available" : "unavailable"}</span>
+        <span>{online ? "Online" : "Offline · local save"}</span>
+        {saveConfirmation ? <span>{saveConfirmation}</span> : null}
+      </p>
+      <div className="capture-composer">
+        <span className="capture-label">Add to this Thread</span>
+        {mode === "type" ? (
+          <>
+            <label className="capture-field-label" htmlFor="capture-text">
+              Capture text
+            </label>
+            <textarea
+              id="capture-text"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="What did you notice?"
+              rows={3}
+              disabled={!ready || isPending}
+            />
+          </>
+        ) : null}
+
+        {mode === "audio" ? (
+          <button
+            type="button"
+            className="outdoor-hold"
+            aria-label="Hold to record audio"
+            disabled={!ready || isPending}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              void commitRecording("audio");
+            }}
+            onPointerUp={() => recordAbortRef.current?.abort()}
+            onPointerLeave={() => recordAbortRef.current?.abort()}
+          >
+            {recordingLabel ?? "Hold to record audio (max 10 min)"}
+          </button>
+        ) : null}
+
+        {mode === "video" ? (
+          <button
+            type="button"
+            className="outdoor-hold"
+            aria-label="Record video"
+            disabled={!ready || isPending}
+            onClick={() => {
+              if (recordAbortRef.current) {
+                recordAbortRef.current.abort();
+                return;
+              }
+              void commitRecording("video");
+            }}
+          >
+            {recordingLabel ?? "Record video (max 2 min)"}
+          </button>
+        ) : null}
+
+        {mode === "photo" ? (
+          <p className="capture-persistence">Camera opener is one tap away.</p>
+        ) : null}
+
+        <div className="capture-media-actions">
+          <button
+            type="button"
+            className="capture-retry"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!ready || isPending}
+          >
+            Add media
+          </button>
+          <input
+            ref={cameraInputRef}
+            className="capture-file-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            aria-label="Take photo"
+            onChange={(event) => {
+              void onFilesSelected(event.target.files);
+              event.target.value = "";
+              setMode("type");
+            }}
+          />
+          <input
+            ref={fileInputRef}
+            className="capture-file-input"
+            type="file"
+            accept="image/*,audio/*,video/*"
+            multiple
+            aria-label="Choose existing media"
+            onChange={(event) => {
+              void onFilesSelected(event.target.files);
+              event.target.value = "";
+            }}
+          />
+        </div>
+        {pendingAttachments.length > 0 ? (
+          <ul className="capture-attachment-drafts" aria-label="Selected media">
+            {pendingAttachments.map((attachment, index) => (
+              <li key={`${attachment.fileName}-${index}`}>
+                {attachment.fileName}
+                <button
+                  type="button"
+                  className="capture-retry"
+                  onClick={() =>
+                    setPendingAttachments((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      {mode === "type" || pendingAttachments.length > 0 ? (
+        <button
+          type="button"
+          onClick={commit}
+          disabled={
+            !ready ||
+            isPending ||
+            (draft.trim().length === 0 && pendingAttachments.length === 0)
+          }
+        >
+          Capture
+        </button>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="capture-workspace">
-      <div className="capture-card outdoor-card" aria-label="New Capture">
-        <OutdoorCaptureDock
-          mode={mode}
-          onChange={onModeChange}
-          disabled={!ready || isPending}
-        />
-        <p className="outdoor-status" role="status">
-          <span>Destination: {destinationLabel}</span>
-          <span>GPS: {gps ? "available" : "unavailable"}</span>
-          <span>{online ? "Online" : "Offline · local save"}</span>
-          {saveConfirmation ? <span>{saveConfirmation}</span> : null}
-        </p>
-        <div className="capture-composer">
-          <span className="capture-label">Outdoor Quick Capture</span>
-          <label className="capture-field-label" htmlFor="capture-destination">
-            Destination
-          </label>
-          <select
-            id="capture-destination"
-            value={destinationValue(destination)}
-            onChange={(event) => onDestinationChange(event.target.value)}
-            onFocus={syncDestinationFromSession}
-            disabled={!ready || isPending}
-          >
-            <option value="inbox">Inbox</option>
-            <option value="new_thread">New Thread</option>
-            {recentThreads.map((thread) => (
-              <option key={thread.id} value={thread.id}>
-                {thread.title}
-              </option>
-            ))}
-          </select>
-
-          {mode === "type" ? (
-            <>
-              <label className="capture-field-label" htmlFor="capture-text">
-                Capture text
-              </label>
-              <textarea
-                id="capture-text"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="What did you notice?"
-                rows={4}
-                disabled={!ready || isPending}
-              />
-            </>
-          ) : null}
-
-          {mode === "audio" ? (
-            <button
-              type="button"
-              className="outdoor-hold"
-              aria-label="Hold to record audio"
-              disabled={!ready || isPending}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                void commitRecording("audio");
-              }}
-              onPointerUp={() => recordAbortRef.current?.abort()}
-              onPointerLeave={() => recordAbortRef.current?.abort()}
-            >
-              {recordingLabel ?? "Hold to record audio (max 10 min)"}
-            </button>
-          ) : null}
-
-          {mode === "video" ? (
-            <button
-              type="button"
-              className="outdoor-hold"
-              aria-label="Record video"
-              disabled={!ready || isPending}
-              onClick={() => {
-                if (recordAbortRef.current) {
-                  recordAbortRef.current.abort();
-                  return;
-                }
-                void commitRecording("video");
-              }}
-            >
-              {recordingLabel ?? "Record video (max 2 min)"}
-            </button>
-          ) : null}
-
-          {mode === "photo" ? (
-            <p className="capture-persistence">Camera opener is one tap away.</p>
-          ) : null}
-
-          <div className="capture-media-actions">
-            <button
-              type="button"
-              className="capture-retry"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!ready || isPending}
-            >
-              Add media
-            </button>
-            <input
-              ref={cameraInputRef}
-              className="capture-file-input"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              aria-label="Take photo"
-              onChange={(event) => {
-                void onFilesSelected(event.target.files);
-                event.target.value = "";
-                setMode("type");
-              }}
-            />
-            <input
-              ref={fileInputRef}
-              className="capture-file-input"
-              type="file"
-              accept="image/*,audio/*,video/*"
-              multiple
-              aria-label="Choose existing media"
-              onChange={(event) => {
-                void onFilesSelected(event.target.files);
-                event.target.value = "";
-              }}
-            />
-          </div>
-          {pendingAttachments.length > 0 ? (
-            <ul className="capture-attachment-drafts" aria-label="Selected media">
-              {pendingAttachments.map((attachment, index) => (
-                <li key={`${attachment.fileName}-${index}`}>
-                  {attachment.fileName}
-                  <button
-                    type="button"
-                    className="capture-retry"
-                    onClick={() =>
-                      setPendingAttachments((current) =>
-                        current.filter((_, itemIndex) => itemIndex !== index),
-                      )
-                    }
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        {mode === "type" || pendingAttachments.length > 0 ? (
-          <button
-            type="button"
-            onClick={commit}
-            disabled={
-              !ready ||
-              isPending ||
-              (draft.trim().length === 0 && pendingAttachments.length === 0)
-            }
-          >
-            Capture
-          </button>
-        ) : null}
-      </div>
-
       <div className="capture-sync-bar">
         <p className="capture-persistence" role="status">
           {isSyncing ? FOREGROUND_SYNC_RUNNING : FOREGROUND_SYNC_IDLE}
@@ -640,9 +626,84 @@ export function CaptureComposer() {
         </p>
       ) : null}
 
+      <section className="capture-section trail-thread" aria-label={trailTitle}>
+        <div className="capture-section-header">
+          <h2 className="capture-section-title">{trailTitle}</h2>
+          {activeView ? (
+            <span className="capture-revision">
+              Revision {activeView.thread.revision}
+            </span>
+          ) : null}
+        </div>
+        <div className="trail-thread-actions">
+          <Link className="topbar-link" href="/threads">
+            All Threads
+          </Link>
+          {destination.type === "thread" ? (
+            <button
+              type="button"
+              className="capture-retry"
+              onClick={onStartNewThread}
+              disabled={!ready || isPending}
+            >
+              Start new Thread
+            </button>
+          ) : null}
+        </div>
+
+        {timeline.length > 0 ? (
+          <ul className="capture-list trail-timeline">
+            {timeline.map((entry) =>
+              entry.kind === "capture" ? (
+                <li key={entry.capture.id}>
+                  <CaptureEntry
+                    capture={entry.capture}
+                    showSpeaker
+                    onRetry={() => void runForegroundSync()}
+                    onRemoveLocalMedia={onRemoveLocalMedia}
+                    onRestoreLocalMedia={onRestoreLocalMedia}
+                  />
+                </li>
+              ) : (
+                <li key={entry.enrichment.id}>
+                  <EnrichmentEntryView enrichment={entry.enrichment} />
+                </li>
+              ),
+            )}
+            {isEnriching ? (
+              <li>
+                <article
+                  className="capture-entry enrichment-pending thread-speaker-agent"
+                  aria-label="Walking Thoughts is preparing a reply"
+                >
+                  <div className="capture-entry-meta">
+                    <span className="thread-speaker">Walking Thoughts</span>
+                    <span className="capture-status status-enriching">
+                      Enriching
+                    </span>
+                  </div>
+                  <p>Preparing a reply from this Thread&apos;s history…</p>
+                </article>
+              </li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="trail-thread-empty">
+            Nothing on today&apos;s hike yet. Your next Capture opens a Thread;
+            replies from Walking Thoughts show up here after sync.
+          </p>
+        )}
+
+        {composer}
+      </section>
+
       {inbox.length > 0 ? (
         <section className="capture-section" aria-label="Inbox">
           <h2 className="capture-section-title">Inbox</h2>
+          <p className="capture-persistence">
+            Older unassigned Captures. Prefer today&apos;s Thread above for the
+            trail.
+          </p>
           <ul className="capture-list">
             {inbox.map((capture) => (
               <li key={capture.id}>
@@ -658,35 +719,29 @@ export function CaptureComposer() {
         </section>
       ) : null}
 
-      {threads.map(({ thread, captures, enrichments }) => (
-        <section
-          key={thread.id}
-          className="capture-section"
-          aria-label={thread.title}
-        >
-          <div className="capture-section-header">
-            <h2 className="capture-section-title">{thread.title}</h2>
-            <span className="capture-revision">Revision {thread.revision}</span>
-          </div>
-          <ul className="capture-list">
-            {captures.map((capture) => (
-              <li key={capture.id}>
-                <CaptureEntry
-                  capture={capture}
-                  onRetry={() => void runForegroundSync()}
-                  onRemoveLocalMedia={onRemoveLocalMedia}
-                  onRestoreLocalMedia={onRestoreLocalMedia}
-                />
-              </li>
-            ))}
-            {enrichments.map((enrichment) => (
-              <li key={enrichment.id}>
-                <EnrichmentEntryView enrichment={enrichment} />
-              </li>
-            ))}
+      {recentThreads.length > 1 ||
+      (recentThreads.length === 1 &&
+        recentThreads[0]?.id !== activeThreadId) ? (
+        <section className="capture-section" aria-label="Switch Thread">
+          <h2 className="capture-section-title">Continue another Thread</h2>
+          <ul className="thread-switch-list">
+            {recentThreads
+              .filter((thread) => thread.id !== activeThreadId)
+              .slice(0, 5)
+              .map((thread) => (
+                <li key={thread.id}>
+                  <button
+                    type="button"
+                    className="capture-retry"
+                    onClick={() => onContinueThread(thread.id)}
+                  >
+                    {thread.title}
+                  </button>
+                </li>
+              ))}
           </ul>
         </section>
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -696,11 +751,13 @@ function CaptureEntry({
   onRetry,
   onRemoveLocalMedia,
   onRestoreLocalMedia,
+  showSpeaker = false,
 }: {
   capture: LocalCapture;
   onRetry: () => void;
   onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
   onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
+  showSpeaker?: boolean;
 }) {
   const label =
     capture.text ||
@@ -708,8 +765,12 @@ function CaptureEntry({
     "Capture";
 
   return (
-    <article className="capture-entry" aria-label={label}>
+    <article
+      className={`capture-entry${showSpeaker ? " thread-speaker-you" : ""}`}
+      aria-label={label}
+    >
       <div className="capture-entry-meta">
+        {showSpeaker ? <span className="thread-speaker">You</span> : null}
         <span className={`capture-status status-${capture.status}`}>
           {statusLabel(capture.status)}
         </span>

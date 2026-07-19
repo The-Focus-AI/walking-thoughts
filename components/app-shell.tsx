@@ -22,6 +22,9 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <span>Walking Thoughts</span>
         </Link>
         <div className="topbar-actions">
+          <Link className="topbar-link" href="/threads">
+            Threads
+          </Link>
           <Link className="topbar-link" href="/journal">
             Map Journal
           </Link>
@@ -30,16 +33,16 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         </div>
       </header>
 
-      <section className="hero">
-        <p className="eyebrow">Built for the trail beyond the signal</p>
-        <h1>Capture what matters out there.</h1>
+      <section className="hero hero-trail">
+        <p className="eyebrow">On the trail</p>
+        <h1>Walking Thoughts</h1>
         <p className="lede">
-          Save observations on your phone first. Walking Thoughts will be ready
-          to add context when you reconnect.
+          Append to today&apos;s Thread as you walk. Replies show up in the same
+          stream after sync.
         </p>
         <p className="hero-review">
-          <Link className="hero-review-link" href="/journal">
-            Review your walks on the Map Journal →
+          <Link className="hero-review-link" href="/threads">
+            Browse Threads by day →
           </Link>
         </p>
 

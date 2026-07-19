@@ -4,25 +4,17 @@ async function openCaptureShell(page: Page) {
   await page.goto("/offline");
   await expect(page.getByLabel("Capture text")).toBeVisible();
   await expect(page.getByText("Ready offline")).toBeVisible();
-  await expect(page.getByLabel("Destination")).toHaveValue("inbox");
+  await expect(
+    page.getByText("First Capture starts today's Thread"),
+  ).toBeVisible();
 }
 
-test.describe("append-only Threads", () => {
-  test("defaults to Inbox, sticks to a Thread, resets on restart, and appends corrections", async ({
+test.describe("trail Threads", () => {
+  test("starts a Thread, sticks appends, shows composer under the stream, and keeps the day sticky", async ({
     page,
   }) => {
     await openCaptureShell(page);
 
-    await page.getByLabel("Capture text").fill("Trail marker leaning left");
-    await page.getByRole("button", { name: "Capture" }).click();
-
-    const inbox = page.getByRole("region", { name: "Inbox" });
-    await expect(
-      inbox.getByRole("article", { name: /Trail marker leaning left/ }),
-    ).toBeVisible();
-    await expect(page.getByLabel("Destination")).toHaveValue("inbox");
-
-    await page.getByLabel("Destination").selectOption("new_thread");
     await page.getByLabel("Capture text").fill("Same ridge, clearer view");
     await page.getByRole("button", { name: "Capture" }).click();
 
@@ -30,33 +22,58 @@ test.describe("append-only Threads", () => {
     await expect(
       thread.getByRole("article", { name: /Same ridge, clearer view/ }),
     ).toBeVisible();
-    await expect(page.getByLabel("Destination")).not.toHaveValue("inbox");
-    await expect(page.getByLabel("Destination")).not.toHaveValue("new_thread");
+    await expect(thread.getByText("You").first()).toBeVisible();
+    await expect(
+      page.getByText(/Adding to .Same ridge, clearer view./),
+    ).toBeVisible();
 
-    const stuckThreadValue = await page.getByLabel("Destination").inputValue();
+    // Composer lives under the active Thread stream.
+    const composer = thread.getByLabel("New Capture");
+    await expect(composer).toBeVisible();
+    const streamBox = await thread
+      .getByRole("article", { name: /Same ridge, clearer view/ })
+      .boundingBox();
+    const composerBox = await composer.boundingBox();
+    expect(streamBox && composerBox).toBeTruthy();
+    expect(composerBox!.y).toBeGreaterThan(streamBox!.y);
 
     await page.getByLabel("Capture text").fill("Correction: marker leans right");
     await page.getByRole("button", { name: "Capture" }).click();
 
     await expect(
-      thread.getByRole("article", { name: /Same ridge, clearer view/ }),
-    ).toBeVisible();
-    await expect(
       thread.getByRole("article", { name: /Correction: marker leans right/ }),
     ).toBeVisible();
-    await expect(page.getByLabel("Destination")).toHaveValue(stuckThreadValue);
 
     await page.reload();
-    await expect(page.getByLabel("Destination")).toHaveValue("inbox");
+    await expect(
+      page.getByText(/Adding to .Same ridge, clearer view./),
+    ).toBeVisible();
     await expect(
       page
         .getByRole("region", { name: /Same ridge, clearer view/ })
         .getByRole("article", { name: /Correction: marker leans right/ }),
     ).toBeVisible();
+  });
+
+  test("Threads archive groups by day and can continue on trail", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await page.getByLabel("Capture text").fill("Overlook fungi");
+    await page.getByRole("button", { name: "Capture" }).click();
     await expect(
-      page
-        .getByRole("region", { name: "Inbox" })
-        .getByRole("article", { name: /Trail marker leaning left/ }),
+      page.getByRole("article", { name: /Overlook fungi/ }),
     ).toBeVisible();
+
+    await page.goto("/threads");
+    await expect(
+      page.getByRole("heading", { name: "Threads by day" }),
+    ).toBeVisible();
+    await expect(page.getByText("Overlook fungi")).toBeVisible();
+
+    await page.getByRole("button", { name: "Continue on trail" }).click();
+    // / requires Clerk; the sticky day session is shared via localStorage.
+    await page.goto("/offline");
+    await expect(page.getByText(/Adding to .Overlook fungi./)).toBeVisible();
   });
 });

@@ -61,6 +61,8 @@ test("Outdoor Quick Capture dock records audio on press-and-hold and commits loc
     page.getByRole("article").filter({ hasText: /audio-/i }),
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Saved locally").first()).toBeVisible();
-  await expect(page.getByText(/Destination:/)).toBeVisible();
+  await expect(
+    page.getByText(/Adding to|First Capture starts today's Thread/),
+  ).toBeVisible();
   await expect(page.getByText(/GPS:/)).toBeVisible();
 });
