@@ -43,4 +43,5 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Frontier query**: `mise run issue:frontier` (open + `ready-for-agent` + not `in-progress` + unblocked). Prefer that over assignee checks — cloud agents often cannot assign.
 - **Claim**: `mise run issue:claim -- <n>` — adds `in-progress` before any work (assignee is best-effort). The session's first tracker write.
 - **Release**: `mise run issue:release -- <n>` — drops `in-progress` if abandoning.
-- **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+- **Resolve (implementation tickets)**: open/merge a PR whose **body** contains `Closes #<n>` (also `Fixes` / `Resolves`). Do not rely on `(#n)` in the title. Cloud agents often cannot `gh issue close`; close-on-merge is required. Infra PRs with no ticket: `No-ticket: true` in the body.
+- **Resolve (wayfinder decision tickets)**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.

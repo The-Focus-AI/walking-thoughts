@@ -24,8 +24,26 @@ spec, run typechecking regularly, and run the two-axis code review before
 committing. Never commit secrets or weaken authentication to make local
 development or tests pass.
 
-Agent PR bodies must include `Closes #<ticket>` (not only `(#N)` in the title)
-so merging to `main` auto-closes the issue without needing agent `issues:write`.
+## Pull requests and ticket close-out
+
+When opening or updating a PR for a product ticket:
+
+1. Put the ticket in the **title** (e.g. `… (#13)`).
+2. Put a **closing keyword in the PR body** on its own line:
+
+   ```text
+   Closes #13
+   ```
+
+   Also accepted: `Fixes #13`, `Resolves #13` (and close/fix/resolve variants).
+3. Do **not** rely on `(#13)` in the title alone — that does not close the issue.
+4. Infra/docs PRs with no product ticket may set `No-ticket: true` on its own
+   line in the body instead.
+
+Cloud Agent tokens often lack `issues:write`. Merging to `main` with
+`Closes #<n>` is how tickets get closed. CI
+(`.github/workflows/agent-ticket-claim.yml`) fails `cursor/*` PRs that omit it.
+Details: `docs/agents/issue-workflow.md`.
 
 ## Cursor Cloud specific instructions
 
@@ -43,3 +61,7 @@ Clerk/fnox flows will not.
 Use `mise` for all project tools. Do not run direct Vercel deploy commands.
 After dependency changes, prefer `mise run install` / `mise install` rather than
 ad-hoc global package managers.
+
+Every product-ticket PR body must include `Closes #<n>` (see above). Prefer that
+over asking the human to close issues, and over attempting `gh issue close`
+when the token lacks permission.
