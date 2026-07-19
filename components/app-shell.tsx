@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { AccountExport } from "@/components/account-export";
 import { CaptureComposer } from "@/components/capture-composer";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { OfflineReadiness } from "@/components/offline-readiness";
@@ -56,6 +57,7 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
       </section>
 
       <OfflineRegionPanel />
+      {!configurationRequired ? <AccountExport /> : null}
 
       <DataHandlingDisclosure />
 

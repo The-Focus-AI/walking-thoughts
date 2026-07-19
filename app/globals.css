@@ -540,6 +540,46 @@ h1 {
   margin-bottom: 0;
 }
 
+.account-export {
+  display: grid;
+  gap: 1rem;
+  margin: 0 auto 2.5rem;
+  max-width: 42rem;
+  padding: 0 1.25rem 2rem;
+}
+
+.account-export-header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+}
+
+.account-export-header p,
+.account-export-error {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.account-export-actions button {
+  border: 1px solid rgba(20, 24, 22, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  border-radius: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.account-export-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.account-export-error {
+  color: #8a4b12;
+}
+
 footer {
   gap: 0.6rem;
   color: #8e958b;
