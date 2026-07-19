@@ -40,7 +40,6 @@ import type {
   ThreadDestination,
 } from "@/lib/local-capture/types";
 import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
-import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
@@ -48,11 +47,12 @@ import {
   evaluatePushOptInAfterSync,
   type AfterSyncPushOptInResult,
 } from "@/lib/push/client";
-import { synchronizePendingCaptures } from "@/lib/sync/client";
+import { getMediaTransport } from "@/lib/sync/media-client";
 import {
-  getMediaTransport,
-  synchronizePendingMedia,
-} from "@/lib/sync/media-client";
+  SYNC_CYCLE_EVENT,
+  runSyncCycle,
+  type SyncCycleResult,
+} from "@/lib/sync/cycle";
 import {
   pendingSyncCount,
   syncFooterSummary,
@@ -68,6 +68,7 @@ type ThreadView = {
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
   const [inbox, setInbox] = useState<LocalCapture[]>([]);
+  const [allCaptures, setAllCaptures] = useState<LocalCapture[]>([]);
   const [threads, setThreads] = useState<ThreadView[]>([]);
   const [recentThreads, setRecentThreads] = useState<LocalThread[]>([]);
   const [destination, setDestinationState] = useState<ThreadDestination>({
@@ -99,9 +100,10 @@ export function CaptureComposer() {
 
   async function refreshLists() {
     const store = getCaptureStore();
-    const [nextInbox, recent] = await Promise.all([
+    const [nextInbox, recent, listed] = await Promise.all([
       store.listInbox(),
       store.listRecentThreads(),
+      store.list(),
     ]);
     const threadViews = await Promise.all(
       recent.map(async (thread) => {
@@ -111,6 +113,7 @@ export function CaptureComposer() {
       }),
     );
     setInbox(nextInbox);
+    setAllCaptures(listed);
     setRecentThreads(recent);
     setThreads(threadViews);
   }
@@ -120,20 +123,16 @@ export function CaptureComposer() {
     const generation = ++syncGeneration.current;
     setIsSyncing(true);
     try {
-      await synchronizePendingMedia(getCaptureStore());
-      const syncBatch = await synchronizePendingCaptures(getCaptureStore());
+      const syncBatch = await runSyncCycle({
+        store: getCaptureStore(),
+      });
       if (generation === syncGeneration.current) {
         const optIn = evaluatePushOptInAfterSync({
-          successfulSyncResultCount: syncBatch.results.length,
+          successfulSyncResultCount: syncBatch.capturesPushed,
         });
         if (optIn.status !== "idle") {
           setPushOptIn(optIn);
         }
-      }
-      await enrichPendingCaptures(getCaptureStore(), undefined, {
-        retryFailed: true,
-      });
-      if (generation === syncGeneration.current) {
         await refreshLists();
       }
     } catch {
@@ -247,16 +246,37 @@ export function CaptureComposer() {
       void runForegroundSync();
     };
     const onOffline = () => setOnline(false);
+    const onCycle = (event: Event) => {
+      const detail = (event as CustomEvent<SyncCycleResult>).detail;
+      if (!detail || detail.skippedOffline) return;
+      void refreshLists();
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+    window.addEventListener(SYNC_CYCLE_EVENT, onCycle);
     return () => {
       window.clearTimeout(start);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener(SYNC_CYCLE_EVENT, onCycle);
     };
     // Foreground sync should arm once the composer is ready and on reconnect.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runForegroundSync closes over latest store helpers
   }, [ready]);
+
+  // Keep Enrichment moving while any Capture is enriching and the shell is open.
+  useEffect(() => {
+    if (!ready || !online) return;
+    const hasEnriching = allCaptures.some(
+      (capture) => capture.status === "enriching",
+    );
+    if (!hasEnriching) return;
+    const timer = window.setInterval(() => {
+      void runForegroundSync();
+    }, 2500);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- drain via runForegroundSync
+  }, [ready, online, allCaptures]);
 
   useEffect(() => {
     if (!ready || isPending) return;
@@ -429,11 +449,7 @@ export function CaptureComposer() {
       ? `Adding to “${trailTitle}”`
       : "First Capture starts today's Thread";
 
-  const statusSources = [
-    ...(activeView?.captures ?? []).map((capture) => capture.status),
-    ...inbox.map((capture) => capture.status),
-  ];
-  const rollup = syncRollup(statusSources);
+  const rollup = syncRollup(allCaptures.map((capture) => capture.status));
   const footerSummary = syncFooterSummary(rollup, { running: isSyncing });
 
   const composer = (
@@ -750,8 +766,8 @@ export function CaptureComposer() {
           <strong>{footerSummary}</strong>
           <p className="capture-persistence">
             {pendingSyncCount(rollup) > 0
-              ? `${rollup.syncing} syncing · ${rollup.enriching} enriching · ${rollup.needs_attention} need attention`
-              : "Foreground sync when open and online (background is best effort)"}
+              ? `${rollup.saved_locally} local · ${rollup.syncing} syncing · ${rollup.enriching} enriching · ${rollup.needs_attention} need attention`
+              : "Sync drains while the app is open and online"}
           </p>
         </div>
         <button

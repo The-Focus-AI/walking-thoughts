@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
+import { SyncRuntime } from "@/components/sync-runtime";
 import { CaptureEntryView } from "@/components/thread-entries";
 import { ThreadChat } from "@/components/thread-chat";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
@@ -326,6 +327,7 @@ export function MapJournal() {
 
   return (
     <div className="journal" data-selected={context ? "true" : "false"}>
+      <SyncRuntime />
       <header className="journal-topbar">
         <Link className="brand" href="/" aria-label="Walking Thoughts home">
           <span className="brand-mark" aria-hidden="true">

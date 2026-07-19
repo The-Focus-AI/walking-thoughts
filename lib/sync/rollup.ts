@@ -34,7 +34,7 @@ export function syncFooterSummary(
   rollup: SyncRollup,
   options?: { running?: boolean },
 ): string {
-  if (options?.running) return "Foreground sync running…";
+  if (options?.running) return "Sync running…";
   const pending = pendingSyncCount(rollup);
   const total =
     pending + rollup.complete;
