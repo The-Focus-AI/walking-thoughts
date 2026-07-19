@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { CaptureComposer } from "@/components/capture-composer";
 import { OfflineReadiness } from "@/components/offline-readiness";
+import { OfflineRegionPanel } from "@/components/offline-region-panel";
 
 type AppShellProps = {
   account?: ReactNode;
@@ -44,6 +45,8 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <CaptureComposer />
         )}
       </section>
+
+      <OfflineRegionPanel />
 
       <footer>
         <span>Local first</span>
