@@ -38,6 +38,10 @@ import type {
   ThreadDestination,
 } from "@/lib/local-capture/types";
 import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
+import {
+  FOREGROUND_SYNC_IDLE,
+  FOREGROUND_SYNC_RUNNING,
+} from "@/lib/disclosures/copy";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
@@ -584,9 +588,7 @@ export function CaptureComposer() {
 
       <div className="capture-sync-bar">
         <p className="capture-persistence" role="status">
-          {isSyncing
-            ? "Foreground sync running…"
-            : "Foreground sync when open and online (background is best effort)"}
+          {isSyncing ? FOREGROUND_SYNC_RUNNING : FOREGROUND_SYNC_IDLE}
         </p>
         <button
           type="button"

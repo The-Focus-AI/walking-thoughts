@@ -2,17 +2,17 @@ import {
   createMemoryBlobStore,
   type PrivateBlobStore,
 } from "./memory-blob-store";
+import { createVercelBlobStore } from "./vercel-blob-store";
 
 export function getPrivateBlobStore(
   environment: NodeJS.ProcessEnv = process.env,
 ): PrivateBlobStore {
-  // Private Vercel Blob integration lands when BLOB_READ_WRITE_TOKEN is present.
-  // Until then (and in tests), use the durable-enough in-process store.
-  if (!environment.BLOB_READ_WRITE_TOKEN) {
+  const token = environment.BLOB_READ_WRITE_TOKEN?.trim();
+  if (!token) {
     return createMemoryBlobStore("default");
   }
 
-  // Lazy-require keeps builds working when the optional token isn't configured.
-  // The memory store remains the test seam; production should set the token.
-  return createMemoryBlobStore("vercel-fallback");
+  // Prefer the real private Blob store when a token is configured. Tests that
+  // need isolation keep using createMemoryBlobStore directly.
+  return createVercelBlobStore(token);
 }

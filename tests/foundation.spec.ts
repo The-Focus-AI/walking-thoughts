@@ -93,16 +93,46 @@ test("health reports configuration without exposing secret values", async ({
   const response = await request.get("/api/health");
   const payload = await response.json();
 
-  expect(response.status()).toBe(clerkRuntimeConfigured ? 200 : 503);
-  expect(payload).toEqual({
-    status: clerkRuntimeConfigured ? "ok" : "configuration_required",
+  expect([200, 503]).toContain(response.status());
+  expect(payload).toMatchObject({
+    status: expect.stringMatching(
+      /^(ok|degraded|configuration_required)$/,
+    ),
+    environment: expect.stringMatching(
+      /^(production|preview|development|unknown)$/,
+    ),
     services: {
-      clerkPublishableKey: Boolean(
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-      ),
-      clerkSecretKey: Boolean(process.env.CLERK_SECRET_KEY),
-      allowedUsers: Boolean(process.env.CLERK_ALLOWED_USER_IDS),
+      clerk: { status: expect.stringMatching(/^(ready|missing|error)$/) },
+      database: { status: expect.stringMatching(/^(ready|missing|error)$/) },
+      blob: { status: expect.stringMatching(/^(ready|missing|error)$/) },
+      gateway: { status: expect.stringMatching(/^(ready|missing|error)$/) },
+      queue: { status: expect.stringMatching(/^(ready|missing|error)$/) },
+      push: { status: expect.stringMatching(/^(ready|missing|error)$/) },
+    },
+    transport: {
+      httpsRequiredInProduction: expect.any(Boolean),
+      canonicalOriginConfigured: expect.any(Boolean),
     },
   });
-  expect(JSON.stringify(payload)).not.toMatch(/(?:pk|sk)_(?:test|live)_/);
+
+  if (!clerkRuntimeConfigured) {
+    expect(response.status()).toBe(503);
+    expect(payload.status).toBe("configuration_required");
+  }
+
+  const serialized = JSON.stringify(payload);
+  expect(serialized).not.toMatch(/(?:pk|sk)_(?:test|live)_/);
+  expect(serialized).not.toMatch(/postgres:\/\//i);
+  expect(serialized).not.toContain("vercel_blob_rw_");
+  for (const secret of [
+    process.env.CLERK_SECRET_KEY,
+    process.env.DATABASE_URL,
+    process.env.BLOB_READ_WRITE_TOKEN,
+    process.env.AI_GATEWAY_API_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  ]) {
+    if (secret && secret.length > 8) {
+      expect(serialized).not.toContain(secret);
+    }
+  }
 });
