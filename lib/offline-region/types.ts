@@ -36,6 +36,8 @@ export type RegionStorage = {
   persisted: boolean;
   usageBytes: number | null;
   quotaBytes: number | null;
+};
+
 export type LatLng = {
   latitude: number;
   longitude: number;
