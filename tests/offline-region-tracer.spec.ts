@@ -1,20 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { TracerHook } from "@/components/region-tracer";
 
 const TRACER_URL = "/region-tracer?region=fixture";
-
-type TracerHook = {
-  state: string;
-  metrics: {
-    packBytes: number | null;
-    downloadedBytes: number | null;
-    installedBytes: number | null;
-    firstRenderMs: number | null;
-    storage: { persisted: boolean } | null;
-  };
-  styleLayerIds: () => string[];
-  attribution: () => string;
-  canvasPainted: () => boolean;
-};
 
 function hook(page: Page) {
   return page.evaluate(() => {

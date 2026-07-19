@@ -60,7 +60,6 @@ export type RegionStore = {
     onProgress?: (progress: RegionDownloadProgress) => void,
   ): Promise<void>;
   openFile(manifest: RegionManifest, path: string): Promise<File>;
-  remove(manifest: RegionManifest): Promise<void>;
   storage(): Promise<RegionStorage>;
 };
 
@@ -171,19 +170,6 @@ export function createRegionStore(baseUrl: string, region: string): RegionStore 
       }
       const handle = await resolveFile(directory, path, false);
       return handle.getFile();
-    },
-
-    async remove(manifest) {
-      try {
-        const root = await navigator.storage.getDirectory();
-        const regions = await root.getDirectoryHandle(ROOT_DIRECTORY, {
-          create: false,
-        });
-        const owner = await regions.getDirectoryHandle(region, { create: false });
-        await owner.removeEntry(`v${manifest.version}`, { recursive: true });
-      } catch {
-        // Already absent.
-      }
     },
 
     async storage() {

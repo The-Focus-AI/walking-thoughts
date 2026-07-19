@@ -9,6 +9,10 @@ gh = "latest"
 jq = "latest"
 ripgrep = "latest"
 "npm:clerk" = "latest"
+# Offline Region pipeline (region:build). tippecanoe and GDAL have no mise
+# backend; build-region.sh checks for them and they install via
+# `apt install gdal-bin python3-gdal python3-numpy` + felt/tippecanoe make.
+"ubi:protomaps/go-pmtiles" = { version = "latest", exe = "pmtiles" }
 
 # Tasks use bash features (pipefail). Keep inline task shell on bash.
 [settings]
@@ -134,6 +138,14 @@ echo "Direct Vercel deployments are disabled."
 echo "Merge an approved PR to main; Vercel's Git integration deploys Production."
 exit 2
 '''
+
+[tasks."region:build"]
+description = "Package one Offline Region (basemap, terrain, contours, fonts, manifest)"
+run = "bash scripts/offline-region/build-region.sh"
+
+[tasks."region:measure"]
+description = "Measure a built Offline Region through /region-tracer on a Pixel-9 viewport"
+run = "node scripts/offline-region/measure-region.mjs"
 
 [tasks."issue:ensure-labels"]
 description = "Create triage and in-progress labels if missing"

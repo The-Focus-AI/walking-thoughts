@@ -48,20 +48,20 @@ export async function renderInstalledRegion(
   glyphStores.set(manifest.region, store);
   glyphManifests.set(manifest.region, manifest);
 
-  const keys: Record<string, string> = {};
+  const pmtilesNameByPath: Record<string, string> = {};
   for (const artifact of manifest.artifacts) {
     const file = await store.openFile(manifest, artifact.path);
     // FileSource keys by file name; qualify it so regions cannot collide.
     const named = new File([file], `${manifest.region}-v${manifest.version}-${artifact.path}`);
     protocol.add(new PMTiles(new FileSource(named)));
-    keys[artifact.path] = named.name;
+    pmtilesNameByPath[artifact.path] = named.name;
   }
 
   const style = trailFirstStyle({
     manifest,
-    basemapUrl: `pmtiles://${keys["basemap.pmtiles"]}`,
-    terrainUrl: `pmtiles://${keys["terrain.pmtiles"]}`,
-    contoursUrl: `pmtiles://${keys["contours.pmtiles"]}`,
+    basemapUrl: `pmtiles://${pmtilesNameByPath["basemap.pmtiles"]}`,
+    terrainUrl: `pmtiles://${pmtilesNameByPath["terrain.pmtiles"]}`,
+    contoursUrl: `pmtiles://${pmtilesNameByPath["contours.pmtiles"]}`,
     glyphsUrl: `region-glyphs://${manifest.region}/{fontstack}/{range}.pbf`,
   });
 
@@ -82,12 +82,6 @@ export async function renderInstalledRegion(
     canvasContextAttributes: { preserveDrawingBuffer: true },
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
-  map.addControl(
-    new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,
-    }),
-  );
 
   const firstRenderMs = new Promise<number>((resolve) => {
     map.once("idle", () => resolve(performance.now() - constructed));

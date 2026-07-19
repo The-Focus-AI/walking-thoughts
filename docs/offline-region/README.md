@@ -20,7 +20,7 @@ for t in n42w074 n42w073 n43w074 n43w073; do
   curl -sL -O "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/$t/USGS_13_$t.tif"
 done
 
-scripts/offline-region/build-region.sh \
+mise run region:build -- \
   --region home \
   --name "Cornwall, Connecticut" \
   --center 41.844,-73.329 \
@@ -30,9 +30,14 @@ scripts/offline-region/build-region.sh \
   --out public/offline-region/home
 ```
 
+`pmtiles` comes from mise (`ubi:protomaps/go-pmtiles`); tippecanoe and GDAL
+have no mise backend — install GDAL with
+`apt install gdal-bin python3-gdal python3-numpy` and build
+[felt/tippecanoe](https://github.com/felt/tippecanoe) with `make && make install`.
+
 Measure it on a Pixel-9-sized viewport (server must be running):
 
 ```bash
 pnpm build && pnpm start --hostname 127.0.0.1 --port 3103 &
-node scripts/offline-region/measure-region.mjs --region home
+mise run region:measure -- --region home
 ```

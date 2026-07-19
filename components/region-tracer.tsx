@@ -7,6 +7,7 @@ import {
   RegionIntegrityError,
   type RegionStore,
 } from "@/lib/offline-region/store";
+import { cacheShellResources } from "@/lib/offline-shell";
 import type {
   RegionDownloadProgress,
   RegionManifest,
@@ -25,7 +26,7 @@ type TracerState =
   | { phase: "failed"; manifest: RegionManifest; reason: string }
   | { phase: "installed"; manifest: RegionManifest };
 
-type TracerMetrics = {
+export type TracerMetrics = {
   packBytes: number | null;
   downloadedBytes: number | null;
   installedBytes: number | null;
@@ -33,7 +34,7 @@ type TracerMetrics = {
   storage: RegionStorage | null;
 };
 
-type TracerHook = {
+export type TracerHook = {
   state: string;
   metrics: TracerMetrics;
   styleLayerIds: () => string[];
@@ -52,28 +53,9 @@ function formatBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1_000))} KB`;
 }
 
-const CACHE_NAME = "walking-thoughts-shell-v8";
-
 async function cacheTracerShell(): Promise<void> {
-  if (!("serviceWorker" in navigator) || !("caches" in window)) return;
   try {
-    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    await navigator.serviceWorker.ready;
-    const cache = await caches.open(CACHE_NAME);
-    const resourceUrls = performance
-      .getEntriesByType("resource")
-      .map((entry) => new URL(entry.name))
-      .filter(
-        (url) =>
-          url.origin === window.location.origin &&
-          url.pathname.startsWith("/_next/static/"),
-      )
-      .map((url) => url.pathname + url.search);
-    await Promise.allSettled(
-      [...new Set(["/region-tracer", ...resourceUrls])].map((url) =>
-        cache.add(url),
-      ),
-    );
+    await cacheShellResources(["/region-tracer"]);
   } catch {
     // Offline shell caching is best-effort; the map itself lives in OPFS.
   }
@@ -258,8 +240,7 @@ export function RegionTracer() {
       {state.phase === "unpublished" && (
         <p role="status">
           The Offline Region artifact for “{region}” has not been published to
-          this deployment. Build it with{" "}
-          <code>scripts/offline-region/build-region.sh</code>.
+          this deployment. Build it with <code>mise run region:build</code>.
         </p>
       )}
 

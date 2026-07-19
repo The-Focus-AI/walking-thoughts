@@ -79,13 +79,17 @@ Measured through the public `/region-tracer` seam on a Pixel-9-sized
 
 | Measurement | Value |
 | --- | --- |
-| Pack size (downloaded = installed) | 87.0 MB (basemap 42.9, terrain 21.8, contours 21.7, fonts 1.2) |
+| Pack size (each file's received bytes verified against the manifest) | 87.0 MB (basemap 42.9, terrain 21.8, contours 21.7, fonts 1.2) |
+| Installed size (`navigator.storage.estimate()` after install) | 88.9 MB |
 | Download + verify + install to OPFS (localhost) | 0.9 s |
 | First render (map create → idle) | 1.4 s |
 | Re-render per zoom step z11–z17 | 0.6–2.0 s |
 | Pan 300 px at z14 | 0.7 s |
 | Airplane-mode reload → fully rendered | 1.2 s |
-| Storage usage / quota after install | 88.9 MB of 3.3 GB (headless quota); `navigator.storage.persist()` requested |
+| Storage quota after install | 3.3 GB (headless quota); `navigator.storage.persist()` requested |
+
+Zoom-level screenshots (z11–z17 plus the airplane-mode reload) are attached
+to the tracer pull request.
 
 Airplane-mode rendering, sharpness through z14–z17, trail-first layer
 ordering, contour/elevation labels, and corrupted-artifact rejection are
