@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   DEFAULT_PUBLISHED_REGION,
   PREFERRED_HOME_REGION,
+  PUBLIC_HOME_REGION_BASE,
   homeRegionBaseUrl,
   resolveJournalRegion,
   resolveRegionBaseUrl,
@@ -10,7 +11,7 @@ import {
 const HOME_BLOB =
   "https://example.public.blob.vercel-storage.com/offline-region/home";
 
-test("Map Journal defaults to fixture when no home Blob base is configured", () => {
+test("Map Journal defaults to fixture when home Blob base is explicitly null", () => {
   expect(resolveJournalRegion(null, { homeBaseUrl: null })).toBe(
     DEFAULT_PUBLISHED_REGION,
   );
@@ -46,7 +47,7 @@ test("home region uses the Blob base URL when configured", () => {
   );
 });
 
-test("homeRegionBaseUrl trims trailing slashes", () => {
+test("homeRegionBaseUrl trims trailing slashes and defaults to the public home pack", () => {
   expect(
     homeRegionBaseUrl({
       NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE: `${HOME_BLOB}/`,
@@ -55,4 +56,5 @@ test("homeRegionBaseUrl trims trailing slashes", () => {
   expect(homeRegionBaseUrl({ NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE: "  " })).toBe(
     null,
   );
+  expect(homeRegionBaseUrl({})).toBe(PUBLIC_HOME_REGION_BASE);
 });

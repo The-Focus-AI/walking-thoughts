@@ -151,10 +151,16 @@ for KEY in $KEYS; do
     echo "$KEY skipped (empty)"
     continue
   fi
+  # NEXT_PUBLIC_* must not be Sensitive — Next.js inlines them at build time.
+  SENSITIVE_FLAG=(--sensitive)
+  case "$KEY" in
+    NEXT_PUBLIC_*) SENSITIVE_FLAG=(--no-sensitive) ;;
+  esac
   vercel env add "$KEY" "$ENV" \
     --value "$VALUE" \
     --yes \
     --force \
+    "${SENSITIVE_FLAG[@]}" \
     --scope "$SCOPE" \
     --project "$PROJECT" \
     >/dev/null
