@@ -442,6 +442,7 @@ footer {
   gap: 0.45rem;
   color: var(--muted);
   font-size: 0.78rem;
+  text-decoration: none;
   white-space: nowrap;
 }
 
