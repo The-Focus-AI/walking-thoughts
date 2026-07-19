@@ -80,14 +80,14 @@ test("installed shell remains useful when the network disappears", async ({
       }),
     )
     .toBe("activated");
-  await expect(page.getByText("Ready offline")).toBeVisible();
+  await expect(page.getByText("App cached")).toBeVisible();
 
   await context.setOffline(true);
   await page.reload();
   await expect(
     page.getByRole("link", { name: "Walking Thoughts home" }),
   ).toBeVisible();
-  await expect(page.getByText("Ready offline")).toBeVisible();
+  await expect(page.getByText("App cached")).toBeVisible();
 });
 
 test("health reports configuration without exposing secret values", async ({

@@ -152,6 +152,32 @@ a {
   width: fit-content;
 }
 
+.trail-map-hero-progress {
+  display: grid;
+  gap: 0.45rem;
+  max-width: 22rem;
+}
+
+.trail-map-hero-progress p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trail-map-hero-progress-track {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.trail-map-hero-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sun);
+  transition: width 160ms ease-out;
+}
+
 .trail-capture {
   min-width: 0;
 }
