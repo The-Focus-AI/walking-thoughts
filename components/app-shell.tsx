@@ -20,6 +20,9 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <span>Walking Thoughts</span>
         </Link>
         <div className="topbar-actions">
+          <Link className="topbar-link" href="/journal">
+            Map Journal
+          </Link>
           <OfflineReadiness />
           {account}
         </div>

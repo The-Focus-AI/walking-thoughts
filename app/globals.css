@@ -648,6 +648,209 @@ footer {
   }
 }
 
+.topbar-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.topbar-link:hover {
+  color: var(--ink);
+}
+
+.journal {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.journal-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.journal-status {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.journal-empty {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--forest-light);
+}
+
+.journal-empty h1 {
+  margin: 0;
+  font-size: clamp(1.3rem, 4vw, 1.9rem);
+}
+
+.journal-empty button {
+  padding: 0.65rem 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--moss);
+  color: var(--forest);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.journal-surface {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  min-height: 70svh;
+  position: relative;
+}
+
+.journal-map {
+  min-height: 70svh;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.journal-panel {
+  background: var(--forest-light);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.journal-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.journal-panel-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.journal-place {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.journal-close {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+.journal-preview {
+  margin-top: 0.75rem;
+}
+
+.journal-thread h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.journal-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.journal-followup {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.journal-followup label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.journal-followup textarea {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ink);
+  padding: 0.6rem;
+  resize: vertical;
+}
+
+.journal-followup button {
+  justify-self: start;
+  padding: 0.55rem 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--moss);
+  color: var(--forest);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.journal-followup button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.journal-gps-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2f7bd9;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 4px rgba(47, 123, 217, 0.25);
+}
+
+/* Desktop: adjacent Thread panel beside the map. */
+@media (min-width: 851px) {
+  .journal[data-selected="true"] .journal-surface {
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+  }
+
+  .journal-panel {
+    max-height: calc(100svh - 8rem);
+  }
+}
+
+/* Mobile: bottom sheet over the map. */
+@media (max-width: 850px) {
+  .journal-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    max-height: 62svh;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.4);
+  }
+}
+
 .region-tracer {
   min-height: 100svh;
   display: flex;

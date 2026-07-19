@@ -30,7 +30,6 @@ import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
   AttachmentInput,
-  CaptureSyncStatus,
   LocalAttachment,
   LocalCapture,
   LocalThread,
@@ -38,8 +37,9 @@ import type {
   PersistenceResult,
   ThreadDestination,
 } from "@/lib/local-capture/types";
+import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
-import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
+import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
 import {
   getMediaTransport,
@@ -55,21 +55,6 @@ function destinationFromValue(value: string): ThreadDestination {
   if (value === "inbox") return { type: "inbox" };
   if (value === "new_thread") return { type: "new_thread" };
   return { type: "thread", threadId: value };
-}
-
-function statusLabel(status: CaptureSyncStatus): string {
-  switch (status) {
-    case "saved_locally":
-      return "Saved locally";
-    case "syncing":
-      return "Syncing";
-    case "enriching":
-      return "Enriching";
-    case "complete":
-      return "Complete";
-    case "needs_attention":
-      return "Needs attention";
-  }
 }
 
 type ThreadView = {
@@ -654,46 +639,13 @@ export function CaptureComposer() {
             ))}
             {enrichments.map((enrichment) => (
               <li key={enrichment.id}>
-                <EnrichmentEntry enrichment={enrichment} />
+                <EnrichmentEntryView enrichment={enrichment} />
               </li>
             ))}
           </ul>
         </section>
       ))}
     </div>
-  );
-}
-
-function EnrichmentEntry({ enrichment }: { enrichment: ThreadEnrichment }) {
-  return (
-    <article
-      className="capture-entry enrichment-entry"
-      aria-label={`Enrichment ${enrichment.model}`}
-    >
-      <div className="capture-entry-meta">
-        <span className="capture-status status-complete">Enrichment</span>
-        <time dateTime={enrichment.createdAt}>
-          {new Date(enrichment.createdAt).toLocaleString()}
-        </time>
-        <span className="enrichment-model">{enrichment.model}</span>
-      </div>
-      <p className="capture-text">{enrichment.text}</p>
-      {enrichment.sources.length > 0 ? (
-        <ul className="enrichment-sources" aria-label="Sources">
-          {enrichment.sources.map((source: EnrichmentSource) => (
-            <li key={`${source.url}-${source.retrievedAt}`}>
-              <a href={source.url} target="_blank" rel="noreferrer">
-                {source.title}
-              </a>
-              <span className="enrichment-source-meta">
-                {" "}
-                · retrieved {new Date(source.retrievedAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </article>
   );
 }
 
