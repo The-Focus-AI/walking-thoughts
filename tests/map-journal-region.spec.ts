@@ -8,7 +8,7 @@ import {
 } from "@/lib/map-journal/region";
 
 const HOME_BLOB =
-  "https://dfshk3veycwqp13u.public.blob.vercel-storage.com/offline-region/home";
+  "https://example.public.blob.vercel-storage.com/offline-region/home";
 
 test("Map Journal defaults to fixture when no home Blob base is configured", () => {
   expect(resolveJournalRegion(null, { homeBaseUrl: null })).toBe(

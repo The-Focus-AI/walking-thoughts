@@ -5,11 +5,11 @@
 //   node scripts/offline-region/publish-region.mjs \
 //     --dir public/offline-region/home --prefix offline-region/home
 //
-// Requires BLOB_REGION_READ_WRITE_TOKEN (preferred) or BLOB_READ_WRITE_TOKEN
-// for a *public* Blob store. Do not reuse the private media store token here.
+// Requires BLOB_REGION_READ_WRITE_TOKEN for the *public* regions Blob store.
+// Do not reuse BLOB_READ_WRITE_TOKEN (private Capture media).
 //
-// Prints the public base URL (no trailing slash) suitable for
-// NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE.
+// Prints the public base URL (no trailing slash). Put that value in fnox as
+// NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE, then `mise run vercel:sync`.
 
 import { put } from "@vercel/blob";
 import fs from "node:fs";
@@ -25,12 +25,13 @@ const dir = option("dir", "public/offline-region/home");
 const prefix = option("prefix", "offline-region/home").replace(/\/+$/, "");
 const concurrency = Number(option("concurrency", "4"));
 
-const token =
-  process.env.BLOB_REGION_READ_WRITE_TOKEN?.trim() ||
-  process.env.BLOB_READ_WRITE_TOKEN?.trim();
+const token = process.env.BLOB_REGION_READ_WRITE_TOKEN?.trim();
 if (!token) {
   console.error(
     "Set BLOB_REGION_READ_WRITE_TOKEN (public regions store) before publishing.",
+  );
+  console.error(
+    "Do not use BLOB_READ_WRITE_TOKEN — that token is for private media only.",
   );
   process.exit(1);
 }
@@ -111,7 +112,8 @@ if (!baseUrl) {
 
 console.log(baseUrl);
 console.error("");
-console.error("Set NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE to the URL above.");
 console.error(
-  "Example: vercel env add NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE production",
+  "Update fnox NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE to the URL above,",
 );
+console.error("then run: mise run vercel:sync -- --env production");
+console.error("          mise run vercel:sync -- --env preview");
