@@ -4,25 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
-import {
-  CaptureEntryView,
-  EnrichmentEntryView,
-} from "@/components/thread-entries";
-import { enrichPendingCaptures } from "@/lib/enrichment/client";
+import { CaptureEntryView } from "@/components/thread-entries";
+import { ThreadChat } from "@/components/thread-chat";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
-import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import {
-  chronologicalThreadEntries,
-  type ThreadTimelineEntry,
-} from "@/lib/local-capture/thread-timeline";
-import type {
-  AttachmentInput,
-  LocalCapture,
-  LocalThread,
-  MediaKind,
-} from "@/lib/local-capture/types";
+import type { LocalCapture, LocalThread } from "@/lib/local-capture/types";
 import {
   addCaptureMarkerLayers,
   CLUSTER_LAYER,
@@ -37,8 +24,6 @@ import {
 import { createRegionStore } from "@/lib/offline-region/store";
 import type { RegionManifest } from "@/lib/offline-region/types";
 import { cacheShellResources } from "@/lib/offline-shell";
-import { synchronizePendingCaptures } from "@/lib/sync/client";
-import { synchronizePendingMedia } from "@/lib/sync/media-client";
 
 type GpsState =
   | { status: "off" }
@@ -61,10 +46,6 @@ type ThreadContext = {
   captures: LocalCapture[];
   enrichments: ThreadEnrichment[];
 };
-
-function chronologicalEntries(context: ThreadContext): ThreadTimelineEntry[] {
-  return chronologicalThreadEntries(context.captures, context.enrichments);
-}
 
 export type MapJournalHook = {
   state: JournalState["phase"];
@@ -92,9 +73,6 @@ export function MapJournal() {
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
   const [context, setContext] = useState<ThreadContext | null>(null);
-  const [followUp, setFollowUp] = useState("");
-  const [followUpMedia, setFollowUpMedia] = useState<AttachmentInput[]>([]);
-  const [followUpBusy, setFollowUpBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [markerCount, setMarkerCount] = useState(0);
 
@@ -335,61 +313,6 @@ export function MapJournal() {
     }
   }, [state, baseUrl, region]);
 
-  const addFollowUpMedia = useCallback((fileList: FileList | null) => {
-    if (!fileList?.length) return;
-    const kindFromMime = (mimeType: string): MediaKind => {
-      if (mimeType.startsWith("audio/")) return "audio";
-      if (mimeType.startsWith("video/")) return "video";
-      return "image";
-    };
-    const next = Array.from(fileList).map((file) => ({
-      kind: kindFromMime(file.type || "application/octet-stream"),
-      mimeType: file.type || "application/octet-stream",
-      fileName: file.name || "attachment",
-      bytes: file,
-    }));
-    setFollowUpMedia((current) => [...current, ...next]);
-  }, []);
-
-  const commitFollowUp = useCallback(async () => {
-    if (
-      !context?.thread ||
-      (!followUp.trim() && followUpMedia.length === 0) ||
-      followUpBusy
-    ) {
-      return;
-    }
-    const threadId = context.thread.id;
-    setFollowUpBusy(true);
-    setError(null);
-    try {
-      // The ordinary Capture pipeline: local commit first, then foreground
-      // sync and Enrichment when connectivity allows.
-      const store = getCaptureStore();
-      await store.commit(followUp.trim(), readAvailableLocation(), {
-        destination: { type: "thread", threadId },
-        attachments: followUpMedia,
-      });
-      setFollowUp("");
-      setFollowUpMedia([]);
-      await refreshMarkers();
-      if (navigator.onLine) {
-        try {
-          await synchronizePendingMedia(store);
-          await synchronizePendingCaptures(store);
-          await enrichPendingCaptures(store, undefined, { retryFailed: true });
-        } catch {
-          // Retryable; statuses stay visible on the entries themselves.
-        }
-      }
-      await openCapture(context.capture.id);
-    } catch {
-      setError("Could not save the follow-up Capture");
-    } finally {
-      setFollowUpBusy(false);
-    }
-  }, [context, followUp, followUpMedia, followUpBusy, refreshMarkers, openCapture]);
-
   const gpsLabel =
     gps.status === "tracking"
       ? gps.accuracy === null
@@ -464,11 +387,20 @@ export function MapJournal() {
             aria-label="Thread context"
             hidden={!context}
           >
-            {context ? (
+            {context?.thread ? (
+              <ThreadChat
+                threadId={context.thread.id}
+                embedded
+                onClose={() => {
+                  setContext(null);
+                  void refreshMarkers();
+                }}
+              />
+            ) : context ? (
               <>
                 <div className="journal-panel-head">
                   <div>
-                    <h2>{context.thread?.title ?? "Inbox Capture"}</h2>
+                    <h2>Inbox Capture</h2>
                     <p className="journal-place">
                       {new Date(context.capture.createdAt).toLocaleString()}
                       {context.capture.location
@@ -485,121 +417,16 @@ export function MapJournal() {
                     ✕
                   </button>
                 </div>
-
                 <section
                   className="journal-preview"
                   aria-label="Capture preview"
                 >
                   <CaptureEntryView capture={context.capture} mediaPreviews />
                 </section>
-
-                {context.thread ? (
-                  <section
-                    className="journal-thread"
-                    aria-label={`Thread ${context.thread.title}`}
-                  >
-                    <h3>
-                      Complete Thread · revision {context.thread.revision}
-                    </h3>
-                    <ul className="capture-list">
-                      {chronologicalEntries(context).map((entry) =>
-                        entry.kind === "capture" ? (
-                          <li key={entry.capture.id}>
-                            <CaptureEntryView
-                              capture={entry.capture}
-                              mediaPreviews
-                            />
-                          </li>
-                        ) : (
-                          <li key={entry.enrichment.id}>
-                            <EnrichmentEntryView enrichment={entry.enrichment} />
-                          </li>
-                        ),
-                      )}
-                    </ul>
-                    {context.enrichments.length === 0 ? (
-                      <p className="journal-note" role="note">
-                        No Enrichments yet — they arrive when this Thread
-                        processes online. Previously loaded Enrichments stay
-                        readable offline.
-                      </p>
-                    ) : null}
-
-                    <div className="journal-followup">
-                      <label htmlFor="journal-followup-text">
-                        Follow-up Capture
-                      </label>
-                      <textarea
-                        id="journal-followup-text"
-                        rows={2}
-                        value={followUp}
-                        placeholder="Add a follow-up to this Thread…"
-                        onChange={(event) => setFollowUp(event.target.value)}
-                        disabled={followUpBusy}
-                      />
-                      {followUpMedia.length > 0 ? (
-                        <ul
-                          className="capture-attachment-drafts"
-                          aria-label="Follow-up media"
-                        >
-                          {followUpMedia.map((attachment, index) => (
-                            <li key={`${attachment.fileName}-${index}`}>
-                              {attachment.fileName}
-                              <button
-                                type="button"
-                                className="capture-retry"
-                                onClick={() =>
-                                  setFollowUpMedia((current) =>
-                                    current.filter(
-                                      (_, itemIndex) => itemIndex !== index,
-                                    ),
-                                  )
-                                }
-                              >
-                                Remove
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      <div className="journal-followup-actions">
-                        <label
-                          className="capture-retry journal-media-picker"
-                          htmlFor="journal-followup-media"
-                        >
-                          Add media
-                        </label>
-                        <input
-                          id="journal-followup-media"
-                          className="capture-file-input"
-                          type="file"
-                          accept="image/*,audio/*,video/*"
-                          multiple
-                          aria-label="Add follow-up media"
-                          onChange={(event) => {
-                            addFollowUpMedia(event.target.files);
-                            event.target.value = "";
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void commitFollowUp()}
-                          disabled={
-                            followUpBusy ||
-                            (!followUp.trim() && followUpMedia.length === 0)
-                          }
-                        >
-                          Capture follow-up
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                ) : (
-                  <p className="journal-note" role="note">
-                    This Capture is in the Inbox. It becomes its own Thread when
-                    online processing begins; follow-ups start there.
-                  </p>
-                )}
+                <p className="journal-note" role="note">
+                  This Capture is in the Inbox. It becomes its own Thread when
+                  online processing begins; open the chat from there to continue.
+                </p>
               </>
             ) : null}
           </aside>

@@ -134,13 +134,21 @@ export function ThreadsArchive() {
                         {view.thread.revision}
                       </span>
                     </button>
-                    <button
-                      type="button"
-                      className="capture-retry"
-                      onClick={() => continueOnTrail(view.thread.id)}
-                    >
-                      Continue on trail
-                    </button>
+                    <div className="threads-day-card-actions">
+                      <Link
+                        className="capture-retry"
+                        href={`/threads/${view.thread.id}`}
+                      >
+                        Open chat
+                      </Link>
+                      <button
+                        type="button"
+                        className="capture-retry"
+                        onClick={() => continueOnTrail(view.thread.id)}
+                      >
+                        Continue on trail
+                      </button>
+                    </div>
                   </div>
                   {open ? (
                     <ul className="capture-list trail-timeline">
@@ -159,6 +167,14 @@ export function ThreadsArchive() {
                           </li>
                         ),
                       )}
+                      <li>
+                        <Link
+                          className="topbar-link"
+                          href={`/threads/${view.thread.id}`}
+                        >
+                          Open as chat →
+                        </Link>
+                      </li>
                     </ul>
                   ) : null}
                 </li>
