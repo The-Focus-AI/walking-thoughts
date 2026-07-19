@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cacheShellResources } from "@/lib/offline-shell";
 
@@ -11,6 +12,7 @@ export function OfflineReadiness() {
     cacheShellResources([
       "/",
       "/offline",
+      "/offline-maps",
       "/threads",
       "/journal",
       "/manifest.webmanifest",
@@ -30,12 +32,13 @@ export function OfflineReadiness() {
   }, []);
 
   return (
-    <span
+    <Link
+      href="/offline-maps"
       className={ready ? "status status-ready" : "status"}
-      title="App screens cached on this device. Trail maps download separately as an Offline Region."
+      title="App screens cached on this device. Open Offline to download trail maps."
     >
       <span className="status-dot" aria-hidden="true" />
       {ready ? "App cached" : "Caching app…"}
-    </span>
+    </Link>
   );
 }

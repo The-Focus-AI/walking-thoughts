@@ -84,9 +84,14 @@ export function ThreadsArchive() {
             in order. Continue one on the trail when you want to append.
           </p>
         </div>
-        <Link className="topbar-link" href="/">
-          Back to capture
-        </Link>
+        <nav className="offline-maps-nav" aria-label="App">
+          <Link className="topbar-link" href="/offline-maps">
+            Offline
+          </Link>
+          <Link className="topbar-link" href="/">
+            Back to capture
+          </Link>
+        </nav>
       </header>
 
       {error ? (

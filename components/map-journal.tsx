@@ -364,6 +364,9 @@ export function MapJournal() {
           <span>Map Journal</span>
         </Link>
         <div className="journal-status" role="status">
+          <Link className="topbar-link" href="/offline-maps">
+            Offline
+          </Link>
           <span data-testid="journal-gps">{gpsLabel}</span>
           <span data-testid="journal-connectivity">
             {online
