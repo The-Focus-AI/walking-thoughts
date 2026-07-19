@@ -8,10 +8,12 @@ prototype was rewritten, not promoted.
 ## How it works
 
 - The installed Offline Region (see `docs/offline-region/`) fills the surface
-  through `renderInstalledRegion`. `/journal` defaults to the shipped
-  `fixture` pack under `/public/offline-region/fixture` and installs it on
-  first visit; use `?region=home` only after publishing a home pack with
-  `mise run region:build`.
+  through `renderInstalledRegion`. When
+  `NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE` points at the Blob-hosted home pack,
+  `/journal` defaults to that ~40 km Cornwall Bridge region and installs it on
+  first visit. Without that env var, `/journal` falls back to the shipped
+  `fixture` under `/public/offline-region/fixture`. Use `?region=fixture` or
+  `?region=home` to override.
 - Capture locations become media-aware markers (`lib/map-journal/markers.ts`):
   text, photo, audio, and video Captures get distinct colors and glyphs, and
   Captures without a recorded location honestly stay off the map.

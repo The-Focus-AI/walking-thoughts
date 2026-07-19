@@ -30,7 +30,10 @@ import {
   updateCaptureMarkers,
 } from "@/lib/map-journal/map-layers";
 import { captureMarkers } from "@/lib/map-journal/markers";
-import { resolveJournalRegion } from "@/lib/map-journal/region";
+import {
+  resolveJournalRegion,
+  resolveRegionBaseUrl,
+} from "@/lib/map-journal/region";
 import { createRegionStore } from "@/lib/offline-region/store";
 import type { RegionManifest } from "@/lib/offline-region/types";
 import { cacheShellResources } from "@/lib/offline-shell";
@@ -80,7 +83,7 @@ declare global {
 export function MapJournal() {
   const searchParams = useSearchParams();
   const region = resolveJournalRegion(searchParams.get("region"));
-  const baseUrl = `/offline-region/${region}`;
+  const baseUrl = resolveRegionBaseUrl(region);
 
   const [state, setState] = useState<JournalState>({ phase: "loading" });
   const [downloading, setDownloading] = useState(false);
@@ -439,8 +442,10 @@ export function MapJournal() {
           ) : (
             <p>
               No Offline Region pack is published for “{region}”. Open{" "}
-              <a href="/journal">/journal</a> for the shipped fixture map, or
-              publish a pack with <code>mise run region:build</code>.
+              <a href="/journal?region=fixture">/journal?region=fixture</a> for
+              the shipped fixture map, or publish home with{" "}
+              <code>mise run region:build</code> and{" "}
+              <code>mise run region:publish</code>.
             </p>
           )}
         </section>

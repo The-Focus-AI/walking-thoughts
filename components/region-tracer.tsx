@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { resolveRegionBaseUrl } from "@/lib/map-journal/region";
 import {
   createRegionStore,
   RegionIntegrityError,
@@ -66,7 +67,7 @@ export function RegionTracer() {
   // working for any region in airplane mode.
   const searchParams = useSearchParams();
   const region = searchParams.get("region") === "fixture" ? "fixture" : "home";
-  const baseUrl = `/offline-region/${region}`;
+  const baseUrl = resolveRegionBaseUrl(region);
 
   const [state, setState] = useState<TracerState>({ phase: "loading" });
   const [metrics, setMetrics] = useState<TracerMetrics>({
