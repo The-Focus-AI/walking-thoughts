@@ -11,6 +11,11 @@ import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type { LocalCapture, LocalThread } from "@/lib/local-capture/types";
 import {
+  formatRegionMegabytes,
+  regionDownloadPercent,
+  regionDownloadProgressLabel,
+} from "@/lib/offline-region/download-copy";
+import {
   addCaptureMarkerLayers,
   CLUSTER_LAYER,
   MARKER_LAYER,
@@ -22,7 +27,10 @@ import {
   resolveRegionBaseUrl,
 } from "@/lib/map-journal/region";
 import { createRegionStore } from "@/lib/offline-region/store";
-import type { RegionManifest } from "@/lib/offline-region/types";
+import type {
+  RegionDownloadProgress,
+  RegionManifest,
+} from "@/lib/offline-region/types";
 import { cacheShellResources } from "@/lib/offline-shell";
 
 type GpsState =
@@ -68,6 +76,7 @@ export function MapJournal() {
 
   const [state, setState] = useState<JournalState>({ phase: "loading" });
   const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<RegionDownloadProgress | null>(null);
   const [gps, setGps] = useState<GpsState>({ status: "off" });
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -161,15 +170,27 @@ export function MapJournal() {
 
       setState({ phase: "region-missing", manifest });
       setDownloading(true);
+      setProgress({
+        downloadedBytes: 0,
+        totalBytes: manifest.totalBytes,
+        currentPath: "",
+      });
       try {
-        await store.install(manifest);
+        await store.install(manifest, (next) => {
+          if (active) setProgress(next);
+        });
         if (active) setState({ phase: "ready", manifest });
       } catch {
         if (active) {
-          setError("The Offline Region download could not be verified");
+          setError(
+            "The Offline Region download could not be verified. Stay online and try again.",
+          );
         }
       } finally {
-        if (active) setDownloading(false);
+        if (active) {
+          setDownloading(false);
+          setProgress(null);
+        }
       }
     })();
 
@@ -300,16 +321,25 @@ export function MapJournal() {
 
   const downloadRegion = useCallback(async () => {
     if (state.phase !== "region-missing" || !state.manifest) return;
+    const manifest = state.manifest;
     setDownloading(true);
     setError(null);
+    setProgress({
+      downloadedBytes: 0,
+      totalBytes: manifest.totalBytes,
+      currentPath: "",
+    });
     try {
       const store = createRegionStore(baseUrl, region);
-      await store.install(state.manifest);
-      setState({ phase: "ready", manifest: state.manifest });
+      await store.install(manifest, (next) => setProgress(next));
+      setState({ phase: "ready", manifest });
     } catch {
-      setError("The Offline Region download could not be verified");
+      setError(
+        "The Offline Region download could not be verified. Stay online and try again.",
+      );
     } finally {
       setDownloading(false);
+      setProgress(null);
     }
   }, [state, baseUrl, region]);
 
@@ -343,30 +373,55 @@ export function MapJournal() {
         </div>
       </header>
 
-      {state.phase === "loading" && <p role="status">Checking this device…</p>}
+      {state.phase === "loading" && (
+        <p role="status">Looking for trail maps on this device…</p>
+      )}
 
       {state.phase === "region-missing" && (
         <section className="journal-empty" role="status">
-          <h1>The Map Journal needs your Offline Region.</h1>
+          <h1>Download trail maps to open the Map Journal</h1>
           {state.manifest ? (
             <>
               <p>
-                {state.manifest.name} — {state.manifest.radiusKm} km radius,{" "}
-                {(state.manifest.totalBytes / 1_000_000).toFixed(1)} MB download.
+                Save <strong>{state.manifest.name}</strong> —{" "}
+                {state.manifest.radiusKm} km of trails and contours (
+                {formatRegionMegabytes(state.manifest.totalBytes)}). The map
+                stays on this phone after the download finishes.
               </p>
-              <button
-                type="button"
-                onClick={() => void downloadRegion()}
-                disabled={downloading}
-              >
-                {downloading ? "Downloading…" : "Download Offline Region"}
-              </button>
+              {downloading ? (
+                <div
+                  className="trail-map-hero-progress"
+                  data-testid="offline-region-download-progress"
+                >
+                  <p>
+                    {regionDownloadProgressLabel(
+                      progress,
+                      state.manifest.totalBytes,
+                    )}
+                  </p>
+                  <div
+                    className="trail-map-hero-progress-track"
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="trail-map-hero-progress-fill"
+                      style={{
+                        width: `${regionDownloadPercent(progress)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => void downloadRegion()}>
+                  Download Offline Region
+                </button>
+              )}
             </>
           ) : (
             <p>
-              No Offline Region pack is published for “{region}”. Open{" "}
-              <a href="/journal?region=fixture">/journal?region=fixture</a> for
-              the shipped fixture map, or publish home with{" "}
+              Trail maps are not published for “{region}” yet. Open{" "}
+              <Link href="/journal?region=fixture">the fixture Map Journal</Link>{" "}
+              for the sample Offline Region, or publish home with{" "}
               <code>mise run region:build</code> and{" "}
               <code>mise run region:publish</code>.
             </p>

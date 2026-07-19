@@ -5,7 +5,7 @@ test("offline mixed-media Capture keeps attachments readable after restart", asy
 }) => {
   await page.goto("/offline");
   await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Ready offline")).toBeVisible();
+  await expect(page.getByText("App cached")).toBeVisible();
 
   await page.getByLabel("Choose existing media").setInputFiles({
     name: "fungus.jpg",

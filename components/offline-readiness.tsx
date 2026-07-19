@@ -30,9 +30,12 @@ export function OfflineReadiness() {
   }, []);
 
   return (
-    <span className={ready ? "status status-ready" : "status"}>
+    <span
+      className={ready ? "status status-ready" : "status"}
+      title="App screens cached on this device. Trail maps download separately as an Offline Region."
+    >
       <span className="status-dot" aria-hidden="true" />
-      {ready ? "Ready offline" : "Preparing offline…"}
+      {ready ? "App cached" : "Caching app…"}
     </span>
   );
 }

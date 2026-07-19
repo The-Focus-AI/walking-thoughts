@@ -4,11 +4,19 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  formatRegionMegabytes,
+  regionDownloadPercent,
+  regionDownloadProgressLabel,
+} from "@/lib/offline-region/download-copy";
+import {
   resolveJournalRegion,
   resolveRegionBaseUrl,
 } from "@/lib/map-journal/region";
 import { createRegionStore } from "@/lib/offline-region/store";
-import type { RegionManifest } from "@/lib/offline-region/types";
+import type {
+  RegionDownloadProgress,
+  RegionManifest,
+} from "@/lib/offline-region/types";
 
 type HeroState =
   | { phase: "loading" }
@@ -24,9 +32,32 @@ export function TrailMapHero() {
   const baseUrl = resolveRegionBaseUrl(region);
   const [state, setState] = useState<HeroState>({ phase: "loading" });
   const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<RegionDownloadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
+
+  async function installManifest(manifest: RegionManifest) {
+    setDownloading(true);
+    setError(null);
+    setProgress({
+      downloadedBytes: 0,
+      totalBytes: manifest.totalBytes,
+      currentPath: "",
+    });
+    try {
+      const store = createRegionStore(baseUrl, region);
+      await store.install(manifest, (next) => setProgress(next));
+      setState({ phase: "ready", manifest });
+    } catch {
+      setError(
+        "The Offline Region download could not be verified. Stay online and try again.",
+      );
+    } finally {
+      setDownloading(false);
+      setProgress(null);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -46,13 +77,27 @@ export function TrailMapHero() {
       }
       setState({ phase: "region-missing", manifest });
       setDownloading(true);
+      setProgress({
+        downloadedBytes: 0,
+        totalBytes: manifest.totalBytes,
+        currentPath: "",
+      });
       try {
-        await store.install(manifest);
+        await store.install(manifest, (next) => {
+          if (active) setProgress(next);
+        });
         if (active) setState({ phase: "ready", manifest });
       } catch {
-        if (active) setError("The Offline Region download could not be verified");
+        if (active) {
+          setError(
+            "The Offline Region download could not be verified. Stay online and try again.",
+          );
+        }
       } finally {
-        if (active) setDownloading(false);
+        if (active) {
+          setDownloading(false);
+          setProgress(null);
+        }
       }
     })();
     return () => {
@@ -84,47 +129,67 @@ export function TrailMapHero() {
     };
   }, [state, baseUrl, region]);
 
-  async function download() {
-    if (state.phase !== "region-missing" || !state.manifest) return;
-    setDownloading(true);
-    setError(null);
-    try {
-      const store = createRegionStore(baseUrl, region);
-      await store.install(state.manifest);
-      setState({ phase: "ready", manifest: state.manifest });
-    } catch {
-      setError("The Offline Region download could not be verified");
-    } finally {
-      setDownloading(false);
-    }
-  }
+  const percent =
+    state.phase === "region-missing" && state.manifest
+      ? regionDownloadPercent(progress)
+      : 0;
 
   return (
     <section className="trail-map-hero" aria-label="Offline Region map">
       {state.phase === "loading" ? (
         <p className="trail-map-hero-status" role="status">
-          Checking Offline Region…
+          Looking for trail maps…
         </p>
       ) : null}
 
       {state.phase === "region-missing" ? (
         <div className="trail-map-hero-missing" role="status">
           <p className="eyebrow">Offline Region</p>
-          <h2>Map your walks</h2>
+          <h2>Download trail maps</h2>
           {state.manifest ? (
             <>
               <p>
-                {state.manifest.name} — {state.manifest.radiusKm} km ·{" "}
-                {(state.manifest.totalBytes / 1_000_000).toFixed(1)} MB
+                Save <strong>{state.manifest.name}</strong> on this phone —{" "}
+                {state.manifest.radiusKm} km of trails, contours, and place
+                names ({formatRegionMegabytes(state.manifest.totalBytes)}).
+                Works without signal once the download finishes.
               </p>
-              <button type="button" onClick={() => void download()} disabled={downloading}>
-                {downloading ? "Downloading…" : "Download Offline Region"}
-              </button>
+              {downloading ? (
+                <div
+                  className="trail-map-hero-progress"
+                  data-testid="offline-region-download-progress"
+                >
+                  <p>
+                    {regionDownloadProgressLabel(
+                      progress,
+                      state.manifest.totalBytes,
+                    )}
+                  </p>
+                  <div
+                    className="trail-map-hero-progress-track"
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="trail-map-hero-progress-fill"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void installManifest(state.manifest!)}
+                >
+                  Download Offline Region
+                </button>
+              )}
             </>
           ) : (
             <p>
-              No Offline Region pack is published. Open{" "}
-              <Link href="/journal?region=fixture">Map Journal (fixture)</Link>.
+              Trail maps are not published for this install yet. You can still
+              open the{" "}
+              <Link href="/journal?region=fixture">fixture Map Journal</Link>{" "}
+              to review the sample Offline Region.
             </p>
           )}
         </div>
@@ -142,7 +207,8 @@ export function TrailMapHero() {
               <p className="eyebrow">Offline Region</p>
               <p className="trail-map-hero-name">{state.manifest.name}</p>
               <p className="trail-map-hero-meta">
-                v{state.manifest.version} · {state.manifest.radiusKm} km · ready
+                Maps ready offline · v{state.manifest.version} ·{" "}
+                {state.manifest.radiusKm} km
               </p>
             </div>
             <Link className="trail-map-hero-cta" href="/journal">
