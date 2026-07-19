@@ -60,6 +60,13 @@ skills experimental_install
 description = "Run the Walking Thoughts development server"
 run = "fnox exec -- pnpm dev"
 
+[tasks."prototype:trail-cleanup"]
+description = "Print the throwaway trail-cleanup UI prototype URL (run mise run dev separately)"
+run = '''
+echo "PROTOTYPE (throwaway): open http://127.0.0.1:3000/prototype/trail-cleanup?area=density&variant=A"
+echo "Areas: density | sync | map   Variants: A B C   Keys: ← →"
+'''
+
 [tasks.lint]
 description = "Lint and typecheck the application"
 run = '''
