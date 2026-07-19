@@ -15,9 +15,10 @@ mise run dev
 mise run prototype:trail-cleanup
 ```
 
-Open:
+Open either entry (same switcher):
 
-`http://127.0.0.1:3000/prototype/trail-cleanup?area=density&variant=A`
+- `/prototype` → redirects here
+- `/prototype/trail-cleanup?area=density&variant=A`
 
 | Control | Action |
 | --- | --- |
