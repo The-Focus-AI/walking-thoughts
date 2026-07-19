@@ -1,0 +1,148 @@
+/* PROTOTYPE ONLY — hub index for throwaway explorations. */
+
+.proto-index {
+  min-height: 100svh;
+  width: min(100%, 52rem);
+  margin: 0 auto;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem
+    max(2rem, env(safe-area-inset-bottom));
+  color: #f2f1e8;
+  background:
+    radial-gradient(circle at 70% 10%, rgba(169, 209, 143, 0.12), transparent 30%),
+    linear-gradient(160deg, #17231b 0%, #101712 100%);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.proto-index-eyebrow {
+  margin: 0 0 0.5rem;
+  color: #f4cf72;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.proto-index-header h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 7vw, 3.2rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.proto-index-header p {
+  margin: 0.85rem 0 0;
+  max-width: 36rem;
+  color: #b9bcae;
+  line-height: 1.5;
+}
+
+.proto-index-back a {
+  color: #a9d18f;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.proto-index-card {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(242, 241, 232, 0.14);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.proto-index-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.proto-index-card-head h2 {
+  margin: 0 0 0.35rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.45rem;
+  font-weight: 500;
+}
+
+.proto-index-card-head p {
+  margin: 0;
+  max-width: 28rem;
+  color: #b9bcae;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.proto-index-open {
+  display: inline-grid;
+  place-items: center;
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  border-radius: 0.7rem;
+  background: #f4cf72;
+  color: #17231b;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.proto-index-areas {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .proto-index-areas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.proto-index-area h3 {
+  margin: 0 0 0.55rem;
+  color: #a9d18f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.proto-index-area ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.proto-index-area a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(242, 241, 232, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: #f2f1e8;
+  text-decoration: none;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.proto-index-area a:hover {
+  border-color: rgba(169, 209, 143, 0.45);
+}
+
+.proto-index-key {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  aspect-ratio: 1;
+  border-radius: 0.4rem;
+  background: rgba(244, 207, 114, 0.18);
+  color: #f4cf72;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}

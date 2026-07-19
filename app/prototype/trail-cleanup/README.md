@@ -15,10 +15,10 @@ mise run dev
 mise run prototype:trail-cleanup
 ```
 
-Open either entry (same switcher):
+Open:
 
-- `/prototype` → redirects here
-- `/prototype/trail-cleanup?area=density&variant=A`
+- `/prototype` — hub with links to every variant
+- `/prototype/trail-cleanup?area=density&variant=A` — switcher directly
 
 | Control | Action |
 | --- | --- |
