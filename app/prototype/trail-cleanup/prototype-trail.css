@@ -1,5 +1,52 @@
 /* PROTOTYPE ONLY — trail-cleanup UI variants. Do not treat as production CSS. */
 
+.proto-viewport-stage {
+  min-height: 100svh;
+  background: #0a0e0b;
+  padding: 1rem 1rem 8.5rem;
+  box-sizing: border-box;
+}
+
+.proto-viewport-chrome {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(100%, 1280px);
+  margin: 0 auto 0.65rem;
+  color: #8e958b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.proto-viewport-frame {
+  margin: 0 auto;
+  overflow: auto;
+  background: #101712;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.viewport-mobile .proto-viewport-frame {
+  width: min(100%, 390px);
+  height: min(844px, calc(100svh - 10rem));
+  border-radius: 1.4rem;
+  border: 2px solid rgba(242, 241, 232, 0.18);
+}
+
+.viewport-desktop .proto-viewport-frame {
+  width: min(100%, 1280px);
+  height: min(900px, calc(100svh - 10rem));
+  border-radius: 0.75rem;
+  border: 1px solid rgba(242, 241, 232, 0.14);
+}
+
+.viewport-mobile .proto-shell,
+.viewport-desktop .proto-shell {
+  min-height: 100%;
+}
+
 .proto-switcher {
   position: fixed;
   left: 50%;
@@ -10,6 +57,10 @@
   gap: 0.4rem;
   width: min(92vw, 28rem);
   pointer-events: none;
+}
+
+.proto-switcher-viewports {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .proto-switcher * {
@@ -782,4 +833,125 @@
 
 .map-c .proto-pad h2 {
   margin: 0;
+}
+
+/* —— Desktop layouts (structurally wider, not just stretched mobile) —— */
+
+.viewport-desktop .density-a {
+  grid-template-columns: 1fr min(22rem, 34%);
+  grid-template-rows: auto 1fr;
+}
+
+.viewport-desktop .density-a > .proto-top {
+  grid-column: 1 / -1;
+}
+
+.viewport-desktop .density-a-main {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.viewport-desktop .density-a-dock {
+  position: static;
+  grid-column: 2;
+  grid-row: 2;
+  align-content: start;
+  border-top: 0;
+  border-left: 1px solid rgba(242, 241, 232, 0.14);
+  padding: 1rem;
+  height: 100%;
+}
+
+.viewport-desktop .density-b {
+  display: grid;
+  grid-template-columns: min(26rem, 38%) 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+.viewport-desktop .density-b > .proto-top {
+  grid-column: 1 / -1;
+}
+
+.viewport-desktop .density-b-composer {
+  grid-column: 1;
+  border-right: 1px solid rgba(242, 241, 232, 0.12);
+}
+
+.viewport-desktop .density-b-sheet {
+  grid-column: 2;
+  margin: 0;
+  border-radius: 0;
+  min-height: 0;
+  border: 0;
+}
+
+.viewport-desktop .density-b-handle {
+  display: none;
+}
+
+.viewport-desktop .sync-a .proto-pad,
+.viewport-desktop .sync-c .sync-gutter-list {
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+.viewport-desktop .sync-lanes {
+  grid-auto-columns: minmax(12rem, 1fr);
+  grid-auto-flow: column;
+  overflow: visible;
+}
+
+.viewport-desktop .sync-footer {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(48rem, calc(100% - 2rem));
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.viewport-desktop .map-a {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  grid-template-rows: 1fr;
+  min-height: 100%;
+  padding-bottom: 0;
+}
+
+.viewport-desktop .map-a-hero {
+  min-height: 100%;
+  grid-row: 1;
+}
+
+.viewport-desktop .map-a-trail {
+  grid-row: 1;
+  overflow: auto;
+  border-left: 1px solid rgba(242, 241, 232, 0.12);
+}
+
+.viewport-desktop .map-b-main {
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+.viewport-desktop .map-b-tabs {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(28rem, calc(100% - 2rem));
+  border-radius: 999px;
+  border: 1px solid rgba(242, 241, 232, 0.16);
+  overflow: hidden;
+}
+
+.viewport-desktop .map-c-strip {
+  max-width: 40rem;
+}
+
+.viewport-desktop .map-c .proto-pad {
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+.viewport-desktop .proto-state {
+  max-width: 42rem;
 }

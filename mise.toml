@@ -63,8 +63,8 @@ run = "fnox exec -- pnpm dev"
 [tasks."prototype:trail-cleanup"]
 description = "Print the throwaway trail-cleanup UI prototype URL (run mise run dev separately)"
 run = '''
-echo "PROTOTYPE (throwaway): open http://127.0.0.1:3000/prototype/trail-cleanup?area=density&variant=A"
-echo "Areas: density | sync | map   Variants: A B C   Keys: ← →"
+echo "PROTOTYPE (throwaway): open http://127.0.0.1:3000/prototype"
+echo "Viewports: mobile | desktop   Areas: density | sync | map   Variants: A B C   Keys: ← →"
 '''
 
 [tasks.lint]

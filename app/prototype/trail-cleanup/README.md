@@ -17,11 +17,12 @@ mise run prototype:trail-cleanup
 
 Open:
 
-- `/prototype` — hub with links to every variant
-- `/prototype/trail-cleanup?area=density&variant=A` — switcher directly
+- `/prototype` — hub with **Mobile** and **Desktop** links for every variant
+- `/prototype/trail-cleanup?viewport=mobile&area=density&variant=A`
 
 | Control | Action |
 | --- | --- |
+| Mobile / Desktop tabs | Pixel frame (390×844) vs desktop shell (1280×900) |
 | Density / Sync / Map tabs | Switch problem area |
 | ← → (or keyboard arrows) | Cycle A → B → C within the area |
 

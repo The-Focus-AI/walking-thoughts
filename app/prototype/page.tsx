@@ -2,7 +2,7 @@ import Link from "next/link";
 import "./prototype-index.css";
 
 /**
- * PROTOTYPE hub — list every throwaway UI exploration with direct variant links.
+ * PROTOTYPE hub — list every throwaway UI exploration with mobile + desktop links.
  */
 
 const TRAIL_CLEANUP = {
@@ -23,8 +23,17 @@ const TRAIL_CLEANUP = {
   ],
 } as const;
 
-function trailHref(area: keyof typeof TRAIL_CLEANUP, variant: string) {
-  return `/prototype/trail-cleanup?area=${area}&variant=${variant}`;
+const VIEWPORTS = [
+  { key: "mobile", label: "Mobile" },
+  { key: "desktop", label: "Desktop" },
+] as const;
+
+function trailHref(
+  area: keyof typeof TRAIL_CLEANUP,
+  variant: string,
+  viewport: string,
+) {
+  return `/prototype/trail-cleanup?viewport=${viewport}&area=${area}&variant=${variant}`;
 }
 
 export default function PrototypeIndexPage() {
@@ -34,8 +43,9 @@ export default function PrototypeIndexPage() {
         <p className="proto-index-eyebrow">PROTOTYPE hub</p>
         <h1>Throwaway UI explorations</h1>
         <p>
-          Not production. Pick a link — each opens a fixture mock with a
-          floating switcher (← → / area tabs).
+          Not production. Each variant has <strong>Mobile</strong> and{" "}
+          <strong>Desktop</strong> links — open both when judging. Floating
+          switcher can flip viewport too (← → / area tabs).
         </p>
         <p className="proto-index-back">
           <Link href="/">← Back to Walking Thoughts</Link>
@@ -48,21 +58,32 @@ export default function PrototypeIndexPage() {
             <h2 id="trail-cleanup-title">Trail cleanup</h2>
             <p>
               Density, sync glanceability, and map findability for the home
-              trail surface.
+              trail surface — Pixel-ish phone frame vs wide desktop shell.
             </p>
           </div>
-          <Link
-            className="proto-index-open"
-            href="/prototype/trail-cleanup?area=density&variant=A"
-          >
-            Open switcher
-          </Link>
+          <div className="proto-index-open-row">
+            <Link
+              className="proto-index-open"
+              href="/prototype/trail-cleanup?viewport=mobile&area=density&variant=A"
+            >
+              Open mobile
+            </Link>
+            <Link
+              className="proto-index-open secondary"
+              href="/prototype/trail-cleanup?viewport=desktop&area=density&variant=A"
+            >
+              Open desktop
+            </Link>
+          </div>
         </div>
 
         <div className="proto-index-areas">
           {(
             Object.entries(TRAIL_CLEANUP) as Array<
-              [keyof typeof TRAIL_CLEANUP, (typeof TRAIL_CLEANUP)[keyof typeof TRAIL_CLEANUP]]
+              [
+                keyof typeof TRAIL_CLEANUP,
+                (typeof TRAIL_CLEANUP)[keyof typeof TRAIL_CLEANUP],
+              ]
             >
           ).map(([area, variants]) => (
             <div key={area} className="proto-index-area">
@@ -70,10 +91,22 @@ export default function PrototypeIndexPage() {
               <ul>
                 {variants.map((variant) => (
                   <li key={variant.key}>
-                    <Link href={trailHref(area, variant.key)}>
+                    <div className="proto-index-variant">
                       <span className="proto-index-key">{variant.key}</span>
-                      <span>{variant.label}</span>
-                    </Link>
+                      <span className="proto-index-variant-label">
+                        {variant.label}
+                      </span>
+                      <div className="proto-index-viewport-links">
+                        {VIEWPORTS.map((viewport) => (
+                          <Link
+                            key={viewport.key}
+                            href={trailHref(area, variant.key, viewport.key)}
+                          >
+                            {viewport.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>

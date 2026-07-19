@@ -15,6 +15,9 @@ type PrototypeSwitcherProps = {
   /** Optional second dimension (e.g. area) — shown as tabs above the pill. */
   areaParam?: string;
   areas?: PrototypeOption[];
+  /** Optional viewport dimension (mobile / desktop). */
+  viewportParam?: string;
+  viewports?: PrototypeOption[];
 };
 
 /**
@@ -26,6 +29,8 @@ export function PrototypeSwitcher({
   options,
   areaParam,
   areas,
+  viewportParam,
+  viewports,
 }: PrototypeSwitcherProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -42,6 +47,12 @@ export function PrototypeSwitcher({
     ? (searchParams.get(areaParam) ?? areas?.[0]?.key)
     : null;
   const currentArea = areas?.find((area) => area.key === areaKey) ?? areas?.[0];
+  const viewportKey = viewportParam
+    ? (searchParams.get(viewportParam) ?? viewports?.[0]?.key)
+    : null;
+  const currentViewport =
+    viewports?.find((viewport) => viewport.key === viewportKey) ??
+    viewports?.[0];
 
   function replaceParams(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -62,6 +73,11 @@ export function PrototypeSwitcher({
     if (!areaParam) return;
     const first = options[0]?.key ?? "A";
     replaceParams({ [areaParam]: key, [param]: first });
+  }
+
+  function setViewport(key: string) {
+    if (!viewportParam) return;
+    replaceParams({ [viewportParam]: key });
   }
 
   useEffect(() => {
@@ -93,6 +109,30 @@ export function PrototypeSwitcher({
 
   return (
     <div className="proto-switcher" data-testid="prototype-switcher">
+      {viewports && viewportParam ? (
+        <div
+          className="proto-switcher-areas proto-switcher-viewports"
+          role="tablist"
+          aria-label="Prototype viewport"
+        >
+          {viewports.map((viewport) => (
+            <button
+              key={viewport.key}
+              type="button"
+              role="tab"
+              aria-selected={viewport.key === currentViewport?.key}
+              className={
+                viewport.key === currentViewport?.key
+                  ? "proto-switcher-area active"
+                  : "proto-switcher-area"
+              }
+              onClick={() => setViewport(viewport.key)}
+            >
+              {viewport.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {areas && areaParam ? (
         <div
           className="proto-switcher-areas"
@@ -127,6 +167,7 @@ export function PrototypeSwitcher({
           ←
         </button>
         <span className="proto-switcher-label">
+          {currentViewport ? `${currentViewport.label} · ` : ""}
           {currentArea ? `${currentArea.label} · ` : ""}
           {current?.key} — {current?.label}
         </span>
