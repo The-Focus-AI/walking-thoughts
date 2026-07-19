@@ -57,6 +57,7 @@ test("missing or failing probes surface degraded service status", () => {
       CLERK_ALLOWED_USER_IDS: "user_owner",
       NEXT_PUBLIC_APP_URL: "https://walking-thoughts.thefocus.ai",
       CLERK_AUTHORIZED_PARTIES: "https://walking-thoughts.thefocus.ai",
+      DATABASE_URL: "postgres://secret-user:secret-pass@host/db",
     },
     probes({
       database: { ok: false, reason: "unreachable" },
@@ -71,4 +72,5 @@ test("missing or failing probes surface degraded service status", () => {
   expect(report.services.push.status).toBe("missing");
   expect(report.services.queue.status).toBe("error");
   expect(report.status).toBe("degraded");
+  expect(JSON.stringify(report)).not.toContain("secret-pass");
 });
