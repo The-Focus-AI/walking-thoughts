@@ -71,7 +71,18 @@ Never start implementation on a ticket that already has `in-progress`.
 ## While working
 
 - One ticket per branch; branch names stay `cursor/<descriptive-name>-…`
-- Reference the claimed issue in the PR title (e.g. `… (#8)`) and body
+- Reference the claimed issue in the PR title (e.g. `… (#8)`)
+- **Put a closing keyword in the PR body** so merge auto-closes the issue:
+
+  ```text
+  Closes #8
+  ```
+
+  Also accepted: `Fixes #8`, `Resolves #8` (and close/fix/resolve variants).
+  A title like `(#8)` alone does **not** close the issue. Cloud Agent tokens
+  often lack `issues:write`, so this GitHub-native close-on-merge path is
+  required. `.github/workflows/agent-ticket-claim.yml` fails `cursor/*` PRs
+  that omit it.
 - Use the ticket's public acceptance criteria as the testing seam
 - Run the repository two-axis code review before asking for merge
 
@@ -88,9 +99,12 @@ returns to the frontier.
 
 ## Resolve (done)
 
-Close the issue only after the deployed behavior is verified (Preview for the
-PR, Production after merge to `main` when that is the acceptance bar). Closing
-ends the claim; do not leave stale `in-progress` labels on closed issues.
+Prefer **merge with `Closes #N` in the PR body**. GitHub closes the issue when
+that PR merges to `main`, without needing agent `issues:write`. Verify Preview
+behavior before merge when that is the acceptance bar.
+
+Closing ends the claim; do not leave stale `in-progress` labels on closed
+issues (GitHub clears the open state; remove leftover labels if they linger).
 
 Vercel deployments are PR-only: push the branch for its Git-integrated Preview,
 then merge the approved PR to `main` for Production. Never run a direct Vercel
