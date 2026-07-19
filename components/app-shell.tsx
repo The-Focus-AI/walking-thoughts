@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CaptureComposer } from "@/components/capture-composer";
+import { MapJournal } from "@/components/map-journal/map-journal";
 import { OfflineReadiness } from "@/components/offline-readiness";
-import { OfflineRegionPanel } from "@/components/offline-region-panel";
 
 type AppShellProps = {
   account?: ReactNode;
@@ -11,7 +10,7 @@ type AppShellProps = {
 
 export function AppShell({ account, configurationRequired }: AppShellProps) {
   return (
-    <main className="shell">
+    <main className="shell shell-journal">
       <header className="topbar">
         <Link className="brand" href="/" aria-label="Walking Thoughts home">
           <span className="brand-mark" aria-hidden="true">
@@ -25,15 +24,10 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         </div>
       </header>
 
-      <section className="hero">
-        <p className="eyebrow">Built for the trail beyond the signal</p>
-        <h1>Capture what matters out there.</h1>
-        <p className="lede">
-          Save observations on your phone first. Walking Thoughts will be ready
-          to add context when you reconnect.
-        </p>
-
-        {configurationRequired ? (
+      {configurationRequired ? (
+        <section className="hero">
+          <p className="eyebrow">Built for the trail beyond the signal</p>
+          <h1>Capture what matters out there.</h1>
           <aside className="configuration-note" role="status">
             <strong>Secure setup required</strong>
             <span>
@@ -41,12 +35,10 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
               Captures can begin.
             </span>
           </aside>
-        ) : (
-          <CaptureComposer />
-        )}
-      </section>
-
-      <OfflineRegionPanel />
+        </section>
+      ) : (
+        <MapJournal />
+      )}
 
       <footer>
         <span>Local first</span>

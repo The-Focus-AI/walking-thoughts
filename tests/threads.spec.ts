@@ -1,9 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openCaptureShell as openShell } from "./helpers/capture-shell";
 
 async function openCaptureShell(page: Page) {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Ready offline")).toBeVisible();
+  await openShell(page);
   await expect(page.getByLabel("Destination")).toHaveValue("inbox");
 }
 

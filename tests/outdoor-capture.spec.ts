@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openCaptureShell } from "./helpers/capture-shell";
 
 test("Outdoor Quick Capture dock records audio on press-and-hold and commits locally", async ({
   page,
@@ -48,7 +49,7 @@ test("Outdoor Quick Capture dock records audio on press-and-hold and commits loc
     ).MediaRecorder = FakeMediaRecorder;
   });
 
-  await page.goto("/offline");
+  await openCaptureShell(page);
   await expect(page.getByLabel("Capture mode")).toBeVisible();
   await page.getByRole("button", { name: "Audio" }).click();
 

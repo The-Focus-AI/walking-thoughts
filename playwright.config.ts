@@ -24,6 +24,15 @@ export default defineConfig({
         viewport: { width: 412, height: 915 },
       },
     },
+    {
+      name: "desktop",
+      dependencies: ["clerk-setup"],
+      testMatch: /map-journal-browser\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
   ],
   webServer: {
     command:

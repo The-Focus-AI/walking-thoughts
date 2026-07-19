@@ -1,10 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-async function openShell(page: Page) {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Ready offline")).toBeVisible();
-}
+import { expect, test } from "@playwright/test";
+import { openCaptureShell as openShell } from "./helpers/capture-shell";
 
 test("remove-from-device appears only after verified sync and keeps Thread context offline", async ({
   page,

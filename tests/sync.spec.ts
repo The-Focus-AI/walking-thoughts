@@ -1,10 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { createMemoryCaptureStore } from "@/lib/local-capture/store";
 import {
   synchronizePendingCaptures,
   type SyncPushResult,
 } from "@/lib/sync/client";
 import type { SyncBatchResponse, SyncCapturePayload } from "@/lib/sync/types";
+import { openCaptureShell as openShell } from "./helpers/capture-shell";
 
 test("client sync batches pending Captures, replays safely, and records failures", async () => {
   const store = createMemoryCaptureStore();
@@ -75,12 +76,6 @@ test("client sync batches pending Captures, replays safely, and records failures
   expect(synced.every((capture) => capture.status === "enriching")).toBe(true);
   expect(pushes).toBe(2);
 });
-
-async function openShell(page: Page) {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Ready offline")).toBeVisible();
-}
 
 test("browser seam syncs after reconnect and keeps Complete through restart", async ({
   context,

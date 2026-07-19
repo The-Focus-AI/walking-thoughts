@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { openCaptureShell } from "./helpers/capture-shell";
 
 test("offline mixed-media Capture keeps attachments readable after restart", async ({
   page,
 }) => {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Ready offline")).toBeVisible();
+  await openCaptureShell(page);
 
   await page.getByLabel("Choose existing media").setInputFiles({
     name: "fungus.jpg",

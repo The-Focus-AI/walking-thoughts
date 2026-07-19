@@ -101,7 +101,12 @@ async function fetchThreadEnrichments(
   }
 }
 
-export function CaptureComposer() {
+type CaptureComposerProps = {
+  /** When false, Inbox / Thread lists are omitted (Map Journal empty dock). */
+  showLists?: boolean;
+};
+
+export function CaptureComposer({ showLists = true }: CaptureComposerProps) {
   const [draft, setDraft] = useState("");
   const [inbox, setInbox] = useState<LocalCapture[]>([]);
   const [threads, setThreads] = useState<ThreadView[]>([]);
@@ -670,7 +675,7 @@ export function CaptureComposer() {
         </p>
       ) : null}
 
-      {inbox.length > 0 ? (
+      {showLists && inbox.length > 0 ? (
         <section className="capture-section" aria-label="Inbox">
           <h2 className="capture-section-title">Inbox</h2>
           <ul className="capture-list">
@@ -688,35 +693,39 @@ export function CaptureComposer() {
         </section>
       ) : null}
 
-      {threads.map(({ thread, captures, enrichments }) => (
-        <section
-          key={thread.id}
-          className="capture-section"
-          aria-label={thread.title}
-        >
-          <div className="capture-section-header">
-            <h2 className="capture-section-title">{thread.title}</h2>
-            <span className="capture-revision">Revision {thread.revision}</span>
-          </div>
-          <ul className="capture-list">
-            {captures.map((capture) => (
-              <li key={capture.id}>
-                <CaptureEntry
-                  capture={capture}
-                  onRetry={() => void runForegroundSync()}
-                  onRemoveLocalMedia={onRemoveLocalMedia}
-                  onRestoreLocalMedia={onRestoreLocalMedia}
-                />
-              </li>
-            ))}
-            {enrichments.map((enrichment) => (
-              <li key={enrichment.id}>
-                <EnrichmentEntry enrichment={enrichment} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {showLists
+        ? threads.map(({ thread, captures, enrichments }) => (
+            <section
+              key={thread.id}
+              className="capture-section"
+              aria-label={thread.title}
+            >
+              <div className="capture-section-header">
+                <h2 className="capture-section-title">{thread.title}</h2>
+                <span className="capture-revision">
+                  Revision {thread.revision}
+                </span>
+              </div>
+              <ul className="capture-list">
+                {captures.map((capture) => (
+                  <li key={capture.id}>
+                    <CaptureEntry
+                      capture={capture}
+                      onRetry={() => void runForegroundSync()}
+                      onRemoveLocalMedia={onRemoveLocalMedia}
+                      onRestoreLocalMedia={onRestoreLocalMedia}
+                    />
+                  </li>
+                ))}
+                {enrichments.map((enrichment) => (
+                  <li key={enrichment.id}>
+                    <EnrichmentEntry enrichment={enrichment} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        : null}
     </div>
   );
 }

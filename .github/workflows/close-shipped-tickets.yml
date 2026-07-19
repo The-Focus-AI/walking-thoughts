@@ -10,7 +10,7 @@ on:
       issues:
         description: "Comma-separated issue numbers to close"
         required: true
-        default: "9,10,12,15,17,28"
+        default: "9,10,11,12,15,17,28"
 
 permissions:
   issues: write
@@ -22,7 +22,7 @@ jobs:
       - name: Close issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUES: ${{ inputs.issues || '9,10,12,15,17,28' }}
+          ISSUES: ${{ inputs.issues || '9,10,11,12,15,17,28' }}
         run: |
           set -euo pipefail
           IFS=',' read -ra NUMS <<< "$ISSUES"
