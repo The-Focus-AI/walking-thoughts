@@ -40,6 +40,11 @@ import type {
 } from "@/lib/local-capture/types";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
+import {
+  enablePushNotifications,
+  evaluatePushOptInAfterSync,
+  type AfterSyncPushOptInResult,
+} from "@/lib/push/client";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
 import {
   getMediaTransport,
@@ -118,6 +123,10 @@ export function CaptureComposer() {
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
+  const [pushOptIn, setPushOptIn] = useState<AfterSyncPushOptInResult>({
+    status: "idle",
+  });
+  const [pushBusy, setPushBusy] = useState(false);
   const draftSaveGeneration = useRef(0);
   const syncGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,7 +157,15 @@ export function CaptureComposer() {
     setIsSyncing(true);
     try {
       await synchronizePendingMedia(getCaptureStore());
-      await synchronizePendingCaptures(getCaptureStore());
+      const syncBatch = await synchronizePendingCaptures(getCaptureStore());
+      if (generation === syncGeneration.current) {
+        const optIn = evaluatePushOptInAfterSync({
+          successfulSyncResultCount: syncBatch.results.length,
+        });
+        if (optIn.status !== "idle") {
+          setPushOptIn(optIn);
+        }
+      }
       await enrichPendingCaptures(getCaptureStore(), undefined, {
         retryFailed: true,
       });
@@ -163,6 +180,18 @@ export function CaptureComposer() {
       if (generation === syncGeneration.current) {
         setIsSyncing(false);
       }
+    }
+  }
+
+  async function onEnableNotifications() {
+    setPushBusy(true);
+    try {
+      const result = await enablePushNotifications({
+        vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "",
+      });
+      setPushOptIn(result);
+    } finally {
+      setPushBusy(false);
     }
   }
 
@@ -600,6 +629,34 @@ export function CaptureComposer() {
           Retry sync
         </button>
       </div>
+
+      {pushOptIn.status === "offer" ? (
+        <div className="capture-push-opt-in" role="status">
+          <p>
+            Captures are syncing. Enable notifications to hear when a Thread
+            batch finishes or needs attention.
+          </p>
+          <button
+            type="button"
+            className="capture-retry"
+            onClick={() => void onEnableNotifications()}
+            disabled={pushBusy}
+          >
+            Enable notifications
+          </button>
+        </div>
+      ) : null}
+      {pushOptIn.status === "denied" ? (
+        <p className="capture-persistence" role="status">
+          Notifications are off for this browser. Capture, sync, and Enrichment
+          still work.
+        </p>
+      ) : null}
+      {pushOptIn.status === "unavailable" ? (
+        <p className="capture-persistence" role="status">
+          {pushOptIn.reason}. Capture, sync, and Enrichment still work.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="capture-error" role="alert">
