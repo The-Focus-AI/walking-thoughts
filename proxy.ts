@@ -2,18 +2,20 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { authConfiguration } from "@/lib/auth-config";
+import { resolveAuthorizedParties } from "@/lib/clerk-authorized-parties";
 import { restorePassThroughForExactSelfRewrite } from "@/lib/clerk-middleware-response";
 
 const clerk = clerkMiddleware(() => undefined, (request) => {
   const configuration = authConfiguration();
 
   return {
-    authorizedParties: configuration.authorizedParties.length
-      ? configuration.authorizedParties
-      : request.nextUrl.hostname === "localhost" ||
-          request.nextUrl.hostname === "127.0.0.1"
-        ? [request.nextUrl.origin]
-        : [],
+    authorizedParties: resolveAuthorizedParties({
+      configuredParties: configuration.authorizedParties,
+      requestOrigin: request.nextUrl.origin,
+      vercelEnv: process.env.VERCEL_ENV,
+      vercelUrl: process.env.VERCEL_URL,
+      vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    }),
     signInUrl: "/sign-in",
     signUpUrl: "/sign-up",
   };
