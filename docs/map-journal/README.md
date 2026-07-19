@@ -8,8 +8,10 @@ prototype was rewritten, not promoted.
 ## How it works
 
 - The installed Offline Region (see `docs/offline-region/`) fills the surface
-  through `renderInstalledRegion`; if the region is not installed the page
-  offers the explicit download with its size, and renders nothing implicit.
+  through `renderInstalledRegion`. `/journal` defaults to the shipped
+  `fixture` pack under `/public/offline-region/fixture` and installs it on
+  first visit; use `?region=home` only after publishing a home pack with
+  `mise run region:build`.
 - Capture locations become media-aware markers (`lib/map-journal/markers.ts`):
   text, photo, audio, and video Captures get distinct colors and glyphs, and
   Captures without a recorded location honestly stay off the map.

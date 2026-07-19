@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import type { MapJournalHook } from "@/components/map-journal";
 import type { CaptureStore } from "@/lib/local-capture/types";
 
-export const JOURNAL_URL = "/journal?region=fixture";
+export const JOURNAL_URL = "/journal";
 
 // Inside the fixture region (1.5 km around Cornwall CT).
 export const TRAIL_FORK = {
@@ -43,10 +43,13 @@ export function journal(page: Page) {
 
 export async function installFixtureRegion(page: Page) {
   await page.goto(JOURNAL_URL);
-  await page.getByRole("button", { name: "Download Offline Region" }).click();
+  // The published fixture pack installs automatically on first visit.
   await expect(page.getByTestId("journal-map")).toBeVisible({
-    timeout: 30_000,
+    timeout: 45_000,
   });
+  await expect
+    .poll(() => journal(page).then((hook) => hook?.state), { timeout: 45_000 })
+    .toBe("ready");
 }
 
 export async function waitForIdleMap(page: Page) {

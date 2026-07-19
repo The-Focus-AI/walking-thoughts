@@ -26,6 +26,7 @@ import {
   updateCaptureMarkers,
 } from "@/lib/map-journal/map-layers";
 import { captureMarkers } from "@/lib/map-journal/markers";
+import { resolveJournalRegion } from "@/lib/map-journal/region";
 import { createRegionStore } from "@/lib/offline-region/store";
 import type { RegionManifest } from "@/lib/offline-region/types";
 import { cacheShellResources } from "@/lib/offline-shell";
@@ -96,7 +97,7 @@ declare global {
 
 export function MapJournal() {
   const searchParams = useSearchParams();
-  const region = searchParams.get("region") === "fixture" ? "fixture" : "home";
+  const region = resolveJournalRegion(searchParams.get("region"));
   const baseUrl = `/offline-region/${region}`;
 
   const [state, setState] = useState<JournalState>({ phase: "loading" });
@@ -172,7 +173,9 @@ export function MapJournal() {
     };
   }, [refreshMarkers]);
 
-  // Region availability drives the whole surface.
+  // Region availability drives the whole surface. When a pack is published but
+  // not yet on this device, install it automatically so /journal works on first
+  // visit without a local `mise run region:build`.
   useEffect(() => {
     let active = true;
     void cacheShellResources(["/journal"]).catch(() => undefined);
@@ -183,9 +186,27 @@ export function MapJournal() {
       if (!active) return;
       if (installed) {
         setState({ phase: "ready", manifest: installed });
-      } else {
-        const manifest = await store.manifest();
-        if (active) setState({ phase: "region-missing", manifest });
+        return;
+      }
+
+      const manifest = await store.manifest();
+      if (!active) return;
+      if (!manifest) {
+        setState({ phase: "region-missing", manifest: null });
+        return;
+      }
+
+      setState({ phase: "region-missing", manifest });
+      setDownloading(true);
+      try {
+        await store.install(manifest);
+        if (active) setState({ phase: "ready", manifest });
+      } catch {
+        if (active) {
+          setError("The Offline Region download could not be verified");
+        }
+      } finally {
+        if (active) setDownloading(false);
       }
     })();
 
@@ -435,8 +456,9 @@ export function MapJournal() {
             </>
           ) : (
             <p>
-              No Offline Region artifact is published for “{region}”. Build one
-              with <code>mise run region:build</code>.
+              No Offline Region pack is published for “{region}”. Open{" "}
+              <a href="/journal">/journal</a> for the shipped fixture map, or
+              publish a pack with <code>mise run region:build</code>.
             </p>
           )}
         </section>
