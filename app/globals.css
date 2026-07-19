@@ -40,6 +40,227 @@ a {
   padding: max(1rem, env(safe-area-inset-top)) 1.25rem max(1rem, env(safe-area-inset-bottom));
 }
 
+.trail-shell {
+  width: min(100%, 1280px);
+  gap: 0.75rem;
+}
+
+.trail-layout {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .trail-layout {
+    grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 1fr);
+    align-items: start;
+    min-height: calc(100svh - 8rem);
+  }
+}
+
+.trail-map-hero {
+  position: relative;
+  min-height: 42svh;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+@media (min-width: 900px) {
+  .trail-map-hero {
+    min-height: calc(100svh - 8rem);
+    position: sticky;
+    top: 0.75rem;
+  }
+}
+
+.trail-map-hero-map {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+}
+
+.trail-map-hero-overlay {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  min-height: 42svh;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(transparent 35%, rgba(16, 23, 18, 0.9) 78%);
+  pointer-events: none;
+}
+
+.trail-map-hero-overlay a,
+.trail-map-hero-overlay button {
+  pointer-events: auto;
+}
+
+@media (min-width: 900px) {
+  .trail-map-hero-overlay {
+    min-height: 100%;
+  }
+}
+
+.trail-map-hero-name {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  font-weight: 500;
+}
+
+.trail-map-hero-meta,
+.trail-map-hero-status {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.trail-map-hero-missing {
+  display: grid;
+  gap: 0.65rem;
+  align-content: end;
+  min-height: 42svh;
+  padding: 1.25rem;
+}
+
+.trail-map-hero-missing h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  font-weight: 500;
+}
+
+.trail-map-hero-missing button,
+.trail-map-hero-cta {
+  display: inline-grid;
+  place-items: center;
+  min-height: 2.8rem;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--sun);
+  color: var(--forest);
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.trail-capture {
+  min-width: 0;
+}
+
+.trail-aca {
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.trail-gutter-list .capture-gutter {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr;
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.gutter-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--moss);
+  padding-top: 0.15rem;
+}
+
+.gutter-syncing .gutter-label,
+.gutter-enriching .gutter-label {
+  color: var(--sun);
+}
+
+.gutter-needs_attention {
+  background: rgba(240, 180, 160, 0.08);
+}
+
+.gutter-needs_attention .gutter-label {
+  color: #f0b4a0;
+}
+
+.trail-sync-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(244, 207, 114, 0.35);
+  border-radius: 0.85rem;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.trail-sync-footer strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.trail-sync-footer p {
+  margin: 0;
+}
+
+.trail-sticky-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-top: 0.35rem;
+  background: linear-gradient(transparent, rgba(16, 23, 18, 0.94) 28%);
+}
+
+@media (min-width: 900px) {
+  .trail-sticky-dock {
+    position: static;
+    background: none;
+    padding-top: 0;
+  }
+}
+
+.trail-dock-card {
+  margin: 0;
+}
+
+.trail-account {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trail-account summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.trail-account .account-export,
+.trail-account .data-handling {
+  margin-top: 1rem;
+}
+
+.trail-shell .capture-section-title {
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+}
+
+.trail-shell h1.capture-section-title {
+  max-width: none;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
 .topbar,
 .topbar-actions,
 .brand,

@@ -10,6 +10,7 @@ test("shell discloses gateway processing and refuses an E2E encryption claim", a
   page,
 }) => {
   await page.goto("/offline");
+  await page.getByText("Account & data handling").click();
   const disclosure = page.getByTestId("data-handling-disclosure");
   await expect(disclosure).toBeVisible();
   await expect(disclosure).toContainText("Vercel AI Gateway");
@@ -28,5 +29,7 @@ test("composer distinguishes dependable foreground sync from best-effort backgro
   page,
 }) => {
   await openCaptureShell(page);
-  await expect(page.getByText(FOREGROUND_SYNC_IDLE)).toBeVisible();
+  const footer = page.getByTestId("trail-sync-footer");
+  await expect(footer).toBeVisible();
+  await expect(footer).toContainText(FOREGROUND_SYNC_IDLE);
 });
