@@ -637,7 +637,7 @@ footer {
   overflow: auto;
 }
 
-.map-journal-empty .capture-sync-bar,
+.map-journal-empty:not(.library-open) .capture-sync-bar,
 .map-journal-empty .capture-push-opt-in {
   display: none;
 }
@@ -735,13 +735,19 @@ footer {
   cursor: not-allowed;
 }
 
-.map-journal-sources {
+.map-journal-sources,
+.map-journal-attachments {
   list-style: none;
   padding: 0;
   margin: 0.55rem 0 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.map-journal-attachments li {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .map-journal-sources a {

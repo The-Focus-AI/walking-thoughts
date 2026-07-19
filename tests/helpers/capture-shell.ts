@@ -13,9 +13,11 @@ export async function openCaptureShell(page: Page) {
   await expect(page.getByLabel("Capture text")).toBeVisible();
   await expect(page.getByText("Ready offline")).toBeVisible();
 
-  const library = page.getByRole("button", { name: "Show library" });
+  const library = page.getByRole("button", { name: "Show Inbox & Threads" });
   if (await library.count()) {
     await library.click();
   }
-  await expect(page.getByRole("button", { name: "Hide library" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Hide Inbox & Threads" }),
+  ).toBeVisible();
 }

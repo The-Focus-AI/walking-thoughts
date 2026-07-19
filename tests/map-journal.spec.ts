@@ -35,12 +35,15 @@ test("lists only Captures that have a location", async () => {
 
   const mappable = await listMappableCaptures(store);
   expect(mappable).toHaveLength(2);
-  expect(mappable.map((item) => item.text)).toEqual([
-    "Ridge owl",
-    "Photo of creek",
-  ]);
-  expect(markerKindFor(mappable[1]!)).toBe("image");
-  expect(toMappableCapture((await store.list())[0]!)).toBeNull();
+  expect(new Set(mappable.map((item) => item.text))).toEqual(
+    new Set(["Ridge owl", "Photo of creek"]),
+  );
+  expect(markerKindFor(mappable.find((item) => item.text === "Photo of creek")!)).toBe(
+    "image",
+  );
+  const unlocated = (await store.list()).find((item) => item.text === "No coords");
+  expect(unlocated).toBeTruthy();
+  expect(toMappableCapture(unlocated!)).toBeNull();
 });
 
 test("clusters nearby Captures when zoomed out and expands when zoomed in", () => {
@@ -97,10 +100,7 @@ test("live GPS starts only while active and reports low accuracy honestly", () =
   }> = [];
   let watchId = 0;
   const geolocation = {
-    watchPosition(
-      success: PositionCallback,
-      _error?: PositionErrorCallback | null,
-    ) {
+    watchPosition(success: PositionCallback) {
       watchId += 1;
       queueMicrotask(() => {
         const next = fixes.shift();

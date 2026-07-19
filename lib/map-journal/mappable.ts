@@ -24,7 +24,10 @@ export async function listMappableCaptures(
   return captures
     .map(toMappableCapture)
     .filter((capture): capture is MappableCapture => capture != null)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    );
 }
 
 export function markerKindFor(capture: MappableCapture): MarkerKind {

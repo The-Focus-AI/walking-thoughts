@@ -83,7 +83,9 @@ test("Map Journal is the primary review surface with Offline Region topography",
 
   // Library stays closed — Inbox is not the primary review metaphor.
   await expect(page.getByRole("heading", { name: "Inbox" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Show library" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Show Inbox & Threads" }),
+  ).toBeVisible();
 
   await expect(
     page.getByText(
@@ -134,7 +136,7 @@ test("GPS, clustering, Capture preview, Thread panel, and follow-up", async ({
   await expect(review).toBeVisible();
   await expect(review.getByText("Selected Capture")).toBeVisible();
   await expect(
-    review.getByText(/Ridge owl|Creek photo|Far meadow/),
+    review.getByRole("heading", { name: /Ridge owl|Creek photo|Far meadow/ }),
   ).toBeVisible();
 
   const expectedLayout =

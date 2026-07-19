@@ -75,7 +75,6 @@ export function clusterMarkers(
       longitude,
       kind: markerKindFor(bucket[0]!),
       clusterCount: bucket.length,
-      memberIds: bucket.map((item) => item.id),
     });
   }
   return markers;

@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { enrichPendingCaptures } from "@/lib/enrichment/client";
+import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
+import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
+  CaptureSyncStatus,
   LocalCapture,
   LocalThread,
 } from "@/lib/local-capture/types";
-import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
 import type { MappableCapture } from "@/lib/map-journal/types";
+import { synchronizePendingCaptures } from "@/lib/sync/client";
+import { synchronizePendingMedia } from "@/lib/sync/media-client";
 
 type ThreadReviewProps = {
   capture: MappableCapture;
@@ -16,11 +21,35 @@ type ThreadReviewProps = {
   onClose: () => void;
 };
 
+type TimelineEntry =
+  | { kind: "capture"; at: string; capture: LocalCapture }
+  | { kind: "enrichment"; at: string; enrichment: ThreadEnrichment };
+
+function statusLabel(status: CaptureSyncStatus): string {
+  switch (status) {
+    case "saved_locally":
+      return "Saved locally";
+    case "syncing":
+      return "Syncing";
+    case "enriching":
+      return "Enriching";
+    case "complete":
+      return "Complete";
+    case "needs_attention":
+      return "Needs attention";
+  }
+}
+
 async function fetchThreadEnrichments(
   threadId: string,
 ): Promise<ThreadEnrichment[]> {
   try {
-    const response = await fetch(`/api/enrichment/threads/${threadId}`);
+    const headers: Record<string, string> = {};
+    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
+    if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
+    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
+      headers,
+    });
     if (!response.ok) return [];
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
     return body.enrichments ?? [];
@@ -42,6 +71,15 @@ export function ThreadReview({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  async function refreshThread() {
+    const store = getCaptureStore();
+    const view = await store.listThread(capture.threadId);
+    const nextEnrichments = await fetchThreadEnrichments(capture.threadId);
+    setThread(view.thread);
+    setEntries(view.captures);
+    setEnrichments(nextEnrichments);
+  }
+
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -58,20 +96,48 @@ export function ThreadReview({
     };
   }, [capture.threadId, capture.id]);
 
+  const timeline = useMemo<TimelineEntry[]>(() => {
+    const items: TimelineEntry[] = [
+      ...entries.map((entry) => ({
+        kind: "capture" as const,
+        at: entry.createdAt,
+        capture: entry,
+      })),
+      ...enrichments.map((enrichment) => ({
+        kind: "enrichment" as const,
+        at: enrichment.createdAt,
+        enrichment,
+      })),
+    ];
+    return items.sort(
+      (a, b) => a.at.localeCompare(b.at) || a.kind.localeCompare(b.kind),
+    );
+  }, [entries, enrichments]);
+
+  const selectedEntry =
+    entries.find((entry) => entry.id === capture.id) ?? null;
+
   function commitFollowUp() {
     const text = draft.trim();
     if (!text) return;
     startTransition(async () => {
       try {
         const store = getCaptureStore();
-        await store.commit(text, null, {
+        await store.commit(text, readAvailableLocation(), {
           destination: { type: "thread", threadId: capture.threadId },
         });
         setDraft("");
-        const view = await store.listThread(capture.threadId);
-        setEntries(view.captures);
-        setThread(view.thread);
         setError(null);
+        if (online) {
+          try {
+            await synchronizePendingMedia(store);
+            await synchronizePendingCaptures(store);
+            await enrichPendingCaptures(store, undefined, { retryFailed: true });
+          } catch {
+            // Local Capture is durable; sync/Enrichment can retry later.
+          }
+        }
+        await refreshThread();
       } catch {
         setError("Could not save follow-up Capture locally");
       }
@@ -89,7 +155,9 @@ export function ThreadReview({
     >
       <header className="map-journal-review-head">
         <div>
-          <p className="map-journal-kicker">{capture.status.replaceAll("_", " ")}</p>
+          <p className="map-journal-kicker">
+            {statusLabel(capture.status)}
+          </p>
           <h2>{thread?.title ?? "Thread"}</h2>
           <p className="map-journal-place">
             {capture.latitude.toFixed(4)}, {capture.longitude.toFixed(4)}
@@ -104,42 +172,70 @@ export function ThreadReview({
       <div className="map-journal-preview" role="status">
         <p className="map-journal-preview-label">Selected Capture</p>
         <p>{capture.text}</p>
-        {capture.mediaKinds.length > 0 ? (
+        {selectedEntry && selectedEntry.attachments.length > 0 ? (
+          <ul className="map-journal-attachments" aria-label="Attachments">
+            {selectedEntry.attachments.map((attachment) => (
+              <li key={attachment.id}>
+                {attachment.kind}: {attachment.fileName}
+              </li>
+            ))}
+          </ul>
+        ) : capture.mediaKinds.length > 0 ? (
           <p className="map-journal-media-kinds">
             Media: {capture.mediaKinds.join(", ")}
           </p>
         ) : null}
+        <p className="map-journal-entry-meta">{statusLabel(capture.status)}</p>
       </div>
 
       <ol className="map-journal-thread">
-        {entries.map((entry) => (
-          <li key={entry.id} className="map-journal-entry capture">
-            <p className="map-journal-entry-meta">
-              Capture · {new Date(entry.createdAt).toLocaleString()} ·{" "}
-              {entry.status.replaceAll("_", " ")}
-            </p>
-            <p>{entry.text}</p>
-          </li>
-        ))}
-        {enrichments.map((enrichment) => (
-          <li key={enrichment.id} className="map-journal-entry enrichment">
-            <p className="map-journal-entry-meta">
-              Enrichment · {enrichment.model}
-            </p>
-            <p>{enrichment.text}</p>
-            {(enrichment.sources ?? []).length > 0 ? (
-              <ul className="map-journal-sources">
-                {(enrichment.sources ?? []).map((source: EnrichmentSource) => (
-                  <li key={`${enrichment.id}:${source.url}`}>
-                    <a href={source.url} target="_blank" rel="noreferrer">
-                      {source.title || source.url}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </li>
-        ))}
+        {timeline.map((item) =>
+          item.kind === "capture" ? (
+            <li
+              key={item.capture.id}
+              className="map-journal-entry capture"
+            >
+              <p className="map-journal-entry-meta">
+                Capture · {new Date(item.capture.createdAt).toLocaleString()} ·{" "}
+                {statusLabel(item.capture.status)}
+              </p>
+              <p>{item.capture.text}</p>
+              {item.capture.attachments.length > 0 ? (
+                <ul className="map-journal-attachments" aria-label="Attachments">
+                  {item.capture.attachments.map((attachment) => (
+                    <li key={attachment.id}>
+                      {attachment.kind}: {attachment.fileName}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ) : (
+            <li
+              key={item.enrichment.id}
+              className="map-journal-entry enrichment"
+            >
+              <p className="map-journal-entry-meta">
+                Enrichment · {item.enrichment.model} ·{" "}
+                {new Date(item.enrichment.createdAt).toLocaleString()}
+              </p>
+              <p>{item.enrichment.text}</p>
+              {(item.enrichment.sources ?? []).length > 0 ? (
+                <ul className="map-journal-sources">
+                  {(item.enrichment.sources ?? []).map(
+                    (source: EnrichmentSource) => (
+                      <li key={`${item.enrichment.id}:${source.url}`}>
+                        <a href={source.url} target="_blank" rel="noreferrer">
+                          {source.title || source.url}
+                        </a>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              ) : null}
+            </li>
+          ),
+        )}
       </ol>
 
       <div className="map-journal-followup">
@@ -162,7 +258,7 @@ export function ThreadReview({
         </button>
         <p className="map-journal-connectivity" role="note">
           {online
-            ? "Follow-ups sync and Enrich when online."
+            ? "Follow-ups use the ordinary Capture sync and Enrichment path when online."
             : "Offline: follow-ups stay on this device until you reconnect."}
         </p>
         {error ? (

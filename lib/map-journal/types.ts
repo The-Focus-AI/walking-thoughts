@@ -22,7 +22,6 @@ export type JournalMarker = {
   longitude: number;
   kind: MarkerKind;
   clusterCount?: number;
-  memberIds?: string[];
 };
 
 export type GpsFix =

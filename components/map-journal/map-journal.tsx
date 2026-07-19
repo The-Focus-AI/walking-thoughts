@@ -282,7 +282,10 @@ export function MapJournal() {
           onClose={() => setSelectedId(null)}
         />
       ) : (
-        <aside className="map-journal-empty" aria-label="Capture dock">
+        <aside
+          className={`map-journal-empty${showLibrary ? " library-open" : ""}`}
+          aria-label="Capture dock"
+        >
           <h2>Map Journal</h2>
           <p>
             Located Captures appear on the Offline Region. Select a marker for
@@ -305,7 +308,7 @@ export function MapJournal() {
               })
             }
           >
-            {showLibrary ? "Hide library" : "Show library"}
+            {showLibrary ? "Hide Inbox & Threads" : "Show Inbox & Threads"}
           </button>
           <CaptureComposer showLists={showLibrary} />
         </aside>
