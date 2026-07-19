@@ -8,10 +8,16 @@ import {
   EnrichmentEntryView,
 } from "@/components/thread-entries";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
+import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import type { LocalCapture, LocalThread } from "@/lib/local-capture/types";
+import type {
+  AttachmentInput,
+  LocalCapture,
+  LocalThread,
+  MediaKind,
+} from "@/lib/local-capture/types";
 import {
   addCaptureMarkerLayers,
   CLUSTER_LAYER,
@@ -47,8 +53,34 @@ type ThreadContext = {
   enrichments: ThreadEnrichment[];
 };
 
+type ThreadEntry =
+  | { kind: "capture"; capture: LocalCapture }
+  | { kind: "enrichment"; enrichment: ThreadEnrichment };
+
+/**
+ * The append-only Thread stream in order: each Enrichment follows the
+ * highest-sequence Capture its recorded basis revision included.
+ */
+function chronologicalEntries(context: ThreadContext): ThreadEntry[] {
+  const entries: Array<{ at: number; tiebreak: number; entry: ThreadEntry }> = [
+    ...context.captures.map((capture) => ({
+      at: capture.sequence,
+      tiebreak: 0,
+      entry: { kind: "capture" as const, capture },
+    })),
+    ...context.enrichments.map((enrichment) => ({
+      at: enrichment.basisRevision,
+      tiebreak: 1,
+      entry: { kind: "enrichment" as const, enrichment },
+    })),
+  ];
+  return entries
+    .sort((a, b) => a.at - b.at || a.tiebreak - b.tiebreak)
+    .map((item) => item.entry);
+}
+
 export type MapJournalHook = {
-  state: string;
+  state: JournalState["phase"];
   markerCount: number;
   gps: GpsState;
   selectedCaptureId: string | null;
@@ -58,24 +90,6 @@ export type MapJournalHook = {
 declare global {
   interface Window {
     __WT_MAP_JOURNAL__?: MapJournalHook;
-  }
-}
-
-async function fetchThreadEnrichments(
-  threadId: string,
-): Promise<ThreadEnrichment[]> {
-  try {
-    const headers: Record<string, string> = {};
-    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
-    if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
-    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
-      headers,
-    });
-    if (!response.ok) return [];
-    const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
-    return body.enrichments ?? [];
-  } catch {
-    return [];
   }
 }
 
@@ -92,6 +106,7 @@ export function MapJournal() {
   );
   const [context, setContext] = useState<ThreadContext | null>(null);
   const [followUp, setFollowUp] = useState("");
+  const [followUpMedia, setFollowUpMedia] = useState<AttachmentInput[]>([]);
   const [followUpBusy, setFollowUpBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [markerCount, setMarkerCount] = useState(0);
@@ -99,7 +114,12 @@ export function MapJournal() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
   const gpsMarkerRef = useRef<import("maplibre-gl").Marker | null>(null);
-  const hookRef = useRef({ state: "loading", gps, markerCount, selected: null as string | null });
+  const hookRef = useRef({
+    state: "loading" as JournalState["phase"],
+    gps,
+    markerCount,
+    selected: null as string | null,
+  });
 
   const refreshMarkers = useCallback(async () => {
     const captures = await getCaptureStore().list();
@@ -119,7 +139,7 @@ export function MapJournal() {
       return;
     }
     const view = await store.listThread(capture.threadId);
-    const enrichments = await fetchThreadEnrichments(capture.threadId);
+    const enrichments = await loadThreadEnrichments(capture.threadId);
     setContext({ capture, ...view, enrichments });
   }, []);
 
@@ -308,8 +328,30 @@ export function MapJournal() {
     }
   }, [state, baseUrl, region]);
 
+  const addFollowUpMedia = useCallback((fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const kindFromMime = (mimeType: string): MediaKind => {
+      if (mimeType.startsWith("audio/")) return "audio";
+      if (mimeType.startsWith("video/")) return "video";
+      return "image";
+    };
+    const next = Array.from(fileList).map((file) => ({
+      kind: kindFromMime(file.type || "application/octet-stream"),
+      mimeType: file.type || "application/octet-stream",
+      fileName: file.name || "attachment",
+      bytes: file,
+    }));
+    setFollowUpMedia((current) => [...current, ...next]);
+  }, []);
+
   const commitFollowUp = useCallback(async () => {
-    if (!context?.thread || !followUp.trim() || followUpBusy) return;
+    if (
+      !context?.thread ||
+      (!followUp.trim() && followUpMedia.length === 0) ||
+      followUpBusy
+    ) {
+      return;
+    }
     const threadId = context.thread.id;
     setFollowUpBusy(true);
     setError(null);
@@ -319,8 +361,10 @@ export function MapJournal() {
       const store = getCaptureStore();
       await store.commit(followUp.trim(), readAvailableLocation(), {
         destination: { type: "thread", threadId },
+        attachments: followUpMedia,
       });
       setFollowUp("");
+      setFollowUpMedia([]);
       await refreshMarkers();
       if (navigator.onLine) {
         try {
@@ -337,7 +381,7 @@ export function MapJournal() {
     } finally {
       setFollowUpBusy(false);
     }
-  }, [context, followUp, followUpBusy, refreshMarkers, openCapture]);
+  }, [context, followUp, followUpMedia, followUpBusy, refreshMarkers, openCapture]);
 
   const gpsLabel =
     gps.status === "tracking"
@@ -436,7 +480,7 @@ export function MapJournal() {
                   className="journal-preview"
                   aria-label="Capture preview"
                 >
-                  <CaptureEntryView capture={context.capture} />
+                  <CaptureEntryView capture={context.capture} mediaPreviews />
                 </section>
 
                 {context.thread ? (
@@ -448,21 +492,26 @@ export function MapJournal() {
                       Complete Thread · revision {context.thread.revision}
                     </h3>
                     <ul className="capture-list">
-                      {context.captures.map((capture) => (
-                        <li key={capture.id}>
-                          <CaptureEntryView capture={capture} />
-                        </li>
-                      ))}
-                      {context.enrichments.map((enrichment) => (
-                        <li key={enrichment.id}>
-                          <EnrichmentEntryView enrichment={enrichment} />
-                        </li>
-                      ))}
+                      {chronologicalEntries(context).map((entry) =>
+                        entry.kind === "capture" ? (
+                          <li key={entry.capture.id}>
+                            <CaptureEntryView
+                              capture={entry.capture}
+                              mediaPreviews
+                            />
+                          </li>
+                        ) : (
+                          <li key={entry.enrichment.id}>
+                            <EnrichmentEntryView enrichment={entry.enrichment} />
+                          </li>
+                        ),
+                      )}
                     </ul>
-                    {context.enrichments.length === 0 && !online ? (
+                    {context.enrichments.length === 0 ? (
                       <p className="journal-note" role="note">
-                        Enrichments synchronize when this device is online;
-                        everything above is stored locally.
+                        No Enrichments yet — they arrive when this Thread
+                        processes online. Previously loaded Enrichments stay
+                        readable offline.
                       </p>
                     ) : null}
 
@@ -478,13 +527,61 @@ export function MapJournal() {
                         onChange={(event) => setFollowUp(event.target.value)}
                         disabled={followUpBusy}
                       />
-                      <button
-                        type="button"
-                        onClick={() => void commitFollowUp()}
-                        disabled={followUpBusy || !followUp.trim()}
-                      >
-                        Capture follow-up
-                      </button>
+                      {followUpMedia.length > 0 ? (
+                        <ul
+                          className="capture-attachment-drafts"
+                          aria-label="Follow-up media"
+                        >
+                          {followUpMedia.map((attachment, index) => (
+                            <li key={`${attachment.fileName}-${index}`}>
+                              {attachment.fileName}
+                              <button
+                                type="button"
+                                className="capture-retry"
+                                onClick={() =>
+                                  setFollowUpMedia((current) =>
+                                    current.filter(
+                                      (_, itemIndex) => itemIndex !== index,
+                                    ),
+                                  )
+                                }
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <div className="journal-followup-actions">
+                        <label
+                          className="capture-retry journal-media-picker"
+                          htmlFor="journal-followup-media"
+                        >
+                          Add media
+                        </label>
+                        <input
+                          id="journal-followup-media"
+                          className="capture-file-input"
+                          type="file"
+                          accept="image/*,audio/*,video/*"
+                          multiple
+                          aria-label="Add follow-up media"
+                          onChange={(event) => {
+                            addFollowUpMedia(event.target.files);
+                            event.target.value = "";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void commitFollowUp()}
+                          disabled={
+                            followUpBusy ||
+                            (!followUp.trim() && followUpMedia.length === 0)
+                          }
+                        >
+                          Capture follow-up
+                        </button>
+                      </div>
                     </div>
                   </section>
                 ) : (

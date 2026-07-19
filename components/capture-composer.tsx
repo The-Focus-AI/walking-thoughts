@@ -39,6 +39,7 @@ import type {
 } from "@/lib/local-capture/types";
 import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
+import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
 import {
@@ -62,24 +63,6 @@ type ThreadView = {
   captures: LocalCapture[];
   enrichments: ThreadEnrichment[];
 };
-
-async function fetchThreadEnrichments(
-  threadId: string,
-): Promise<ThreadEnrichment[]> {
-  try {
-    const headers: Record<string, string> = {};
-    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
-    if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
-    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
-      headers,
-    });
-    if (!response.ok) return [];
-    const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
-    return body.enrichments ?? [];
-  } catch {
-    return [];
-  }
-}
 
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
@@ -118,7 +101,7 @@ export function CaptureComposer() {
     const threadViews = await Promise.all(
       recent.map(async (thread) => {
         const view = await store.listThread(thread.id);
-        const enrichments = await fetchThreadEnrichments(thread.id);
+        const enrichments = await loadThreadEnrichments(thread.id);
         return { ...view, enrichments };
       }),
     );

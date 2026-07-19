@@ -16,12 +16,19 @@ prototype was rewritten, not promoted.
 - Markers cluster while zoomed out (`lib/map-journal/map-layers.ts`, MapLibre
   GeoJSON clustering with circle + text layers only — no sprite assets, so the
   markers work in airplane mode with the packaged region fonts).
-- Selecting a marker opens a compact Capture preview plus the complete Thread
-  (Captures, Enrichments with sources and exact models, processing status)
-  and a follow-up composer. Desktop shows the Thread panel adjacent to the
-  map; mobile uses a bottom sheet over it.
-- Follow-ups use the ordinary Capture pipeline: local commit first through the
-  Capture store, then foreground synchronization and Enrichment when online.
+- Selecting a marker opens a compact Capture preview (with inline local media)
+  plus the complete Thread as one chronological append-only stream — Captures
+  interleaved with the Enrichments whose basis revision follows them, each
+  with sources and exact models — and a follow-up composer. Desktop shows the
+  Thread panel adjacent to the map; mobile uses a bottom sheet over it.
+- Enrichments load from the server when online and are retained locally
+  (`lib/enrichment/thread-view.ts`) so previously reviewed Threads keep their
+  Enrichments readable in airplane mode.
+- Follow-ups use the ordinary Capture pipeline with optional media
+  attachments: local commit first through the Capture store, then foreground
+  synchronization and Enrichment when online.
+- The home shell links to the journal as the primary review destination
+  ("Review your walks on the Map Journal").
 - Live browser GPS runs only while the map surface is mounted
   (`watchPosition` cleared on unmount) and reports honest states: starting,
   unavailable, or tracking with the reported accuracy.
@@ -30,8 +37,9 @@ prototype was rewritten, not promoted.
 
 ## Tests
 
-`tests/map-journal.spec.ts` covers offline topography, clustering and
-media-aware markers, honest GPS states, marker preview and complete Thread
-context, an offline follow-up through the ordinary pipeline, complete
-airplane-mode rendering, and the desktop adjacent-panel layout, on the
-Pixel-9-sized project plus a desktop viewport.
+`tests/map-journal.spec.ts` (Pixel-9 project) covers offline topography,
+clustering and media-aware markers, honest GPS states, marker preview with
+complete Thread context and the mobile bottom sheet, an offline follow-up
+through the ordinary pipeline, and complete airplane-mode rendering.
+`tests/map-journal-desktop.spec.ts` runs on a dedicated Desktop Chrome
+Playwright project and asserts the adjacent Thread panel layout.

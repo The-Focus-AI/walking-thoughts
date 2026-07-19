@@ -35,6 +35,11 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           Save observations on your phone first. Walking Thoughts will be ready
           to add context when you reconnect.
         </p>
+        <p className="hero-review">
+          <Link className="hero-review-link" href="/journal">
+            Review your walks on the Map Journal →
+          </Link>
+        </p>
 
         {configurationRequired ? (
           <aside className="configuration-note" role="status">

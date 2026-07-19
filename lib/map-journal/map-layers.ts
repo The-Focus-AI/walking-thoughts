@@ -31,7 +31,7 @@ export function addCaptureMarkerLayers(
 ): void {
   map.addSource(MARKERS_SOURCE, {
     type: "geojson",
-    data: markers,
+    data: markers as Parameters<maplibregl.GeoJSONSource["setData"]>[0],
     cluster: true,
     clusterMaxZoom: 13,
     clusterRadius: 46,
@@ -99,5 +99,7 @@ export function updateCaptureMarkers(
   const source = map.getSource(MARKERS_SOURCE) as
     | maplibregl.GeoJSONSource
     | undefined;
-  source?.setData(markers as never);
+  source?.setData(
+    markers as Parameters<maplibregl.GeoJSONSource["setData"]>[0],
+  );
 }

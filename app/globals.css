@@ -648,6 +648,38 @@ footer {
   }
 }
 
+.hero-review {
+  margin: 0.5rem 0 1rem;
+}
+
+.hero-review-link {
+  color: var(--moss);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.hero-review-link:hover {
+  text-decoration: underline;
+}
+
+.journal .media-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 180px;
+  margin-top: 0.5rem;
+  border-radius: 10px;
+}
+
+.journal-followup-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.journal-media-picker {
+  cursor: pointer;
+}
+
 .topbar-link {
   color: var(--muted);
   text-decoration: none;
