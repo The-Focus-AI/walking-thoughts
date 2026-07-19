@@ -17,7 +17,10 @@
   "dependencies": {
     "@clerk/nextjs": "latest",
     "@neondatabase/serverless": "^1.1.0",
+    "@protomaps/basemaps": "^5.7.2",
+    "maplibre-gl": "^5.24.0",
     "next": "latest",
+    "pmtiles": "^4.4.1",
     "react": "latest",
     "react-dom": "latest"
   },

@@ -1,6 +1,7 @@
-const CACHE_NAME = "walking-thoughts-shell-v7";
+const CACHE_NAME = "walking-thoughts-shell-v8";
 const SHELL = [
   "/offline",
+  "/region-tracer",
   "/manifest.webmanifest",
   "/icon-192.svg",
   "/icon-512.svg",
@@ -31,8 +32,10 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .catch(() => caches.match("/offline")),
+      fetch(request).catch(
+        async () =>
+          (await caches.match(url.pathname)) || caches.match("/offline"),
+      ),
     );
     return;
   }
