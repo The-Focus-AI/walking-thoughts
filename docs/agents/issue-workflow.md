@@ -82,7 +82,8 @@ Never start implementation on a ticket that already has `in-progress`.
   A title like `(#8)` alone does **not** close the issue. Cloud Agent tokens
   often lack `issues:write`, so this GitHub-native close-on-merge path is
   required. `.github/workflows/agent-ticket-claim.yml` fails `cursor/*` PRs
-  that omit it.
+  that omit it. Infra/docs PRs with no product ticket may set
+  `No-ticket: true` on its own line in the body to skip claim/close checks.
 - Use the ticket's public acceptance criteria as the testing seam
 - Run the repository two-axis code review before asking for merge
 
