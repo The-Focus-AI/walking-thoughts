@@ -117,7 +117,9 @@ export function OfflineMapsPage() {
             </p>
             <p className="offline-maps-note">
               This phone has the Offline Region. Open Map Journal to walk the
-              map without signal.
+              map without signal. If you previously downloaded the small
+              Cornwall village fixture, use Re-download to install the full
+              home pack.
             </p>
             <div className="offline-maps-actions">
               <Link className="offline-maps-download" href="/journal">

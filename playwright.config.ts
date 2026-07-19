@@ -44,6 +44,8 @@ export default defineConfig({
       CLERK_ALLOWED_USER_IDS: process.env.CLERK_ALLOWED_USER_IDS ?? "",
       CLERK_AUTHORIZED_PARTIES: testOrigin,
       NEXT_PUBLIC_APP_URL: testOrigin,
+      // Empty string forces the small committed fixture pack (not the ~87 MB home Blob).
+      NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE: "",
     },
     url: `${testOrigin}/offline`,
     reuseExistingServer: !process.env.CI,
