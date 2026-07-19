@@ -40,10 +40,6 @@ import type {
   ThreadDestination,
 } from "@/lib/local-capture/types";
 import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
-import {
-  FOREGROUND_SYNC_IDLE,
-  FOREGROUND_SYNC_RUNNING,
-} from "@/lib/disclosures/copy";
 import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
@@ -57,6 +53,11 @@ import {
   getMediaTransport,
   synchronizePendingMedia,
 } from "@/lib/sync/media-client";
+import {
+  pendingSyncCount,
+  syncFooterSummary,
+  syncRollup,
+} from "@/lib/sync/rollup";
 
 type ThreadView = {
   thread: LocalThread;
@@ -428,8 +429,15 @@ export function CaptureComposer() {
       ? `Adding to “${trailTitle}”`
       : "First Capture starts today's Thread";
 
+  const statusSources = [
+    ...(activeView?.captures ?? []).map((capture) => capture.status),
+    ...inbox.map((capture) => capture.status),
+  ];
+  const rollup = syncRollup(statusSources);
+  const footerSummary = syncFooterSummary(rollup, { running: isSyncing });
+
   const composer = (
-    <div className="capture-card outdoor-card" aria-label="New Capture">
+    <div className="capture-card outdoor-card trail-dock-card" aria-label="New Capture">
       <OutdoorCaptureDock
         mode={mode}
         onChange={onModeChange}
@@ -453,7 +461,7 @@ export function CaptureComposer() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="What did you notice?"
-              rows={3}
+              rows={2}
               disabled={!ready || isPending}
             />
           </>
@@ -571,21 +579,7 @@ export function CaptureComposer() {
   );
 
   return (
-    <div className="capture-workspace">
-      <div className="capture-sync-bar">
-        <p className="capture-persistence" role="status">
-          {isSyncing ? FOREGROUND_SYNC_RUNNING : FOREGROUND_SYNC_IDLE}
-        </p>
-        <button
-          type="button"
-          className="capture-retry"
-          onClick={() => void runForegroundSync()}
-          disabled={!ready || isSyncing}
-        >
-          Retry sync
-        </button>
-      </div>
-
+    <div className="capture-workspace trail-aca">
       {pushOptIn.status === "offer" ? (
         <div className="capture-push-opt-in" role="status">
           <p>
@@ -628,7 +622,7 @@ export function CaptureComposer() {
 
       <section className="capture-section trail-thread" aria-label={trailTitle}>
         <div className="capture-section-header">
-          <h2 className="capture-section-title">{trailTitle}</h2>
+          <h1 className="capture-section-title">{trailTitle}</h1>
           {activeView ? (
             <span className="capture-revision">
               Revision {activeView.thread.revision}
@@ -652,13 +646,14 @@ export function CaptureComposer() {
         </div>
 
         {timeline.length > 0 ? (
-          <ul className="capture-list trail-timeline">
+          <ul className="capture-list trail-timeline trail-gutter-list">
             {timeline.map((entry) =>
               entry.kind === "capture" ? (
                 <li key={entry.capture.id}>
                   <CaptureEntry
                     capture={entry.capture}
                     showSpeaker
+                    gutter
                     onRetry={() => void runForegroundSync()}
                     onRemoveLocalMedia={onRemoveLocalMedia}
                     onRestoreLocalMedia={onRestoreLocalMedia}
@@ -673,16 +668,16 @@ export function CaptureComposer() {
             {isEnriching ? (
               <li>
                 <article
-                  className="capture-entry enrichment-pending thread-speaker-agent"
+                  className="capture-entry enrichment-pending thread-speaker-agent capture-gutter gutter-enriching"
                   aria-label="Walking Thoughts is preparing a reply"
                 >
-                  <div className="capture-entry-meta">
-                    <span className="thread-speaker">Walking Thoughts</span>
-                    <span className="capture-status status-enriching">
-                      Enriching
-                    </span>
+                  <span className="gutter-label">Enriching</span>
+                  <div>
+                    <div className="capture-entry-meta">
+                      <span className="thread-speaker">Walking Thoughts</span>
+                    </div>
+                    <p>Preparing a reply from this Thread&apos;s history…</p>
                   </div>
-                  <p>Preparing a reply from this Thread&apos;s history…</p>
                 </article>
               </li>
             ) : null}
@@ -693,8 +688,6 @@ export function CaptureComposer() {
             replies from Walking Thoughts show up here after sync.
           </p>
         )}
-
-        {composer}
       </section>
 
       {inbox.length > 0 ? (
@@ -704,11 +697,12 @@ export function CaptureComposer() {
             Older unassigned Captures. Prefer today&apos;s Thread above for the
             trail.
           </p>
-          <ul className="capture-list">
+          <ul className="capture-list trail-gutter-list">
             {inbox.map((capture) => (
               <li key={capture.id}>
                 <CaptureEntry
                   capture={capture}
+                  gutter
                   onRetry={() => void runForegroundSync()}
                   onRemoveLocalMedia={onRemoveLocalMedia}
                   onRestoreLocalMedia={onRestoreLocalMedia}
@@ -742,6 +736,27 @@ export function CaptureComposer() {
           </ul>
         </section>
       ) : null}
+
+      <footer className="trail-sync-footer" role="status" data-testid="trail-sync-footer">
+        <div>
+          <strong>{footerSummary}</strong>
+          <p className="capture-persistence">
+            {pendingSyncCount(rollup) > 0
+              ? `${rollup.syncing} syncing · ${rollup.enriching} enriching · ${rollup.needs_attention} need attention`
+              : "Foreground sync when open and online (background is best effort)"}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="capture-retry"
+          onClick={() => void runForegroundSync()}
+          disabled={!ready || isSyncing}
+        >
+          Retry
+        </button>
+      </footer>
+
+      <div className="trail-sticky-dock">{composer}</div>
     </div>
   );
 }
@@ -752,12 +767,14 @@ function CaptureEntry({
   onRemoveLocalMedia,
   onRestoreLocalMedia,
   showSpeaker = false,
+  gutter = false,
 }: {
   capture: LocalCapture;
   onRetry: () => void;
   onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
   onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
   showSpeaker?: boolean;
+  gutter?: boolean;
 }) {
   const label =
     capture.text ||
@@ -766,14 +783,22 @@ function CaptureEntry({
 
   return (
     <article
-      className={`capture-entry${showSpeaker ? " thread-speaker-you" : ""}`}
+      className={`capture-entry${showSpeaker ? " thread-speaker-you" : ""}${
+        gutter ? ` capture-gutter gutter-${capture.status}` : ""
+      }`}
       aria-label={label}
     >
+      {gutter ? (
+        <span className="gutter-label">{statusLabel(capture.status)}</span>
+      ) : null}
+      <div className={gutter ? "capture-gutter-body" : undefined}>
       <div className="capture-entry-meta">
         {showSpeaker ? <span className="thread-speaker">You</span> : null}
-        <span className={`capture-status status-${capture.status}`}>
-          {statusLabel(capture.status)}
-        </span>
+        {gutter ? null : (
+          <span className={`capture-status status-${capture.status}`}>
+            {statusLabel(capture.status)}
+          </span>
+        )}
         <span className="capture-sequence">#{capture.sequence}</span>
         <time dateTime={capture.createdAt}>
           {new Date(capture.createdAt).toLocaleString()}
@@ -803,6 +828,7 @@ function CaptureEntry({
           ) : null}
         </div>
       ) : null}
+      </div>
     </article>
   );
 }

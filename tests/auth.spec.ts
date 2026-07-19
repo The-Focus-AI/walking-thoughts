@@ -25,14 +25,17 @@ test.describe("single-user Clerk boundary", () => {
     await clerk.signIn({ page, emailAddress: allowedEmail! });
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: "Walking Thoughts", exact: true }),
+      page.getByRole("heading", { name: "Today's hike", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Offline Region map" }),
     ).toBeVisible();
     await expect(page.getByText("Ready offline")).toBeVisible();
 
     await context.setOffline(true);
     await page.reload();
     await expect(
-      page.getByRole("heading", { name: "Walking Thoughts", exact: true }),
+      page.getByRole("heading", { name: "Today's hike", exact: true }),
     ).toBeVisible();
   });
 

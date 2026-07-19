@@ -55,7 +55,10 @@ test("installed shell remains useful when the network disappears", async ({
   await page.goto("/");
   await expect(page).toHaveTitle("Walking Thoughts");
   await expect(
-    page.getByRole("heading", { name: "Walking Thoughts", exact: true }),
+    page.getByRole("link", { name: "Walking Thoughts home" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Offline Region map" }),
   ).toBeVisible();
 
   const manifest = await page.locator('link[rel="manifest"]').getAttribute("href");
@@ -82,7 +85,7 @@ test("installed shell remains useful when the network disappears", async ({
   await context.setOffline(true);
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Walking Thoughts", exact: true }),
+    page.getByRole("link", { name: "Walking Thoughts home" }),
   ).toBeVisible();
   await expect(page.getByText("Ready offline")).toBeVisible();
 });

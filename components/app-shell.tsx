@@ -4,16 +4,20 @@ import { AccountExport } from "@/components/account-export";
 import { CaptureComposer } from "@/components/capture-composer";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { OfflineReadiness } from "@/components/offline-readiness";
-import { OfflineRegionPanel } from "@/components/offline-region-panel";
+import { TrailMapHero } from "@/components/trail-map-hero";
 
 type AppShellProps = {
   account?: ReactNode;
   configurationRequired?: boolean;
 };
 
+/**
+ * Trail home — Density A + Sync C + Map A fold from the trail-cleanup prototype.
+ * Map hero first; sticky Capture dock + sync footer live in CaptureComposer.
+ */
 export function AppShell({ account, configurationRequired }: AppShellProps) {
   return (
-    <main className="shell">
+    <main className="shell trail-shell">
       <header className="topbar">
         <Link className="brand" href="/" aria-label="Walking Thoughts home">
           <span className="brand-mark" aria-hidden="true">
@@ -33,36 +37,29 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         </div>
       </header>
 
-      <section className="hero hero-trail">
-        <p className="eyebrow">On the trail</p>
-        <h1>Walking Thoughts</h1>
-        <p className="lede">
-          Append to today&apos;s Thread as you walk. Replies show up in the same
-          stream after sync.
-        </p>
-        <p className="hero-review">
-          <Link className="hero-review-link" href="/threads">
-            Browse Threads by day →
-          </Link>
-        </p>
+      <div className="trail-layout">
+        <TrailMapHero />
 
-        {configurationRequired ? (
-          <aside className="configuration-note" role="status">
-            <strong>Secure setup required</strong>
-            <span>
-              Clerk keys and the allowed user must be configured before private
-              Captures can begin.
-            </span>
-          </aside>
-        ) : (
-          <CaptureComposer />
-        )}
-      </section>
+        <section className="trail-capture" aria-label="On the trail">
+          {configurationRequired ? (
+            <aside className="configuration-note" role="status">
+              <strong>Secure setup required</strong>
+              <span>
+                Clerk keys and the allowed user must be configured before private
+                Captures can begin.
+              </span>
+            </aside>
+          ) : (
+            <CaptureComposer />
+          )}
+        </section>
+      </div>
 
-      <OfflineRegionPanel />
-      {!configurationRequired ? <AccountExport /> : null}
-
-      <DataHandlingDisclosure />
+      <details className="trail-account">
+        <summary>Account &amp; data handling</summary>
+        {!configurationRequired ? <AccountExport /> : null}
+        <DataHandlingDisclosure />
+      </details>
 
       <footer>
         <span>Local first</span>
