@@ -190,3 +190,26 @@
 .proto-index-viewport-links a:hover {
   background: rgba(169, 209, 143, 0.18);
 }
+
+.proto-index-verdict {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(244, 207, 114, 0.45);
+  background: rgba(244, 207, 114, 0.08);
+  color: #f2f1e8 !important;
+}
+
+.proto-index-variant.winner {
+  border-color: rgba(244, 207, 114, 0.55);
+  background: rgba(244, 207, 114, 0.1);
+}
+
+.proto-index-winner-tag {
+  margin-left: 0.35rem;
+  color: #f4cf72;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

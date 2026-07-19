@@ -44,8 +44,12 @@ export default function PrototypeIndexPage() {
         <h1>Throwaway UI explorations</h1>
         <p>
           Not production. Each variant has <strong>Mobile</strong> and{" "}
-          <strong>Desktop</strong> links — open both when judging. Floating
-          switcher can flip viewport too (← → / area tabs).
+          <strong>Desktop</strong> links. Floating switcher flips viewport too
+          (← → / area tabs).
+        </p>
+        <p className="proto-index-verdict" role="status">
+          Verdict: Density <strong>A</strong> · Sync <strong>C</strong> · Map{" "}
+          <strong>A</strong> (issue #53). Winners highlighted below.
         </p>
         <p className="proto-index-back">
           <Link href="/">← Back to Walking Thoughts</Link>
