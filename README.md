@@ -34,9 +34,9 @@ gitignored `.fnox/env` bootstrap file. Interactive shells may use
 
 Use `mise run vercel:sync -- --env preview` before opening or updating the PR
 and `mise run vercel:sync -- --env production` before merging it. The task
-selects the matching fnox profile so credentials cannot cross environment
-boundaries. Vercel receives resolved environment variables; fnox does not run
-in Vercel builds or functions.
+selects the matching fnox profile and writes keys into Vercel (`thefocusai` /
+`walking-thoughts`) using `VERCEL_TOKEN`. Fnox does not run in Vercel builds or
+functions.
 
 Deployments are PR-only. A branch push creates its Preview through Vercel's Git
 integration, and merging the approved PR to `main` creates Production. Do not

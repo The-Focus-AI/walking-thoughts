@@ -52,11 +52,18 @@ script installs mise and the 1Password CLI (`op`), activates mise shims on
 `PATH`, runs `mise install`, bootstraps `.fnox/env` when possible, then runs
 `mise run install`.
 
-For secret access, add `OP_SERVICE_ACCOUNT_TOKEN` (the Walking Thoughts
-project-scoped 1Password service-account token) in the Cursor Cloud Secrets tab
-for this environment. The install script writes it to gitignored `.fnox/env`.
-Without that token, lint/build/test of public surfaces still work; authenticated
-Clerk/fnox flows will not.
+Add these in the Cursor Cloud Secrets tab for this environment (written into
+gitignored `.fnox/env`):
+
+- `OP_SERVICE_ACCOUNT_TOKEN` — Walking Thoughts 1Password service-account token
+  (required for fnox vault reads)
+- `VERCEL_TOKEN` — Vercel token with env write on `thefocusai/walking-thoughts`
+  (required for `mise run vercel:sync`; may also live as a Development vault
+  Password item titled `VERCEL_TOKEN`)
+
+Without `OP_SERVICE_ACCOUNT_TOKEN`, lint/build/test of public surfaces still
+work; authenticated Clerk/fnox flows will not. Without `VERCEL_TOKEN`, agents
+cannot push fnox secrets into Vercel Preview/Production env vars.
 
 Use `mise` for all project tools. Do not run direct Vercel deploy commands.
 After dependency changes, prefer `mise run install` / `mise install` rather than

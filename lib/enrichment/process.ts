@@ -1,6 +1,10 @@
 import type { MediaKind } from "@/lib/local-capture/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
 import type { PrivateBlobStore } from "@/lib/media/memory-blob-store";
+import { notifyEnrichmentOutcome } from "@/lib/push/notify";
+import { getPushRepository } from "@/lib/push/repository";
+import { createWebPushSender } from "@/lib/push/send";
+import type { PushRepository, PushSender } from "@/lib/push/types";
 import type { ThreadRepository } from "@/lib/sync/types";
 import { assertModelSupportsMedia } from "./capabilities";
 import { enrichmentSystemAndModel, getGatewayClient } from "./gateway";
@@ -21,6 +25,20 @@ import type {
   GatewayClient,
   GatewayMediaPart,
 } from "./types";
+
+type PushHooks = {
+  repository: PushRepository;
+  sender: PushSender | null;
+};
+
+async function maybeNotify(
+  userId: string,
+  push: PushHooks | undefined,
+  event: Parameters<typeof notifyEnrichmentOutcome>[1],
+): Promise<void> {
+  if (!push?.sender) return;
+  await notifyEnrichmentOutcome(userId, event, push.repository, push.sender);
+}
 
 function createJobId(): string {
   return crypto.randomUUID();
@@ -151,6 +169,7 @@ async function runJob(
   blobStore: PrivateBlobStore,
   placeResolver: NearbyPlaceResolver,
   search: WebSearchClient,
+  push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
     return job.targetCaptureIds.map((id) => ({
@@ -170,6 +189,13 @@ async function runJob(
   const thread = threadsById.get(running.threadId);
   if (!thread) {
     await repository.markJobFailed(userId, running.id, "thread_missing");
+    await maybeNotify(userId, push, {
+      kind: "needs_attention",
+      jobId: running.id,
+      threadId: running.threadId,
+      attempt: running.attempts,
+      reason: "thread_missing",
+    });
     return running.targetCaptureIds.map((id) => ({
       id,
       threadId: running.threadId,
@@ -196,6 +222,13 @@ async function runJob(
     const capability = assertModelSupportsMedia(running.model, kinds);
     if (!capability.ok) {
       await repository.markJobFailed(userId, running.id, capability.reason);
+      await maybeNotify(userId, push, {
+        kind: "needs_attention",
+        jobId: running.id,
+        threadId: running.threadId,
+        attempt: running.attempts,
+        reason: capability.reason,
+      });
       return running.targetCaptureIds.map((id) => ({
         id,
         threadId: running.threadId,
@@ -233,6 +266,15 @@ async function runJob(
       sources: generation.sources,
     });
 
+    if (completed.created) {
+      await maybeNotify(userId, push, {
+        kind: "complete",
+        jobId: running.id,
+        threadId: running.threadId,
+        title: completed.enrichment.title ?? undefined,
+      });
+    }
+
     return running.targetCaptureIds.map((id) => ({
       id,
       threadId: running.threadId,
@@ -244,6 +286,13 @@ async function runJob(
     const reason =
       error instanceof Error ? error.message : "enrichment_failed";
     await repository.markJobFailed(userId, running.id, reason);
+    await maybeNotify(userId, push, {
+      kind: "needs_attention",
+      jobId: running.id,
+      threadId: running.threadId,
+      attempt: running.attempts,
+      reason,
+    });
     return running.targetCaptureIds.map((id) => ({
       id,
       threadId: running.threadId,
@@ -265,6 +314,8 @@ export async function processPendingEnrichments(
     blobStore?: PrivateBlobStore;
     placeResolver?: NearbyPlaceResolver;
     search?: WebSearchClient;
+    pushRepository?: PushRepository;
+    pushSender?: PushSender | null;
   } = {},
 ): Promise<EnrichmentBatchResponse> {
   const environment = options.environment ?? process.env;
@@ -276,6 +327,16 @@ export async function processPendingEnrichments(
   const placeResolver =
     options.placeResolver ?? getNearbyPlaceResolver(environment);
   const search = options.search ?? getWebSearchClient(environment);
+  const pushRepository =
+    options.pushRepository ??
+    getPushRepository(environment as NodeJS.ProcessEnv);
+  const pushSender =
+    options.pushSender === undefined
+      ? createWebPushSender(environment as NodeJS.ProcessEnv)
+      : options.pushSender;
+  const push: PushHooks | undefined = pushSender
+    ? { repository: pushRepository, sender: pushSender }
+    : undefined;
 
   if (options.retryFailed) {
     await repository.requeueFailed(userId);
@@ -302,6 +363,7 @@ export async function processPendingEnrichments(
       blobStore,
       placeResolver,
       search,
+      push,
     );
     results.push(...jobResults);
   }
