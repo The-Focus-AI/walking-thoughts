@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { statusLabel } from "@/components/thread-entries";
-import { enrichPendingCaptures } from "@/lib/enrichment/client";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { readAvailableLocation } from "@/lib/local-capture/location";
@@ -17,8 +16,7 @@ import type {
   LocalThread,
   MediaKind,
 } from "@/lib/local-capture/types";
-import { synchronizePendingCaptures } from "@/lib/sync/client";
-import { synchronizePendingMedia } from "@/lib/sync/media-client";
+import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
 
 type ThreadChatProps = {
   threadId: string;
@@ -175,15 +173,23 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
   }, [refresh]);
 
   useEffect(() => {
-    const onOnline = () => setOnline(true);
+    const onOnline = () => {
+      setOnline(true);
+      void runSyncCycle({ store: getCaptureStore() }).then(() => refresh());
+    };
     const onOffline = () => setOnline(false);
+    const onCycle = () => {
+      void refresh();
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+    window.addEventListener(SYNC_CYCLE_EVENT, onCycle);
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener(SYNC_CYCLE_EVENT, onCycle);
     };
-  }, []);
+  }, [refresh]);
 
   const isEnriching = captures.some((capture) => capture.status === "enriching");
 
@@ -193,8 +199,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
     const timer = window.setInterval(() => {
       void (async () => {
         try {
-          const store = getCaptureStore();
-          await enrichPendingCaptures(store);
+          await runSyncCycle({ store: getCaptureStore() });
           await refresh();
         } catch {
           // Retryable; the enriching gutter stays visible.
@@ -226,9 +231,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
 
       if (navigator.onLine) {
         try {
-          await synchronizePendingMedia(store);
-          await synchronizePendingCaptures(store);
-          await enrichPendingCaptures(store, undefined, { retryFailed: true });
+          await runSyncCycle({ store });
         } catch {
           // Statuses remain visible on turns.
         }

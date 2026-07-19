@@ -131,23 +131,27 @@ test.describe("Thread chat", () => {
             `wt-thread-enrichments:${latest.threadId}`,
           );
           const existing = existingRaw
-            ? (JSON.parse(existingRaw) as unknown[])
+            ? (JSON.parse(existingRaw) as Array<Record<string, unknown>>)
             : [];
-          const enrichment = {
-            id: `enrich-${latest.id}`,
-            threadId: latest.threadId,
-            basisRevision: latest.sequence,
-            basisEntryIds: [latest.id],
-            targetCaptureIds: [latest.id],
-            text: "That sounds like a hermit thrush.",
-            model: "test-model",
-            createdAt: new Date().toISOString(),
-            sources: [],
-          };
-          localStorage.setItem(
-            `wt-thread-enrichments:${latest.threadId}`,
-            JSON.stringify([...existing, enrichment]),
-          );
+          const enrichmentId = `enrich-${latest.id}`;
+          // Idempotent: SyncRuntime + Thread view may drain the outbox concurrently.
+          if (!existing.some((item) => item.id === enrichmentId)) {
+            existing.push({
+              id: enrichmentId,
+              threadId: latest.threadId,
+              basisRevision: latest.sequence,
+              basisEntryIds: [latest.id],
+              targetCaptureIds: [latest.id],
+              text: "That sounds like a hermit thrush.",
+              model: "test-model",
+              createdAt: new Date().toISOString(),
+              sources: [],
+            });
+            localStorage.setItem(
+              `wt-thread-enrichments:${latest.threadId}`,
+              JSON.stringify(existing),
+            );
+          }
           return {
             results: targets.map((capture) => ({
               id: capture.id,

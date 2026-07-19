@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { SyncRuntime } from "@/components/sync-runtime";
 import {
   CaptureEntryView,
   EnrichmentEntryView,
@@ -75,6 +76,7 @@ export function ThreadsArchive() {
 
   return (
     <main className="threads-archive">
+      <SyncRuntime />
       <header className="threads-archive-header">
         <div>
           <p className="eyebrow">Archive</p>

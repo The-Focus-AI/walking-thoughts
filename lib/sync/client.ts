@@ -83,10 +83,26 @@ function toPayload(capture: LocalCapture): SyncCapturePayload {
   };
 }
 
+/** True when every local media blob for this Capture has already uploaded. */
+export function captureReadyForMetadataPush(capture: LocalCapture): boolean {
+  return capture.attachments.every(
+    (attachment) =>
+      attachment.localObjectKey == null ||
+      attachment.syncStatus === "complete",
+  );
+}
+
+/**
+ * Outbox eligibility: saved / needs attention / abandoned syncing, and media
+ * already pushed when the Capture still holds a local original.
+ */
 function pendingCaptures(captures: LocalCapture[]): LocalCapture[] {
   return captures.filter(
     (capture) =>
-      capture.status === "saved_locally" || capture.status === "needs_attention",
+      (capture.status === "saved_locally" ||
+        capture.status === "needs_attention" ||
+        capture.status === "syncing") &&
+      captureReadyForMetadataPush(capture),
   );
 }
 
@@ -101,13 +117,25 @@ export async function synchronizePendingCaptures(
 
   const ids = pending.map((capture) => capture.id);
   await store.markSyncing(ids);
-  const result = await transport.pushCaptures(pending.map(toPayload));
 
-  if (!isBatch(result)) {
-    await store.restoreSavedLocally(ids);
-    return { results: [], failures: [] };
+  try {
+    const result = await transport.pushCaptures(pending.map(toPayload));
+
+    if (!isBatch(result)) {
+      await store.restoreSavedLocally(ids);
+      return { results: [], failures: [] };
+    }
+
+    await store.applySyncBatch(result);
+    return result;
+  } catch {
+    const failures = ids.map((id) => ({
+      id,
+      status: "needs_attention" as const,
+      reason: "transport_error",
+      retryable: true,
+    }));
+    await store.applySyncBatch({ results: [], failures });
+    return { results: [], failures };
   }
-
-  await store.applySyncBatch(result);
-  return result;
 }

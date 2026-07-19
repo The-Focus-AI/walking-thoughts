@@ -152,7 +152,7 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
   await expect(page.getByText("Saved locally").first()).toBeVisible();
 
   await context.setOffline(false);
-  await page.getByRole("button", { name: "Retry sync" }).click();
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(page.getByText("Complete").first()).toBeVisible();
 
   const pushCount = await page.evaluate(() => {
