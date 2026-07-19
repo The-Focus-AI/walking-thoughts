@@ -8,22 +8,24 @@ export type MediaTransport = {
     mimeType: string;
     bytes: Blob;
   }): Promise<{ attachmentId: string; duplicate: boolean }>;
+  verify?(attachmentId: string): Promise<boolean>;
+  download?(attachmentId: string): Promise<Blob>;
 };
 
 type MediaGlobals = typeof globalThis & {
   __WT_MEDIA_TRANSPORT__?: MediaTransport;
 };
 
-function defaultMediaTransport(): MediaTransport {
-  const headers = (): HeadersInit => {
-    const result: Record<string, string> = {};
-    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
-    if (testUser) {
-      result["x-walking-thoughts-test-user"] = testUser;
-    }
-    return result;
-  };
+function authHeaders(): HeadersInit {
+  const result: Record<string, string> = {};
+  const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
+  if (testUser) {
+    result["x-walking-thoughts-test-user"] = testUser;
+  }
+  return result;
+}
 
+function defaultMediaTransport(): MediaTransport {
   return {
     async upload({ attachmentId, operationId, mimeType, bytes }) {
       const body = new FormData();
@@ -33,7 +35,7 @@ function defaultMediaTransport(): MediaTransport {
       body.set("file", bytes, attachmentId);
       const response = await fetch("/api/sync/media", {
         method: "POST",
-        headers: headers(),
+        headers: authHeaders(),
         body,
       });
       if (
@@ -51,6 +53,23 @@ function defaultMediaTransport(): MediaTransport {
         duplicate: boolean;
       };
     },
+    async verify(attachmentId) {
+      const response = await fetch(`/api/media/${attachmentId}`, {
+        method: "GET",
+        headers: authHeaders(),
+      });
+      return response.ok;
+    },
+    async download(attachmentId) {
+      const response = await fetch(`/api/media/${attachmentId}`, {
+        method: "GET",
+        headers: authHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`media_download_${response.status}`);
+      }
+      return await response.blob();
+    },
   };
 }
 
@@ -66,8 +85,9 @@ function pendingMedia(captures: LocalCapture[]) {
     capture.attachments
       .filter(
         (attachment) =>
-          attachment.syncStatus === "saved_locally" ||
-          attachment.syncStatus === "needs_attention",
+          Boolean(attachment.localObjectKey) &&
+          (attachment.syncStatus === "saved_locally" ||
+            attachment.syncStatus === "needs_attention"),
       )
       .map((attachment) => ({ capture, attachment })),
   );
@@ -83,6 +103,9 @@ export async function synchronizePendingMedia(
 
   for (const { capture, attachment } of pending) {
     try {
+      if (!attachment.localObjectKey) {
+        throw new Error("local_media_missing");
+      }
       const blob = await mediaStore.get(attachment.localObjectKey);
       if (!blob) {
         throw new Error("local_media_missing");

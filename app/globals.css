@@ -313,6 +313,25 @@ h1 {
   color: #f0b4a0;
 }
 
+.enrichment-entry {
+  border-left-color: rgba(120, 170, 210, 0.75);
+}
+
+.enrichment-model {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.enrichment-sources {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.enrichment-sources a {
+  color: var(--sun);
+}
+
 .capture-sync-bar,
 .capture-attention {
   display: flex;
@@ -375,6 +394,30 @@ h1 {
   gap: 0.5rem;
   align-items: center;
   justify-content: space-between;
+}
+
+.media-availability {
+  color: var(--ink);
+}
+
+.availability-online_only {
+  color: var(--muted);
+}
+
+.availability-error {
+  color: #b42318;
+}
+
+.media-remove-local,
+.media-restore-local {
+  border: 1px solid rgba(20, 24, 22, 0.18);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
 }
 
 .outdoor-card {

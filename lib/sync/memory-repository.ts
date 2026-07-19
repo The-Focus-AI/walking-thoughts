@@ -81,13 +81,18 @@ function collectAttachmentIds(
   if (provided && provided.length > 0) {
     return [...new Set(provided)];
   }
-  // Server has no attachment index yet; rely on client-supplied ids.
-  // When omitted, still return a stable empty list (no invented media keys).
-  void db;
-  void userId;
-  void kind;
-  void targetId;
-  return [];
+  if (kind === "capture") {
+    const capture = db.captures.get(`${userId}:${targetId}`);
+    return (capture?.attachments ?? []).map((attachment) => attachment.id);
+  }
+  return [...db.captures.values()]
+    .filter(
+      (capture) =>
+        capture.userId === userId && capture.threadId === targetId,
+    )
+    .flatMap((capture) =>
+      (capture.attachments ?? []).map((attachment) => attachment.id),
+    );
 }
 
 function applyTrash(
@@ -316,6 +321,7 @@ export function createMemoryThreadRepository(
               createdAt: capture.createdAt,
               location: capture.location,
               sequence: capture.sequence,
+              attachments: capture.attachments ?? [],
             }));
           return {
             id: thread.id,
@@ -381,6 +387,14 @@ export function createMemoryThreadRepository(
       const result: PurgeExpiredResult = { purged, duplicate: false };
       db.purgeOps.set(opKey, result);
       return result;
+    },
+
+    async updateThreadTitle(userId, threadId, title) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return;
+      db.threads.set(key, { ...existing, title });
     },
   };
 }

@@ -1,0 +1,15 @@
+{
+  "model": "anthropic/claude-sonnet-5",
+  "mediaKinds": ["image"],
+  "searchQuery": "barred owl identification",
+  "searchResults": [
+    {
+      "title": "Barred Owl — All About Birds",
+      "url": "https://example.test/barred-owl",
+      "snippet": "Large owl with brown bars across the chest.",
+      "retrievedAt": "2026-07-18T23:00:00.000Z"
+    }
+  ],
+  "enrichmentText": "Likely a barred owl based on the chest barring.",
+  "expectation": "image_identification"
+}

@@ -1,10 +1,18 @@
-import type { CaptureLocation } from "@/lib/local-capture/types";
+import type { CaptureLocation, MediaKind } from "@/lib/local-capture/types";
 
 export type SyncCaptureStatus =
   | "saved_locally"
   | "syncing"
+  | "enriching"
   | "complete"
   | "needs_attention";
+
+export type SyncAttachmentMeta = {
+  id: string;
+  kind: MediaKind;
+  mimeType: string;
+  fileName: string;
+};
 
 export type SyncCapturePayload = {
   id: string;
@@ -15,6 +23,7 @@ export type SyncCapturePayload = {
   sequence: number;
   /** Stable idempotency key; defaults to capture id. */
   idempotencyKey: string;
+  attachments?: SyncAttachmentMeta[];
 };
 
 export type SyncCaptureResult = {
@@ -47,6 +56,7 @@ export type ServerThread = {
     createdAt: string;
     location: CaptureLocation | null;
     sequence: number;
+    attachments: SyncAttachmentMeta[];
   }>;
 };
 
@@ -108,6 +118,11 @@ export type ThreadRepository = {
     captures: SyncCapturePayload[],
   ): Promise<SyncBatchResponse>;
   listThreads(userId: string): Promise<ServerThread[]>;
+  updateThreadTitle?(
+    userId: string,
+    threadId: string,
+    title: string,
+  ): Promise<void>;
   applyTrashMutations(
     userId: string,
     mutations: TrashMutation[],

@@ -10,6 +10,7 @@ import type {
   CaptureLocation,
   CaptureStore,
   CommitOptions,
+  EnrichmentBatchApplication,
   LocalAttachment,
   LocalCapture,
   LocalThread,
@@ -102,9 +103,18 @@ async function persistAttachments(
     for (const input of inputs) {
       const id = input.id ?? createId();
       const localObjectKey = `${captureId}/${id}`;
+      const thumbnailObjectKey = `${localObjectKey}:thumb`;
       const blob = toBlob(input.bytes, input.mimeType);
       await mediaStore.put(localObjectKey, blob);
       writtenKeys.push(localObjectKey);
+      // Retain a compact stand-in so offline Thread review stays meaningful
+      // after the user removes the full local original.
+      const thumb = new Blob(
+        [`thumb:${input.fileName}:${input.kind}`],
+        { type: "text/plain" },
+      );
+      await mediaStore.put(thumbnailObjectKey, thumb);
+      writtenKeys.push(thumbnailObjectKey);
       attachments.push({
         id,
         kind: input.kind,
@@ -112,6 +122,7 @@ async function persistAttachments(
         fileName: input.fileName,
         byteLength: blob.size,
         localObjectKey,
+        thumbnailObjectKey,
         remoteObjectKey: null,
         syncStatus: "saved_locally",
       });
@@ -280,7 +291,7 @@ export function createMemoryCaptureStore(
         if (!current) continue;
         const next: LocalCapture = {
           ...current,
-          status: "complete",
+          status: "enriching",
           threadId: result.threadId,
           sequence: result.sequence,
           syncReason: null,
@@ -315,6 +326,27 @@ export function createMemoryCaptureStore(
           syncReason: failure.reason,
           syncRetryable: failure.retryable,
         });
+      }
+      captures = [...byId.values()];
+    },
+    async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
+      const byId = new Map(captures.map((capture) => [capture.id, capture]));
+      for (const result of batch.results) {
+        const current = byId.get(result.id);
+        if (!current) continue;
+        byId.set(result.id, {
+          ...current,
+          status: result.status,
+          syncReason: result.reason ?? null,
+          syncRetryable: result.retryable,
+        });
+        if (result.threadTitle) {
+          threads = threads.map((thread) =>
+            thread.id === result.threadId
+              ? { ...thread, title: result.threadTitle as string }
+              : thread,
+          );
+        }
       }
       captures = [...byId.values()];
     },
@@ -584,7 +616,15 @@ function normalizeCapture(value: LocalCapture): LocalCapture {
     sequence: value.sequence ?? 1,
     status: value.status ?? "saved_locally",
     syncReason: value.syncReason ?? null,
-    attachments: value.attachments ?? [],
+    attachments: (value.attachments ?? []).map((attachment) => ({
+      ...attachment,
+      localObjectKey:
+        attachment.localObjectKey === undefined
+          ? null
+          : attachment.localObjectKey,
+      thumbnailObjectKey: attachment.thumbnailObjectKey ?? null,
+      remoteObjectKey: attachment.remoteObjectKey ?? null,
+    })),
   };
 }
 
@@ -782,9 +822,13 @@ export function createIdbCaptureStore(): CaptureStore {
         return capture;
       } catch (error) {
         await Promise.allSettled(
-          attachments.map((attachment) =>
-            mediaStore.delete(attachment.localObjectKey),
-          ),
+          attachments.flatMap((attachment) => {
+            const keys = [
+              attachment.localObjectKey,
+              attachment.thumbnailObjectKey,
+            ].filter((key): key is string => Boolean(key));
+            return keys.map((key) => mediaStore.delete(key));
+          }),
         );
         throw error;
       } finally {
@@ -829,7 +873,7 @@ export function createIdbCaptureStore(): CaptureStore {
           if (!current) continue;
           byId.set(result.id, {
             ...current,
-            status: "complete",
+            status: "enriching",
             threadId: result.threadId,
             sequence: result.sequence,
             syncReason: null,
@@ -864,6 +908,55 @@ export function createIdbCaptureStore(): CaptureStore {
             syncReason: failure.reason,
             syncRetryable: failure.retryable,
           });
+        }
+
+        const transaction = db.transaction(["captures", "threads"], "readwrite");
+        const captureStore = transaction.objectStore("captures");
+        const threadStore = transaction.objectStore("threads");
+        for (const capture of byId.values()) {
+          captureStore.put(capture);
+        }
+        for (const thread of threads) {
+          threadStore.put(thread);
+        }
+        await transactionDone(transaction);
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
+      const db = await openDatabase();
+      try {
+        const existingCaptures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const existingThreads = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").getAll(),
+        )) as LocalThread[];
+        const byId = new Map(
+          existingCaptures.map((capture) => [capture.id, capture]),
+        );
+        let threads = [...existingThreads];
+
+        for (const result of batch.results) {
+          const current = byId.get(result.id);
+          if (!current) continue;
+          byId.set(result.id, {
+            ...current,
+            status: result.status,
+            syncReason: result.reason ?? null,
+            syncRetryable: result.retryable,
+          });
+          if (result.threadTitle) {
+            threads = threads.map((thread) =>
+              thread.id === result.threadId
+                ? { ...thread, title: result.threadTitle as string }
+                : thread,
+            );
+          }
         }
 
         const transaction = db.transaction(["captures", "threads"], "readwrite");

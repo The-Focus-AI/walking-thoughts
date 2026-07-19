@@ -71,8 +71,8 @@ test("client sync batches pending Captures, replays safely, and records failures
   expect(threads.length).toBeGreaterThanOrEqual(1);
   const inbox = await store.listInbox();
   expect(inbox.find((capture) => capture.id === first.id)).toBeUndefined();
-  const completed = await store.list();
-  expect(completed.every((capture) => capture.status === "complete")).toBe(true);
+  const synced = await store.list();
+  expect(synced.every((capture) => capture.status === "enriching")).toBe(true);
   expect(pushes).toBe(2);
 });
 
@@ -90,29 +90,36 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
 
   await page.evaluate(() => {
     const pushes: string[][] = [];
-    (
-      globalThis as typeof globalThis & {
-        __WT_SYNC_TRANSPORT__?: {
-          pushCaptures(
-            captures: Array<{ id: string; threadId: string | null }>,
-          ): Promise<{
-            results: Array<{
-              id: string;
-              threadId: string;
-              sequence: number;
-              status: "complete";
-            }>;
-            failures: [];
+    const g = globalThis as typeof globalThis & {
+      __WT_SYNC_TRANSPORT__?: {
+        pushCaptures(
+          captures: Array<{ id: string; threadId: string | null }>,
+        ): Promise<{
+          results: Array<{
+            id: string;
+            threadId: string;
+            sequence: number;
+            status: "complete";
           }>;
-        };
-        __WT_SYNC_PUSHES__?: string[][];
-      }
-    ).__WT_SYNC_TRANSPORT__ = {
+          failures: [];
+        }>;
+      };
+      __WT_ENRICHMENT_TRANSPORT__?: {
+        process(): Promise<{
+          results: Array<{
+            id: string;
+            threadId: string;
+            status: "complete";
+          }>;
+          jobs: [];
+        }>;
+      };
+      __WT_SYNC_PUSHES__?: string[][];
+    };
+    g.__WT_SYNC_TRANSPORT__ = {
       async pushCaptures(captures) {
         pushes.push(captures.map((capture) => capture.id));
-        (
-          globalThis as typeof globalThis & { __WT_SYNC_PUSHES__?: string[][] }
-        ).__WT_SYNC_PUSHES__ = pushes;
+        g.__WT_SYNC_PUSHES__ = pushes;
         return {
           results: captures.map((capture) => ({
             id: capture.id,
@@ -121,6 +128,19 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
             status: "complete" as const,
           })),
           failures: [],
+        };
+      },
+    };
+    g.__WT_ENRICHMENT_TRANSPORT__ = {
+      async process() {
+        const ids = g.__WT_SYNC_PUSHES__?.flat() ?? [];
+        return {
+          results: ids.map((id) => ({
+            id,
+            threadId: id,
+            status: "complete" as const,
+          })),
+          jobs: [],
         };
       },
     };
@@ -145,23 +165,25 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
 
   await page.reload();
   await page.evaluate(() => {
-    (
-      globalThis as typeof globalThis & {
-        __WT_SYNC_TRANSPORT__?: {
-          pushCaptures(
-            captures: Array<{ id: string; threadId: string | null }>,
-          ): Promise<{
-            results: Array<{
-              id: string;
-              threadId: string;
-              sequence: number;
-              status: "complete";
-            }>;
-            failures: [];
+    const g = globalThis as typeof globalThis & {
+      __WT_SYNC_TRANSPORT__?: {
+        pushCaptures(
+          captures: Array<{ id: string; threadId: string | null }>,
+        ): Promise<{
+          results: Array<{
+            id: string;
+            threadId: string;
+            sequence: number;
+            status: "complete";
           }>;
-        };
-      }
-    ).__WT_SYNC_TRANSPORT__ = {
+          failures: [];
+        }>;
+      };
+      __WT_ENRICHMENT_TRANSPORT__?: {
+        process(): Promise<{ results: []; jobs: [] }>;
+      };
+    };
+    g.__WT_SYNC_TRANSPORT__ = {
       async pushCaptures(captures) {
         return {
           results: captures.map((capture) => ({
@@ -172,6 +194,11 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
           })),
           failures: [],
         };
+      },
+    };
+    g.__WT_ENRICHMENT_TRANSPORT__ = {
+      async process() {
+        return { results: [], jobs: [] };
       },
     };
   });

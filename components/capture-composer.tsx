@@ -19,18 +19,32 @@ import {
   VIDEO_LIMIT_MS,
   createRecorder,
 } from "@/lib/local-capture/recording";
+import {
+  canOfferLocalRemoval,
+  mediaAvailability,
+  mediaAvailabilityLabel,
+  removeLocalOriginal,
+  restoreLocalOriginal,
+} from "@/lib/local-capture/local-media-retention";
+import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
   AttachmentInput,
   CaptureSyncStatus,
+  LocalAttachment,
   LocalCapture,
   LocalThread,
   MediaKind,
   PersistenceResult,
   ThreadDestination,
 } from "@/lib/local-capture/types";
+import { enrichPendingCaptures } from "@/lib/enrichment/client";
+import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
 import { synchronizePendingCaptures } from "@/lib/sync/client";
-import { synchronizePendingMedia } from "@/lib/sync/media-client";
+import {
+  getMediaTransport,
+  synchronizePendingMedia,
+} from "@/lib/sync/media-client";
 
 function destinationValue(destination: ThreadDestination): string {
   if (destination.type === "thread") return destination.threadId;
@@ -49,6 +63,8 @@ function statusLabel(status: CaptureSyncStatus): string {
       return "Saved locally";
     case "syncing":
       return "Syncing";
+    case "enriching":
+      return "Enriching";
     case "complete":
       return "Complete";
     case "needs_attention":
@@ -59,7 +75,26 @@ function statusLabel(status: CaptureSyncStatus): string {
 type ThreadView = {
   thread: LocalThread;
   captures: LocalCapture[];
+  enrichments: ThreadEnrichment[];
 };
+
+async function fetchThreadEnrichments(
+  threadId: string,
+): Promise<ThreadEnrichment[]> {
+  try {
+    const headers: Record<string, string> = {};
+    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
+    if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
+    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
+      headers,
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
+    return body.enrichments ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
@@ -96,7 +131,11 @@ export function CaptureComposer() {
       store.listRecentThreads(),
     ]);
     const threadViews = await Promise.all(
-      recent.map(async (thread) => store.listThread(thread.id)),
+      recent.map(async (thread) => {
+        const view = await store.listThread(thread.id);
+        const enrichments = await fetchThreadEnrichments(thread.id);
+        return { ...view, enrichments };
+      }),
     );
     setInbox(nextInbox);
     setRecentThreads(recent);
@@ -110,6 +149,9 @@ export function CaptureComposer() {
     try {
       await synchronizePendingMedia(getCaptureStore());
       await synchronizePendingCaptures(getCaptureStore());
+      await enrichPendingCaptures(getCaptureStore(), undefined, {
+        retryFailed: true,
+      });
       if (generation === syncGeneration.current) {
         await refreshLists();
       }
@@ -121,6 +163,59 @@ export function CaptureComposer() {
       if (generation === syncGeneration.current) {
         setIsSyncing(false);
       }
+    }
+  }
+
+  async function onRemoveLocalMedia(
+    captureId: string,
+    attachmentId: string,
+  ) {
+    const transport = getMediaTransport();
+    if (!transport.verify || !transport.download) {
+      setError("Media verification is unavailable");
+      return;
+    }
+    try {
+      await removeLocalOriginal({
+        store: getCaptureStore(),
+        mediaStore: createIdbMediaStore(),
+        captureId,
+        attachmentId,
+        remote: {
+          verify: (id) => transport.verify!(id),
+          download: (id) => transport.download!(id),
+        },
+      });
+      await refreshLists();
+    } catch {
+      setError("Could not remove local media until the server copy is verified");
+    }
+  }
+
+  async function onRestoreLocalMedia(
+    captureId: string,
+    attachmentId: string,
+  ) {
+    const transport = getMediaTransport();
+    if (!transport.download) {
+      setError("Media download is unavailable");
+      return;
+    }
+    try {
+      await restoreLocalOriginal({
+        store: getCaptureStore(),
+        mediaStore: createIdbMediaStore(),
+        captureId,
+        attachmentId,
+        remote: {
+          verify: async (id) =>
+            transport.verify ? transport.verify(id) : true,
+          download: (id) => transport.download!(id),
+        },
+      });
+      await refreshLists();
+    } catch {
+      setError("Could not restore media from the private server copy");
     }
   }
 
@@ -524,14 +619,19 @@ export function CaptureComposer() {
           <ul className="capture-list">
             {inbox.map((capture) => (
               <li key={capture.id}>
-                <CaptureEntry capture={capture} onRetry={() => void runForegroundSync()} />
+                <CaptureEntry
+                  capture={capture}
+                  onRetry={() => void runForegroundSync()}
+                  onRemoveLocalMedia={onRemoveLocalMedia}
+                  onRestoreLocalMedia={onRestoreLocalMedia}
+                />
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      {threads.map(({ thread, captures }) => (
+      {threads.map(({ thread, captures, enrichments }) => (
         <section
           key={thread.id}
           className="capture-section"
@@ -544,7 +644,17 @@ export function CaptureComposer() {
           <ul className="capture-list">
             {captures.map((capture) => (
               <li key={capture.id}>
-                <CaptureEntry capture={capture} onRetry={() => void runForegroundSync()} />
+                <CaptureEntry
+                  capture={capture}
+                  onRetry={() => void runForegroundSync()}
+                  onRemoveLocalMedia={onRemoveLocalMedia}
+                  onRestoreLocalMedia={onRestoreLocalMedia}
+                />
+              </li>
+            ))}
+            {enrichments.map((enrichment) => (
+              <li key={enrichment.id}>
+                <EnrichmentEntry enrichment={enrichment} />
               </li>
             ))}
           </ul>
@@ -554,12 +664,49 @@ export function CaptureComposer() {
   );
 }
 
+function EnrichmentEntry({ enrichment }: { enrichment: ThreadEnrichment }) {
+  return (
+    <article
+      className="capture-entry enrichment-entry"
+      aria-label={`Enrichment ${enrichment.model}`}
+    >
+      <div className="capture-entry-meta">
+        <span className="capture-status status-complete">Enrichment</span>
+        <time dateTime={enrichment.createdAt}>
+          {new Date(enrichment.createdAt).toLocaleString()}
+        </time>
+        <span className="enrichment-model">{enrichment.model}</span>
+      </div>
+      <p className="capture-text">{enrichment.text}</p>
+      {enrichment.sources.length > 0 ? (
+        <ul className="enrichment-sources" aria-label="Sources">
+          {enrichment.sources.map((source: EnrichmentSource) => (
+            <li key={`${source.url}-${source.retrievedAt}`}>
+              <a href={source.url} target="_blank" rel="noreferrer">
+                {source.title}
+              </a>
+              <span className="enrichment-source-meta">
+                {" "}
+                · retrieved {new Date(source.retrievedAt).toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
 function CaptureEntry({
   capture,
   onRetry,
+  onRemoveLocalMedia,
+  onRestoreLocalMedia,
 }: {
   capture: LocalCapture;
   onRetry: () => void;
+  onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
+  onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
 }) {
   const label =
     capture.text ||
@@ -581,10 +728,13 @@ function CaptureEntry({
       {capture.attachments.length > 0 ? (
         <ul className="capture-attachments" aria-label="Attachments">
           {capture.attachments.map((attachment) => (
-            <li key={attachment.id}>
-              {attachment.fileName} · {attachment.kind} ·{" "}
-              {statusLabel(attachment.syncStatus)}
-            </li>
+            <AttachmentRow
+              key={attachment.id}
+              captureId={capture.id}
+              attachment={attachment}
+              onRemoveLocalMedia={onRemoveLocalMedia}
+              onRestoreLocalMedia={onRestoreLocalMedia}
+            />
           ))}
         </ul>
       ) : null}
@@ -599,5 +749,50 @@ function CaptureEntry({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function AttachmentRow({
+  captureId,
+  attachment,
+  onRemoveLocalMedia,
+  onRestoreLocalMedia,
+}: {
+  captureId: string;
+  attachment: LocalAttachment;
+  onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
+  onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
+}) {
+  const availability = mediaAvailability(attachment);
+  const offerRemove = canOfferLocalRemoval(attachment);
+
+  return (
+    <li>
+      <span>
+        {attachment.fileName} · {attachment.kind} ·{" "}
+        {statusLabel(attachment.syncStatus)} ·{" "}
+        <span className={`media-availability availability-${availability}`}>
+          {mediaAvailabilityLabel(availability)}
+        </span>
+      </span>
+      {offerRemove ? (
+        <button
+          type="button"
+          className="media-remove-local"
+          onClick={() => onRemoveLocalMedia(captureId, attachment.id)}
+        >
+          Remove from device
+        </button>
+      ) : null}
+      {availability === "online_only" ? (
+        <button
+          type="button"
+          className="media-restore-local"
+          onClick={() => onRestoreLocalMedia(captureId, attachment.id)}
+        >
+          Download to device
+        </button>
+      ) : null}
+    </li>
   );
 }

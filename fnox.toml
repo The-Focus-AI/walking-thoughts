@@ -66,6 +66,24 @@ value = "BLOB_READ_WRITE_TOKEN"
 if_missing = "ignore"
 description = "Vercel Blob read/write token for private media"
 
+[secrets.AI_GATEWAY_API_KEY]
+provider = "op"
+value = "AI_GATEWAY_API_KEY"
+if_missing = "ignore"
+description = "Vercel AI Gateway API key for Enrichments"
+
+[secrets.AI_GATEWAY_MODEL]
+provider = "op"
+value = "AI_GATEWAY_MODEL"
+if_missing = "ignore"
+description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-5)"
+
+[secrets.TAVILY_API_KEY]
+provider = "op"
+value = "TAVILY_API_KEY"
+if_missing = "ignore"
+description = "Optional Tavily API key for Enrichment web search"
+
 [secrets.NEXT_PUBLIC_CLERK_SIGN_IN_URL]
 default = "/sign-in"
 description = "Clerk sign-in route"
