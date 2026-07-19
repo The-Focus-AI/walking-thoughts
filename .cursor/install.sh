@@ -91,25 +91,26 @@ mise install
 eval "$(mise activate bash --shims)"
 export PATH="${HOME}/.local/share/mise/shims:${HOME}/.local/bin:${PATH}"
 
-# --- fnox bootstrap -------------------------------------------------------
+# --- fnox / tooling bootstrap ---------------------------------------------
+# Cursor Cloud Secrets inject OP_SERVICE_ACCOUNT_TOKEN and VERCEL_TOKEN.
 mkdir -p .fnox && chmod 700 .fnox
-if [ -s .fnox/env ]; then
-  log ".fnox/env already present — skipping secret bootstrap"
-elif [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
-  log "Writing .fnox/env from OP_SERVICE_ACCOUNT_TOKEN"
-  umask 077
-  printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$OP_SERVICE_ACCOUNT_TOKEN" >.fnox/env
-  chmod 600 .fnox/env
+umask 077
+bash "${ROOT}/scripts/bootstrap-fnox-env.sh"
+
+if [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] || [ -n "${VERCEL_TOKEN:-}" ]; then
+  log "Bootstrapped .fnox/env from Cursor Cloud Secrets / process env"
+elif [ -s .fnox/env ]; then
+  log ".fnox/env already present"
 elif command -v op >/dev/null 2>&1; then
-  log "Attempting mise run setup (op read of project service-account token)"
+  log "Attempting mise run setup"
   if mise run setup; then
     log "fnox bootstrap via mise run setup succeeded"
   else
-    warn "Could not bootstrap .fnox/env. Add OP_SERVICE_ACCOUNT_TOKEN to Cursor Cloud Secrets,"
-    warn "or authenticate op so 'mise run setup' can read the thefocus vault item."
+    warn "Could not bootstrap .fnox/env. Add OP_SERVICE_ACCOUNT_TOKEN (and VERCEL_TOKEN"
+    warn "for vercel:sync) to Cursor Cloud Secrets, or authenticate op for mise run setup."
   fi
 else
-  warn "Neither OP_SERVICE_ACCOUNT_TOKEN nor op is available; secrets remain unconfigured."
+  warn "Neither Cloud Secrets nor op is available; secrets remain unconfigured."
 fi
 
 # --- app dependencies -----------------------------------------------------

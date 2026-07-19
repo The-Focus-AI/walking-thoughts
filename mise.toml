@@ -22,18 +22,29 @@ unix_default_inline_shell_args = "bash -c -o errexit"
 _.file = ".fnox/env"
 
 [tasks.setup]
-description = "First-time onboarding: pull the scoped 1Password service-account token"
+description = "First-time onboarding: pull bootstrap tokens into .fnox/env"
 run = '''
 set -euo pipefail
 mkdir -p .fnox && chmod 700 .fnox
-if [ -s .fnox/env ]; then
-  echo "✓ .fnox/env already contains the project bootstrap token — skipping"
-  exit 0
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  OP_SERVICE_ACCOUNT_TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
+  export OP_SERVICE_ACCOUNT_TOKEN
 fi
-TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
-printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
-chmod 600 .fnox/env
-echo "✓ .fnox/env written. Open a new shell tab or use 'fnox exec -- <command>'."
+if [ -z "${VERCEL_TOKEN:-}" ]; then
+  VERCEL_TOKEN="$(op read 'op://Walking Thoughts - Development/VERCEL_TOKEN/password' 2>/dev/null || true)"
+  export VERCEL_TOKEN
+fi
+bash scripts/bootstrap-fnox-env.sh
+if ! grep -q '^OP_SERVICE_ACCOUNT_TOKEN=.\+' .fnox/env 2>/dev/null; then
+  echo "Missing OP_SERVICE_ACCOUNT_TOKEN. Add it to Cursor Cloud Secrets or the thefocus vault."
+  exit 1
+fi
+echo "✓ .fnox/env written."
+if grep -q '^VERCEL_TOKEN=.\+' .fnox/env 2>/dev/null; then
+  echo "✓ VERCEL_TOKEN present — mise run vercel:sync works."
+else
+  echo "ℹ Add VERCEL_TOKEN to Cursor Cloud Secrets (or Development vault) so agents can sync env to Vercel."
+fi
 '''
 
 [tasks.install]
@@ -59,7 +70,7 @@ pnpm typecheck
 
 [tasks.test]
 description = "Run public-surface browser tests"
-run = "pnpm test"
+run = "fnox exec --if-missing ignore -- pnpm test"
 
 [tasks.build]
 description = "Create the production Next.js build"
@@ -89,15 +100,8 @@ description = "List declared fnox secrets without values"
 run = "fnox list"
 
 [tasks."secrets:rotate-token"]
-description = "Re-pull the scoped 1Password service-account token"
-run = '''
-set -euo pipefail
-mkdir -p .fnox && chmod 700 .fnox
-TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
-printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$TOKEN" > .fnox/env
-chmod 600 .fnox/env
-echo "✓ .fnox/env refreshed."
-'''
+description = "Re-pull bootstrap tokens into .fnox/env"
+run = "mise run setup"
 
 [tasks."vercel:sync"]
 description = "Push fnox-resolved configuration to a Vercel environment"
@@ -113,16 +117,40 @@ case "$ENV" in
   development) PROFILE="default" ;;
   *) echo "Invalid Vercel environment: $ENV"; exit 2 ;;
 esac
-SECRETS_JSON=$(fnox export --profile "$PROFILE" -f json --if-missing ignore)
+
+if [ -z "${VERCEL_TOKEN:-}" ]; then
+  echo "Cannot write Vercel env vars: VERCEL_TOKEN is not set in this environment."
+  echo "Add a Vercel token (https://vercel.com/account/tokens) as Cursor Cloud Secret"
+  echo "VERCEL_TOKEN (or Development vault Password item VERCEL_TOKEN), then re-run:"
+  echo "  mise run setup && mise run vercel:sync -- --env $ENV"
+  exit 1
+fi
+
+SCOPE="${VERCEL_SCOPE:-thefocusai}"
+PROJECT="${VERCEL_PROJECT:-walking-thoughts}"
+export VERCEL_TOKEN
+
+SECRETS_JSON=$(fnox export --profile "$PROFILE" -f json --if-missing ignore 2>/dev/null)
 KEYS=$(printf '%s' "$SECRETS_JSON" | jq -r '.secrets | keys[]')
 for KEY in $KEYS; do
+  case "$KEY" in
+    VERCEL_TOKEN|VERCEL_ORG_ID|VERCEL_PROJECT_ID|OP_SERVICE_ACCOUNT_TOKEN)
+      echo "$KEY skipped (tooling bootstrap — not an app secret)"
+      continue
+      ;;
+  esac
   VALUE=$(printf '%s' "$SECRETS_JSON" | jq -r --arg key "$KEY" '.secrets[$key]')
   if [ -z "$VALUE" ] || [ "$VALUE" = "null" ]; then
     echo "$KEY skipped (empty)"
     continue
   fi
-  vercel env rm "$KEY" "$ENV" --yes >/dev/null 2>&1 || true
-  vercel env add "$KEY" "$ENV" --value "$VALUE" --yes >/dev/null
+  vercel env add "$KEY" "$ENV" \
+    --value "$VALUE" \
+    --yes \
+    --force \
+    --scope "$SCOPE" \
+    --project "$PROJECT" \
+    >/dev/null
   echo "$KEY synced to $ENV"
 done
 '''

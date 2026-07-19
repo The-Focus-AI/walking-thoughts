@@ -24,7 +24,8 @@
     "pmtiles": "^4.4.1",
     "react": "latest",
     "react-dom": "latest",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@clerk/testing": "^2.2.9",
@@ -35,6 +36,7 @@
     "eslint": "9.39.2",
     "eslint-config-next": "latest",
     "typescript": "5.9.3",
-    "webreel": "^0.1.4"
+    "webreel": "^0.1.4",
+    "@types/web-push": "^3.6.4"
   }
 }
