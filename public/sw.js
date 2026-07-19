@@ -1,8 +1,9 @@
 // Keep in sync with SHELL_CACHE_NAME in lib/offline-shell.ts.
-const CACHE_NAME = "walking-thoughts-shell-v9";
+const CACHE_NAME = "walking-thoughts-shell-v10";
 const SHELL = [
   "/offline",
   "/journal",
+  "/privacy",
   "/region-tracer",
   "/manifest.webmanifest",
   "/icon-192.svg",

@@ -564,6 +564,43 @@ footer {
   margin: 0.5rem 0 1rem;
 }
 
+.footer-link {
+  color: var(--muted);
+}
+
+.footer-link:hover {
+  color: var(--ink);
+}
+
+.privacy {
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: min(100%, 820px);
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem max(1rem, env(safe-area-inset-bottom));
+}
+
+.privacy-body h1 {
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  margin: 1.5rem 0 0.5rem;
+}
+
+.privacy-body h2 {
+  font-size: 1.1rem;
+  margin: 1.75rem 0 0.4rem;
+}
+
+.privacy-body p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0.4rem 0;
+}
+
+.privacy-body strong {
+  color: var(--ink);
+}
+
 .hero-review-link {
   color: var(--moss);
   font-weight: 750;

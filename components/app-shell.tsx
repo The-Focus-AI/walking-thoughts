@@ -60,6 +60,10 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         <span>Local first</span>
         <span aria-hidden="true">·</span>
         <span>Private by default</span>
+        <span aria-hidden="true">·</span>
+        <Link className="footer-link" href="/privacy">
+          Privacy &amp; data handling
+        </Link>
       </footer>
     </main>
   );

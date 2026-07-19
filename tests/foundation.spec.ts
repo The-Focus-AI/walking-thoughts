@@ -87,22 +87,38 @@ test("installed shell remains useful when the network disappears", async ({
   await expect(page.getByText("Ready offline")).toBeVisible();
 });
 
-test("health reports configuration without exposing secret values", async ({
+test("health reports every external service without exposing secret values", async ({
   request,
 }) => {
   const response = await request.get("/api/health");
   const payload = await response.json();
 
   expect(response.status()).toBe(clerkRuntimeConfigured ? 200 : 503);
-  expect(payload).toEqual({
-    status: clerkRuntimeConfigured ? "ok" : "configuration_required",
-    services: {
-      clerkPublishableKey: Boolean(
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-      ),
-      clerkSecretKey: Boolean(process.env.CLERK_SECRET_KEY),
-      allowedUsers: Boolean(process.env.CLERK_ALLOWED_USER_IDS),
-    },
-  });
-  expect(JSON.stringify(payload)).not.toMatch(/(?:pk|sk)_(?:test|live)_/);
+  expect(payload.status).toBe(
+    clerkRuntimeConfigured ? "ok" : "configuration_required",
+  );
+  for (const service of [
+    "database",
+    "objectStorage",
+    "clerk",
+    "gateway",
+    "queue",
+    "push",
+  ]) {
+    expect(payload.services[service].status).toMatch(
+      /^(ok|degraded|error|not_configured)$/,
+    );
+    expect(typeof payload.services[service].detail).toBe("string");
+  }
+  const serialized = JSON.stringify(payload);
+  expect(serialized).not.toMatch(/(?:pk|sk)_(?:test|live)_/);
+  for (const secret of [
+    process.env.CLERK_SECRET_KEY,
+    process.env.DATABASE_URL,
+    process.env.BLOB_READ_WRITE_TOKEN,
+    process.env.AI_GATEWAY_API_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  ]) {
+    if (secret) expect(serialized).not.toContain(secret);
+  }
 });

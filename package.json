@@ -18,14 +18,15 @@
     "@clerk/nextjs": "latest",
     "@neondatabase/serverless": "^1.1.0",
     "@protomaps/basemaps": "^5.7.2",
+    "@vercel/blob": "^2.6.1",
     "ai": "^7.0.31",
     "maplibre-gl": "^5.24.0",
     "next": "latest",
     "pmtiles": "^4.4.1",
     "react": "latest",
     "react-dom": "latest",
-    "zod": "^4.4.3",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@clerk/testing": "^2.2.9",
@@ -33,10 +34,10 @@
     "@types/node": "24",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/web-push": "^3.6.4",
     "eslint": "9.39.2",
     "eslint-config-next": "latest",
     "typescript": "5.9.3",
-    "webreel": "^0.1.4",
-    "@types/web-push": "^3.6.4"
+    "webreel": "^0.1.4"
   }
 }
