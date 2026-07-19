@@ -7,19 +7,19 @@ import "./prototype-index.css";
 
 const TRAIL_CLEANUP = {
   density: [
-    { key: "A", label: "Sticky dock trail" },
-    { key: "B", label: "Composer-first sheet" },
-    { key: "C", label: "Day strip rail" },
+    { key: "A", label: "Sticky dock trail", winner: true },
+    { key: "B", label: "Composer-first sheet", winner: false },
+    { key: "C", label: "Day strip rail", winner: false },
   ],
   sync: [
-    { key: "A", label: "Queue chip strip" },
-    { key: "B", label: "Status swimlanes" },
-    { key: "C", label: "Pulse gutter + footer" },
+    { key: "A", label: "Queue chip strip", winner: false },
+    { key: "B", label: "Status swimlanes", winner: false },
+    { key: "C", label: "Pulse gutter + footer", winner: true },
   ],
   map: [
-    { key: "A", label: "Map as home hero" },
-    { key: "B", label: "Peer bottom tabs" },
-    { key: "C", label: "Place strip + thumbnail" },
+    { key: "A", label: "Map as home hero", winner: true },
+    { key: "B", label: "Peer bottom tabs", winner: false },
+    { key: "C", label: "Place strip + thumbnail", winner: false },
   ],
 } as const;
 
@@ -95,10 +95,19 @@ export default function PrototypeIndexPage() {
               <ul>
                 {variants.map((variant) => (
                   <li key={variant.key}>
-                    <div className="proto-index-variant">
+                    <div
+                      className={
+                        variant.winner
+                          ? "proto-index-variant winner"
+                          : "proto-index-variant"
+                      }
+                    >
                       <span className="proto-index-key">{variant.key}</span>
                       <span className="proto-index-variant-label">
                         {variant.label}
+                        {variant.winner ? (
+                          <em className="proto-index-winner-tag"> winner</em>
+                        ) : null}
                       </span>
                       <div className="proto-index-viewport-links">
                         {VIEWPORTS.map((viewport) => (
