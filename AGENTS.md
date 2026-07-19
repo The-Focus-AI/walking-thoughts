@@ -24,6 +24,9 @@ spec, run typechecking regularly, and run the two-axis code review before
 committing. Never commit secrets or weaken authentication to make local
 development or tests pass.
 
+Agent PR bodies must include `Closes #<ticket>` (not only `(#N)` in the title)
+so merging to `main` auto-closes the issue without needing agent `issues:write`.
+
 ## Cursor Cloud specific instructions
 
 `.cursor/environment.json` runs `.cursor/install.sh` on each machine boot. That

@@ -31,14 +31,40 @@ jobs:
         run: |
           set -euo pipefail
           TEXT="${PR_TITLE}"$'\n'"${PR_BODY}"
+
+          # Infra/docs PRs that do not ship a product ticket may opt out.
+          if printf '%s\n' "$PR_BODY" | grep -qiE '^No-ticket:[[:space:]]*true[[:space:]]*$'; then
+            echo "No-ticket: true — skipping issue claim (infra/docs PR)."
+            exit 0
+          fi
+
           mapfile -t ISSUES < <(printf '%s' "$TEXT" | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++')
           if [ "${#ISSUES[@]}" -eq 0 ]; then
-            echo "cursor/* PRs must reference a GitHub issue (e.g. title ends with (#28))."
+            echo "cursor/* PRs must reference a GitHub issue (e.g. title ends with (#28)),"
+            echo "or set 'No-ticket: true' in the PR body for infra/docs work."
             exit 1
           fi
 
           PRIMARY="${ISSUES[0]}"
           echo "Primary ticket: #$PRIMARY"
+
+          # GitHub auto-closes the issue on merge only when the PR body uses a
+          # closing keyword. Title references like "(#13)" are not enough, and
+          # Cloud Agent tokens often lack issues:write to close manually.
+          if ! printf '%s\n' "$PR_BODY" | grep -qiE \
+            "(^|[^[:alnum:]_])((close[sd]?)|(fix(e[sd])?)|(resolve[sd]?))[[:space:]]+#${PRIMARY}\\b"; then
+            cat <<EOF
+ERROR: PR body must include a closing keyword for #${PRIMARY}.
+Add a line such as:
+
+  Closes #${PRIMARY}
+
+Supported keywords: close/closes/closed, fix/fixes/fixed, resolve/resolves/resolved.
+Merging into main then closes the issue automatically.
+EOF
+            exit 1
+          fi
+          echo "Closing keyword present for #${PRIMARY}."
 
           # Bootstrap labels on the issue side.
           gh label list --limit 200 >/dev/null
