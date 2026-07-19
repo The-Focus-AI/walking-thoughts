@@ -31,9 +31,17 @@ jobs:
         run: |
           set -euo pipefail
           TEXT="${PR_TITLE}"$'\n'"${PR_BODY}"
+
+          # Infra/docs PRs that do not ship a product ticket may opt out.
+          if printf '%s\n' "$PR_BODY" | grep -qiE '^No-ticket:[[:space:]]*true[[:space:]]*$'; then
+            echo "No-ticket: true — skipping issue claim (infra/docs PR)."
+            exit 0
+          fi
+
           mapfile -t ISSUES < <(printf '%s' "$TEXT" | grep -oE '#[0-9]+' | tr -d '#' | awk '!seen[$0]++')
           if [ "${#ISSUES[@]}" -eq 0 ]; then
-            echo "cursor/* PRs must reference a GitHub issue (e.g. title ends with (#28))."
+            echo "cursor/* PRs must reference a GitHub issue (e.g. title ends with (#28)),"
+            echo "or set 'No-ticket: true' in the PR body for infra/docs work."
             exit 1
           fi
 
