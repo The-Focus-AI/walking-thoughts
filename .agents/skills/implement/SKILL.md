@@ -17,3 +17,8 @@ Run typechecking regularly, single test files regularly, and the full test suite
 Once done, use /code-review to review the work.
 
 Commit your work to the current branch.
+
+When opening the PR, the **body must include** `Closes #<ticket>` (e.g.
+`Closes #13`). A title like `(#13)` is not enough — GitHub only auto-closes on
+merge when the body uses a closing keyword. Infra/docs PRs with no product
+ticket may use `No-ticket: true` instead.
