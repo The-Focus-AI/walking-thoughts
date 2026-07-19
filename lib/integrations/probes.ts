@@ -36,8 +36,8 @@ export async function probeIntegrationDependencies(
     reason: "token_missing",
   };
   if (blobToken) {
-    // Token presence is enough for readiness; private access is the store mode
-    // Walking Thoughts always requests via the private Blob adapter.
+    // Walking Thoughts always uses the private Blob adapter (`access: "private"`).
+    // Health reports that policy; it does not open a public URL to prove isolation.
     blob = { ok: true, privateAccess: true };
   }
 

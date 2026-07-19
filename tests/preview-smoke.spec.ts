@@ -15,12 +15,20 @@ const smokeEnabled = Boolean(
     process.env.BLOB_READ_WRITE_TOKEN &&
     process.env.AI_GATEWAY_API_KEY &&
     process.env.TAVILY_API_KEY &&
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    process.env.CLERK_SECRET_KEY &&
     (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY) &&
     process.env.VAPID_PRIVATE_KEY,
 );
 
 test.describe("preview integration smoke", () => {
   test.skip(!smokeEnabled, "Set PREVIEW_SMOKE=1 with preview vault secrets");
+
+  test("Clerk preview keys are configured (identity E2E is auth.spec)", async () => {
+    expect(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY).toMatch(/^pk_/);
+    expect(process.env.CLERK_SECRET_KEY).toMatch(/^sk_/);
+    expect(process.env.CLERK_ALLOWED_USER_IDS?.length).toBeGreaterThan(0);
+  });
 
   test("Neon accepts a trivial round-trip", async () => {
     const sql = neon(process.env.DATABASE_URL!);

@@ -3,8 +3,8 @@ import type { PrivateBlobStore } from "@/lib/media/memory-blob-store";
 import { createMediaAccessService } from "@/lib/media/access-service";
 
 /**
- * Contract test for the private Blob adapter shape using an in-memory stand-in
- * that mirrors user-scoped paths + reverse index semantics.
+ * Cross-user boundary contract shared by memory and Vercel private Blob
+ * adapters (user-scoped objects + reverse ownership index).
  */
 function createIndexedMemoryStore(): PrivateBlobStore {
   const objects = new Map<string, Uint8Array>();

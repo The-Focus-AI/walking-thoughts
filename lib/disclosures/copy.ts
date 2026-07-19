@@ -15,6 +15,3 @@ export const FOREGROUND_SYNC_RUNNING = "Foreground sync running…";
 
 export const OFFLINE_CAPTURE_PROMISE =
   "Offline: Captures stay on this device. Sync, Enrichment, and push wait for connectivity — local commits are never discarded because a remote step is unavailable.";
-
-export const ONLINE_CAPTURE_NOTE =
-  "Online: Enrichment and sync can run. Captures still commit locally first.";
