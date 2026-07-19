@@ -10,12 +10,36 @@ import { expect, test } from "@playwright/test";
 const smokeRunId = `smoke-${Date.now()}`;
 
 test.describe("preview integration smoke", () => {
-  test("Neon database answers a round-trip", async () => {
+  test("Clerk backend API accepts the configured secret key", async ({
+    request,
+  }) => {
+    test.skip(
+      !process.env.CLERK_SECRET_KEY,
+      "CLERK_SECRET_KEY is not configured",
+    );
+    const response = await request.get(
+      "https://api.clerk.com/v1/users?limit=1",
+      {
+        headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+      },
+    );
+    expect(response.status()).toBe(200);
+  });
+
+  test("Neon database answers a round-trip and scopes records by user", async () => {
     test.skip(!process.env.DATABASE_URL, "DATABASE_URL is not configured");
     const { neon } = await import("@neondatabase/serverless");
     const sql = neon(process.env.DATABASE_URL!);
     const rows = await sql`SELECT 1 AS ready`;
     expect(rows[0]?.ready).toBe(1);
+
+    // Cross-user identifier check against the real repository: a user that
+    // has never written sees nothing.
+    const { createNeonThreadRepository } = await import(
+      "@/lib/sync/neon-repository"
+    );
+    const repository = createNeonThreadRepository(process.env.DATABASE_URL!);
+    expect(await repository.listThreads(`${smokeRunId}-nobody`)).toEqual([]);
   });
 
   test("private Vercel Blob stores, serves, and deletes one small object", async () => {
@@ -103,6 +127,9 @@ test.describe("preview integration smoke", () => {
       },
       { title: "smoke", body: "smoke", url: "/", tag: smokeRunId },
     );
-    expect(["sent", "gone", "failed"]).toContain(outcome);
+    // A push service answers 404/410 ("gone") for an unknown subscription
+    // only after accepting the VAPID authentication; rejected credentials
+    // surface as "failed" and fail this smoke test.
+    expect(outcome).toBe("gone");
   });
 });

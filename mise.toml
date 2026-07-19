@@ -167,6 +167,10 @@ echo "Merge an approved PR to main; Vercel's Git integration deploys Production.
 exit 2
 '''
 
+[tasks."smoke:preview"]
+description = "Run low-volume integration smoke tests against preview resources"
+run = "fnox exec --profile preview -- pnpm exec playwright test tests/preview-smoke.spec.ts"
+
 [tasks."region:build"]
 description = "Package one Offline Region (basemap, terrain, contours, fonts, manifest)"
 run = "bash scripts/offline-region/build-region.sh"

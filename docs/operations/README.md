@@ -48,12 +48,18 @@ Transport enforces HTTPS via `Strict-Transport-Security` (next.config.ts).
 ## Smoke tests
 
 `tests/preview-smoke.spec.ts` exercises the real preview instances at low
-volume — Neon round-trip, private Blob put/get/delete, one tiny gateway
-completion, one web search, one push send with the configured VAPID keys.
-Each test skips when its credential is absent, so the suite passes without
-secrets; run with the preview vault loaded (`fnox exec --profile preview --
-pnpm test`) to exercise the integrations. Clerk smoke coverage lives in
-`tests/auth.spec.ts` behind the same skip pattern.
+volume — one Clerk backend API call, a Neon round-trip plus a real-repository
+cross-user check, private Blob put/get/delete, one tiny gateway completion,
+one web search, and one push send whose VAPID authentication must be accepted
+by the push service. Each test skips when its credential is absent, so the
+suite passes without secrets. Run them against the preview vault with:
+
+```bash
+mise run smoke:preview
+```
+
+Full authenticated Clerk E2E coverage lives in `tests/auth.spec.ts` behind
+the same skip pattern.
 
 ## Disclosure
 

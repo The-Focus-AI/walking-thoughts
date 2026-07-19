@@ -1,26 +1,8 @@
-import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
+import { BlobNotFoundError, del, get, head, list, put } from "@vercel/blob";
 import type { BlobObject, PrivateBlobStore } from "./memory-blob-store";
 
 function pathnameFor(userId: string, attachmentId: string): string {
   return `media/${userId}/${attachmentId}`;
-}
-
-async function readStream(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  const reader = stream.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
 }
 
 /**
@@ -62,7 +44,7 @@ export function createVercelBlobStore(token: string): PrivateBlobStore {
           userId,
           attachmentId,
           mimeType: result.blob.contentType,
-          bytes: await readStream(result.stream),
+          bytes: new Uint8Array(await new Response(result.stream).arrayBuffer()),
           operationId: "",
         };
       } catch (error) {
@@ -81,6 +63,25 @@ export function createVercelBlobStore(token: string): PrivateBlobStore {
       }
       await del(pathname, { token });
       return { deleted: true };
+    },
+
+    // Lets the media route answer 403 rather than 404 when a caller probes
+    // an attachment identifier that belongs to someone else.
+    async existsForOtherUser(userId, attachmentId) {
+      let cursor: string | undefined;
+      do {
+        const page = await list({ prefix: "media/", token, cursor });
+        for (const blob of page.blobs) {
+          if (
+            blob.pathname.endsWith(`/${attachmentId}`) &&
+            blob.pathname !== pathnameFor(userId, attachmentId)
+          ) {
+            return true;
+          }
+        }
+        cursor = page.hasMore ? page.cursor : undefined;
+      } while (cursor);
+      return false;
     },
   };
 }
