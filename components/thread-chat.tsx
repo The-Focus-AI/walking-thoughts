@@ -273,9 +273,14 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
             ✕
           </button>
         ) : (
-          <Link className="topbar-link" href="/">
-            Trail
-          </Link>
+          <nav className="offline-maps-nav" aria-label="App">
+            <Link className="topbar-link" href="/offline-maps">
+              Offline
+            </Link>
+            <Link className="topbar-link" href="/">
+              Trail
+            </Link>
+          </nav>
         )}
       </header>
 

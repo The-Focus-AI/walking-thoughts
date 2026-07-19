@@ -176,20 +176,24 @@ export function TrailMapHero() {
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => void installManifest(state.manifest!)}
-                >
-                  Download Offline Region
-                </button>
+                <div className="offline-maps-actions">
+                  <button
+                    type="button"
+                    onClick={() => void installManifest(state.manifest!)}
+                  >
+                    Download Offline Region
+                  </button>
+                  <Link className="offline-maps-secondary" href="/offline-maps">
+                    Offline details
+                  </Link>
+                </div>
               )}
             </>
           ) : (
             <p>
-              Trail maps are not published for this install yet. You can still
-              open the{" "}
-              <Link href="/journal?region=fixture">fixture Map Journal</Link>{" "}
-              to review the sample Offline Region.
+              Trail maps are not published for this install yet. Open{" "}
+              <Link href="/offline-maps">Offline</Link> for status, or the{" "}
+              <Link href="/journal?region=fixture">fixture Map Journal</Link>.
             </p>
           )}
         </div>
@@ -211,9 +215,14 @@ export function TrailMapHero() {
                 {state.manifest.radiusKm} km
               </p>
             </div>
-            <Link className="trail-map-hero-cta" href="/journal">
-              Open Map Journal
-            </Link>
+            <div className="offline-maps-actions">
+              <Link className="trail-map-hero-cta" href="/journal">
+                Open Map Journal
+              </Link>
+              <Link className="offline-maps-secondary" href="/offline-maps">
+                Offline
+              </Link>
+            </div>
           </div>
         </>
       ) : null}

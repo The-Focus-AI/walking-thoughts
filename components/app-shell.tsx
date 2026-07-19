@@ -32,6 +32,9 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <Link className="topbar-link" href="/journal">
             Map Journal
           </Link>
+          <Link className="topbar-link" href="/offline-maps">
+            Offline
+          </Link>
           <OfflineReadiness />
           {account}
         </div>
