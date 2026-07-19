@@ -20,6 +20,9 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <span>Walking Thoughts</span>
         </Link>
         <div className="topbar-actions">
+          <Link className="topbar-link" href="/journal">
+            Map Journal
+          </Link>
           <OfflineReadiness />
           {account}
         </div>
@@ -31,6 +34,11 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         <p className="lede">
           Save observations on your phone first. Walking Thoughts will be ready
           to add context when you reconnect.
+        </p>
+        <p className="hero-review">
+          <Link className="hero-review-link" href="/journal">
+            Review your walks on the Map Journal →
+          </Link>
         </p>
 
         {configurationRequired ? (

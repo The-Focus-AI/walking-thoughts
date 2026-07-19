@@ -54,14 +54,14 @@ jobs:
           if ! printf '%s\n' "$PR_BODY" | grep -qiE \
             "(^|[^[:alnum:]_])((close[sd]?)|(fix(e[sd])?)|(resolve[sd]?))[[:space:]]+#${PRIMARY}\\b"; then
             cat <<EOF
-ERROR: PR body must include a closing keyword for #${PRIMARY}.
-Add a line such as:
+          ERROR: PR body must include a closing keyword for #${PRIMARY}.
+          Add a line such as:
 
-  Closes #${PRIMARY}
+            Closes #${PRIMARY}
 
-Supported keywords: close/closes/closed, fix/fixes/fixed, resolve/resolves/resolved.
-Merging into main then closes the issue automatically.
-EOF
+          Supported keywords: close/closes/closed, fix/fixes/fixed, resolve/resolves/resolved.
+          Merging into main then closes the issue automatically.
+          EOF
             exit 1
           fi
           echo "Closing keyword present for #${PRIMARY}."

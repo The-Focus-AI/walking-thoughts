@@ -18,10 +18,19 @@ export default defineConfig({
     {
       name: "pixel-9",
       dependencies: ["clerk-setup"],
-      testIgnore: /clerk\.setup\.ts/,
+      testIgnore: [/clerk\.setup\.ts/, /.*-desktop\.spec\.ts/],
       use: {
         ...devices["Pixel 7"],
         viewport: { width: 412, height: 915 },
+      },
+    },
+    {
+      name: "desktop",
+      dependencies: ["clerk-setup"],
+      testMatch: /.*-desktop\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 820 },
       },
     },
   ],
