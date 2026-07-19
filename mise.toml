@@ -171,6 +171,10 @@ exit 2
 description = "Package one Offline Region (basemap, terrain, contours, fonts, manifest)"
 run = "bash scripts/offline-region/build-region.sh"
 
+[tasks."region:publish"]
+description = "Upload a built Offline Region pack to the public Vercel Blob store"
+run = "node scripts/offline-region/publish-region.mjs"
+
 [tasks."region:measure"]
 description = "Measure a built Offline Region through /region-tracer on a Pixel-9 viewport"
 run = "node scripts/offline-region/measure-region.mjs"

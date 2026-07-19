@@ -52,6 +52,20 @@ export class RegionIntegrityError extends Error {
   }
 }
 
+/**
+ * Build a fetch URL for one pack artifact. Path segments are encoded so
+ * font directories with spaces (e.g. `Noto Sans Regular`) work on Blob hosts.
+ */
+export function regionArtifactUrl(baseUrl: string, path: string): string {
+  const root = baseUrl.replace(/\/+$/, "");
+  const encoded = path
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${root}/${encoded}`;
+}
+
 export type RegionStore = {
   manifest(): Promise<RegionManifest | null>;
   installed(): Promise<RegionManifest | null>;
@@ -67,7 +81,7 @@ export function createRegionStore(baseUrl: string, region: string): RegionStore 
   return {
     async manifest() {
       try {
-        const response = await fetch(`${baseUrl}/manifest.json`, {
+        const response = await fetch(regionArtifactUrl(baseUrl, "manifest.json"), {
           cache: "no-cache",
         });
         if (!response.ok) return null;
@@ -122,7 +136,7 @@ export function createRegionStore(baseUrl: string, region: string): RegionStore 
           currentPath: entry.path,
         });
 
-        const response = await fetch(`${baseUrl}/${entry.path}`);
+        const response = await fetch(regionArtifactUrl(baseUrl, entry.path));
         if (!response.ok) {
           throw new RegionIntegrityError(entry.path, `download failed (${response.status})`);
         }

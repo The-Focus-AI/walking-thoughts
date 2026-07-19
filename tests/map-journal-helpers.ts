@@ -2,7 +2,8 @@ import { expect, type Page } from "@playwright/test";
 import type { MapJournalHook } from "@/components/map-journal";
 import type { CaptureStore } from "@/lib/local-capture/types";
 
-export const JOURNAL_URL = "/journal";
+/** Always pin the fixture so journal tests stay fast and offline-capable. */
+export const JOURNAL_URL = "/journal?region=fixture";
 
 // Inside the fixture region (1.5 km around Cornwall CT).
 export const TRAIL_FORK = {
