@@ -313,8 +313,134 @@ h1 {
   color: #f0b4a0;
 }
 
-.enrichment-entry {
+.enrichment-entry,
+.enrichment-pending {
   border-left-color: rgba(120, 170, 210, 0.75);
+  background: rgba(120, 170, 210, 0.08);
+}
+
+.thread-speaker-you {
+  border-left-color: rgba(169, 209, 143, 0.85);
+}
+
+.thread-speaker {
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trail-thread {
+  gap: 1rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.trail-thread-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+
+.trail-thread-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.trail-timeline {
+  margin-bottom: 0.25rem;
+}
+
+.thread-switch-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.threads-archive {
+  display: grid;
+  gap: 1.5rem;
+  width: min(100%, 48rem);
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem
+    max(2rem, env(safe-area-inset-bottom));
+}
+
+.threads-archive-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.threads-archive-header h1 {
+  margin: 0.15rem 0 0.4rem;
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+}
+
+.threads-archive-header p {
+  margin: 0;
+  max-width: 36rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.threads-day {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.threads-day h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--moss);
+}
+
+.threads-day-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.threads-day-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.threads-day-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threads-day-toggle {
+  display: grid;
+  gap: 0.2rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.threads-day-toggle > span:first-child {
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .enrichment-model {

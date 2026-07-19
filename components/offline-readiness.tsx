@@ -9,7 +9,9 @@ export function OfflineReadiness() {
   useEffect(() => {
     let active = true;
     cacheShellResources([
+      "/",
       "/offline",
+      "/threads",
       "/manifest.webmanifest",
       "/icon-192.svg",
       "/icon-512.svg",

@@ -62,9 +62,12 @@ function AttachmentPreview({ attachment }: { attachment: LocalAttachment }) {
 export function CaptureEntryView({
   capture,
   mediaPreviews = false,
+  showSpeaker = false,
 }: {
   capture: LocalCapture;
   mediaPreviews?: boolean;
+  /** When true, label the entry as a walker message in the Thread stream. */
+  showSpeaker?: boolean;
 }) {
   const label =
     capture.text ||
@@ -72,8 +75,14 @@ export function CaptureEntryView({
     "Capture";
 
   return (
-    <article className="capture-entry" aria-label={label}>
+    <article
+      className={`capture-entry${showSpeaker ? " thread-speaker-you" : ""}`}
+      aria-label={label}
+    >
       <div className="capture-entry-meta">
+        {showSpeaker ? (
+          <span className="thread-speaker">You</span>
+        ) : null}
         <span className={`capture-status status-${capture.status}`}>
           {statusLabel(capture.status)}
         </span>
@@ -112,11 +121,12 @@ export function EnrichmentEntryView({
 }) {
   return (
     <article
-      className="capture-entry enrichment-entry"
-      aria-label={`Enrichment ${enrichment.model}`}
+      className="capture-entry enrichment-entry thread-speaker-agent"
+      aria-label={`Walking Thoughts reply · ${enrichment.model}`}
     >
       <div className="capture-entry-meta">
-        <span className="capture-status status-complete">Enrichment</span>
+        <span className="thread-speaker">Walking Thoughts</span>
+        <span className="capture-status status-complete">Reply</span>
         <time dateTime={enrichment.createdAt}>
           {new Date(enrichment.createdAt).toLocaleString()}
         </time>
