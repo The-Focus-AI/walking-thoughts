@@ -33,7 +33,7 @@ export function createFakeWebSearchClient(
 }
 
 /** Optional Tavily-backed search when TAVILY_API_KEY is set. */
-function createTavilySearchClient(apiKey: string): WebSearchClient {
+export function createTavilySearchClient(apiKey: string): WebSearchClient {
   return {
     async search(query) {
       const response = await fetch("https://api.tavily.com/search", {

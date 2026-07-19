@@ -1,21 +1,20 @@
-import { authConfiguration } from "@/lib/auth-config";
+import { reportIntegrationHealth } from "@/lib/integrations/health";
+import { probeIntegrationDependencies } from "@/lib/integrations/probes";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  const configuration = authConfiguration();
-  return Response.json(
-    {
-      status: configuration.configured ? "ok" : "configuration_required",
-      services: {
-        clerkPublishableKey: configuration.publishableKey,
-        clerkSecretKey: configuration.secretKey,
-        allowedUsers: configuration.allowedUserIds.size > 0,
-      },
-    },
-    {
-      status: configuration.configured ? 200 : 503,
-      headers: { "Cache-Control": "no-store" },
-    },
-  );
+export async function GET() {
+  const probes = await probeIntegrationDependencies();
+  const report = reportIntegrationHealth(process.env, probes);
+  const httpStatus =
+    report.status === "configuration_required"
+      ? 503
+      : report.status === "degraded"
+        ? 200
+        : 200;
+
+  return Response.json(report, {
+    status: httpStatus,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

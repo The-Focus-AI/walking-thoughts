@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import {
   CaptureEntryView,
   EnrichmentEntryView,
@@ -601,6 +602,8 @@ export function MapJournal() {
           {error}
         </p>
       ) : null}
+
+      <DataHandlingDisclosure />
     </div>
   );
 }
