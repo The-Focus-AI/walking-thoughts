@@ -105,6 +105,7 @@ test.describe("Map Journal", () => {
     expect(panelBox!.y).toBeGreaterThan(mapBox!.y);
     expect(panelBox!.y).toBeLessThan(mapBox!.y + mapBox!.height);
 
+    await expect(panel.getByTestId("thread-chat")).toBeVisible();
     await expect(
       panel.getByRole("heading", {
         name: "Fresh bobcat tracks at the trail fork",
@@ -113,7 +114,7 @@ test.describe("Map Journal", () => {
     await expect(
       panel.getByText("Second set of tracks on the ledge"),
     ).toBeVisible();
-    await expect(panel.getByText(/Complete Thread · revision 2/)).toBeVisible();
+    await expect(panel.getByText(/rev 2/)).toBeVisible();
     await expect(page.getByTestId("journal-connectivity")).toHaveText(
       /Offline — Captures save on this device/,
     );
@@ -125,11 +126,11 @@ test.describe("Map Journal", () => {
     await panel
       .getByLabel("Follow-up Capture")
       .fill("Returning tomorrow with the trail camera");
-    await panel.getByRole("button", { name: "Capture follow-up" }).click();
+    await panel.getByRole("button", { name: "Send" }).click();
     await expect(
       panel.getByText("Returning tomorrow with the trail camera"),
     ).toBeVisible();
-    await expect(panel.getByText(/Complete Thread · revision 3/)).toBeVisible();
+    await expect(panel.getByText(/rev 3/)).toBeVisible();
     const followUpStatus = await page.evaluate(async (threadId) => {
       const store = (window as JournalWindow).__WT_CAPTURE_STORE__!;
       const view = await store.listThread(threadId);

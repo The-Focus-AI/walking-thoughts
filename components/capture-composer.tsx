@@ -640,14 +640,22 @@ export function CaptureComposer() {
             All Threads
           </Link>
           {destination.type === "thread" ? (
-            <button
-              type="button"
-              className="capture-retry"
-              onClick={onStartNewThread}
-              disabled={!ready || isPending}
-            >
-              Start new Thread
-            </button>
+            <>
+              <Link
+                className="topbar-link"
+                href={`/threads/${destination.threadId}`}
+              >
+                Open chat
+              </Link>
+              <button
+                type="button"
+                className="capture-retry"
+                onClick={onStartNewThread}
+                disabled={!ready || isPending}
+              >
+                Start new Thread
+              </button>
+            </>
           ) : null}
         </div>
 
