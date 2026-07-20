@@ -2,15 +2,28 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { AttachmentDrafts } from "@/components/attachment-drafts";
 import {
   OutdoorCaptureDock,
   type CaptureMode,
 } from "@/components/outdoor-capture-dock";
+import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
+import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
+import type { ThreadEnrichment } from "@/lib/enrichment/types";
+import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
 import { getDestinationSession } from "@/lib/local-capture/destination";
 import {
   prefetchLocation,
   readAvailableLocation,
 } from "@/lib/local-capture/location";
+import {
+  canOfferLocalRemoval,
+  mediaAvailability,
+  mediaAvailabilityLabel,
+  removeLocalOriginal,
+  restoreLocalOriginal,
+} from "@/lib/local-capture/local-media-retention";
+import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import {
   persistenceLabel,
   requestPersistentStorage,
@@ -20,14 +33,6 @@ import {
   VIDEO_LIMIT_MS,
   createRecorder,
 } from "@/lib/local-capture/recording";
-import {
-  canOfferLocalRemoval,
-  mediaAvailability,
-  mediaAvailabilityLabel,
-  removeLocalOriginal,
-  restoreLocalOriginal,
-} from "@/lib/local-capture/local-media-retention";
-import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import { chronologicalThreadEntries } from "@/lib/local-capture/thread-timeline";
 import type {
@@ -35,29 +40,32 @@ import type {
   LocalAttachment,
   LocalCapture,
   LocalThread,
-  MediaKind,
   PersistenceResult,
   ThreadDestination,
 } from "@/lib/local-capture/types";
-import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
-import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
-import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
   enablePushNotifications,
   evaluatePushOptInAfterSync,
   type AfterSyncPushOptInResult,
 } from "@/lib/push/client";
-import { getMediaTransport } from "@/lib/sync/media-client";
 import {
   SYNC_CYCLE_EVENT,
   runSyncCycle,
   type SyncCycleResult,
 } from "@/lib/sync/cycle";
+import { getMediaTransport } from "@/lib/sync/media-client";
 import {
   pendingSyncCount,
   syncFooterSummary,
   syncRollup,
 } from "@/lib/sync/rollup";
+
+function formatRecordingClock(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
 
 type ThreadView = {
   thread: LocalThread;
@@ -83,7 +91,10 @@ export function CaptureComposer() {
     [],
   );
   const [mode, setMode] = useState<CaptureMode>("type");
-  const [recordingLabel, setRecordingLabel] = useState<string | null>(null);
+  const [recordingKind, setRecordingKind] = useState<"audio" | "video" | null>(
+    null,
+  );
+  const [recordingMs, setRecordingMs] = useState(0);
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -313,23 +324,11 @@ export function CaptureComposer() {
     setDestinationState(getDestinationSession().get());
   }
 
-  function kindFromMime(mimeType: string): MediaKind {
-    if (mimeType.startsWith("audio/")) return "audio";
-    if (mimeType.startsWith("video/")) return "video";
-    return "image";
-  }
-
   async function onFilesSelected(fileList: FileList | null) {
     if (!fileList?.length) return;
-    const next: AttachmentInput[] = [];
-    for (const file of Array.from(fileList)) {
-      next.push({
-        kind: kindFromMime(file.type || "application/octet-stream"),
-        mimeType: file.type || "application/octet-stream",
-        fileName: file.name || "attachment",
-        bytes: file,
-      });
-    }
+    const next = Array.from(fileList).map((file) =>
+      attachmentInputFromFile(file),
+    );
     setPendingAttachments((current) => [...current, ...next]);
   }
 
@@ -386,30 +385,26 @@ export function CaptureComposer() {
     commitWithAttachments(draft.trim(), pendingAttachments);
   }
 
-  async function commitRecording(kind: "audio" | "video") {
+  /** Record into a reviewable draft — never auto-commit under poor connectivity. */
+  async function stageRecording(kind: "audio" | "video") {
+    if (recordingKind) return;
     setError(null);
-    setRecordingLabel(kind === "audio" ? "Recording audio…" : "Recording video…");
+    setRecordingKind(kind);
+    setRecordingMs(0);
     const controller = new AbortController();
     recordAbortRef.current = controller;
+    const startedAt = Date.now();
+    const tick = window.setInterval(() => {
+      setRecordingMs(Date.now() - startedAt);
+    }, 200);
     try {
       const result = await createRecorder().record(kind, {
         signal: controller.signal,
         maxMs: kind === "audio" ? AUDIO_LIMIT_MS : VIDEO_LIMIT_MS,
       });
-      if (result.bytes.size === 0) {
-        setRecordingLabel(null);
-        return;
-      }
-      if (result.hitLimit) {
-        setRecordingLabel(
-          kind === "audio"
-            ? "Audio hit the 10-minute limit"
-            : "Video hit the 2-minute limit",
-        );
-      } else {
-        setRecordingLabel(null);
-      }
-      commitWithAttachments("", [
+      if (result.bytes.size === 0) return;
+      setPendingAttachments((current) => [
+        ...current,
         {
           kind: result.kind,
           mimeType: result.mimeType,
@@ -417,10 +412,22 @@ export function CaptureComposer() {
           bytes: result.bytes,
         },
       ]);
+      setMode("type");
+      if (result.hitLimit) {
+        setSaveConfirmation(
+          kind === "audio"
+            ? "Audio hit the 10-minute limit — review below"
+            : "Video hit the 2-minute limit — review below",
+        );
+      } else {
+        setSaveConfirmation("Recording ready — review, then Capture");
+      }
     } catch {
       setError(`Could not record ${kind}`);
-      setRecordingLabel(null);
     } finally {
+      window.clearInterval(tick);
+      setRecordingKind(null);
+      setRecordingMs(0);
       recordAbortRef.current = null;
     }
   }
@@ -452,22 +459,38 @@ export function CaptureComposer() {
   const rollup = syncRollup(allCaptures.map((capture) => capture.status));
   const footerSummary = syncFooterSummary(rollup, { running: isSyncing });
 
+  const canCapture =
+    ready &&
+    !isPending &&
+    !recordingKind &&
+    (draft.trim().length > 0 || pendingAttachments.length > 0);
+
   const composer = (
     <div className="capture-card outdoor-card trail-dock-card" aria-label="New Capture">
       <OutdoorCaptureDock
         mode={mode}
         onChange={onModeChange}
-        disabled={!ready || isPending}
+        disabled={!ready || isPending || Boolean(recordingKind)}
       />
       <p className="outdoor-status" role="status">
         <span>{trailStatus}</span>
         <span>GPS: {gps ? "available" : "unavailable"}</span>
-        <span>{online ? "Online" : "Offline · local save"}</span>
+        <span>
+          {online
+            ? "Network online · Captures sync when ready"
+            : "Network offline · Captures stay on this phone"}
+        </span>
         {saveConfirmation ? <span>{saveConfirmation}</span> : null}
       </p>
+      {recordingKind ? (
+        <p className="recording-banner" role="status" data-testid="recording-banner">
+          Recording {recordingKind} · {formatRecordingClock(recordingMs)}
+          {recordingKind === "video" ? " · tap Stop when finished" : " · release to stop"}
+        </p>
+      ) : null}
       <div className="capture-composer">
         <span className="capture-label">Add to this Thread</span>
-        {mode === "type" ? (
+        {mode === "type" || pendingAttachments.length > 0 ? (
           <>
             <label className="capture-field-label" htmlFor="capture-text">
               Capture text
@@ -478,7 +501,7 @@ export function CaptureComposer() {
               onChange={(event) => setDraft(event.target.value)}
               placeholder="What did you notice?"
               rows={2}
-              disabled={!ready || isPending}
+              disabled={!ready || isPending || Boolean(recordingKind)}
             />
           </>
         ) : null}
@@ -486,50 +509,64 @@ export function CaptureComposer() {
         {mode === "audio" ? (
           <button
             type="button"
-            className="outdoor-hold"
-            aria-label="Hold to record audio"
+            className={
+              recordingKind === "audio" ? "outdoor-hold recording" : "outdoor-hold"
+            }
+            aria-label={
+              recordingKind === "audio" ? "Release to stop audio" : "Hold to record audio"
+            }
             disabled={!ready || isPending}
             onPointerDown={(event) => {
               event.preventDefault();
-              void commitRecording("audio");
+              void stageRecording("audio");
             }}
             onPointerUp={() => recordAbortRef.current?.abort()}
             onPointerLeave={() => recordAbortRef.current?.abort()}
           >
-            {recordingLabel ?? "Hold to record audio (max 10 min)"}
+            {recordingKind === "audio"
+              ? `Recording… ${formatRecordingClock(recordingMs)}`
+              : "Hold to record audio (max 10 min)"}
           </button>
         ) : null}
 
         {mode === "video" ? (
           <button
             type="button"
-            className="outdoor-hold"
-            aria-label="Record video"
+            className={
+              recordingKind === "video" ? "outdoor-hold recording" : "outdoor-hold"
+            }
+            aria-label={
+              recordingKind === "video" ? "Stop video recording" : "Start video recording"
+            }
             disabled={!ready || isPending}
             onClick={() => {
               if (recordAbortRef.current) {
                 recordAbortRef.current.abort();
                 return;
               }
-              void commitRecording("video");
+              void stageRecording("video");
             }}
           >
-            {recordingLabel ?? "Record video (max 2 min)"}
+            {recordingKind === "video"
+              ? `Stop · ${formatRecordingClock(recordingMs)}`
+              : "Start video recording (max 2 min)"}
           </button>
         ) : null}
 
         {mode === "photo" ? (
-          <p className="capture-persistence">Camera opener is one tap away.</p>
+          <p className="capture-persistence">
+            Camera opens next — the photo lands here for review before Capture.
+          </p>
         ) : null}
 
         <div className="capture-media-actions">
           <button
             type="button"
-            className="capture-retry"
+            className="capture-add-media"
             onClick={() => fileInputRef.current?.click()}
-            disabled={!ready || isPending}
+            disabled={!ready || isPending || Boolean(recordingKind)}
           >
-            Add media
+            Add photo or video
           </button>
           <input
             ref={cameraInputRef}
@@ -542,6 +579,7 @@ export function CaptureComposer() {
               void onFilesSelected(event.target.files);
               event.target.value = "";
               setMode("type");
+              setSaveConfirmation("Photo ready — review, then Capture");
             }}
           />
           <input
@@ -550,47 +588,27 @@ export function CaptureComposer() {
             type="file"
             accept="image/*,audio/*,video/*"
             multiple
-            aria-label="Choose existing media"
+            aria-label="Choose photo or video from device"
             onChange={(event) => {
               void onFilesSelected(event.target.files);
               event.target.value = "";
+              setMode("type");
+              setSaveConfirmation("Media ready — review, then Capture");
             }}
           />
         </div>
-        {pendingAttachments.length > 0 ? (
-          <ul className="capture-attachment-drafts" aria-label="Selected media">
-            {pendingAttachments.map((attachment, index) => (
-              <li key={`${attachment.fileName}-${index}`}>
-                {attachment.fileName}
-                <button
-                  type="button"
-                  className="capture-retry"
-                  onClick={() =>
-                    setPendingAttachments((current) =>
-                      current.filter((_, itemIndex) => itemIndex !== index),
-                    )
-                  }
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-      {mode === "type" || pendingAttachments.length > 0 ? (
-        <button
-          type="button"
-          onClick={commit}
-          disabled={
-            !ready ||
-            isPending ||
-            (draft.trim().length === 0 && pendingAttachments.length === 0)
+        <AttachmentDrafts
+          attachments={pendingAttachments}
+          onRemove={(index) =>
+            setPendingAttachments((current) =>
+              current.filter((_, itemIndex) => itemIndex !== index),
+            )
           }
-        >
-          Capture
-        </button>
-      ) : null}
+        />
+      </div>
+      <button type="button" onClick={commit} disabled={!canCapture}>
+        {isPending ? "Saving…" : "Capture"}
+      </button>
     </div>
   );
 

@@ -1,4 +1,6 @@
 import { enrichPendingCaptures, type EnrichmentTransport } from "@/lib/enrichment/client";
+import { recoverStaleLocalCaptures } from "@/lib/enrichment/recover";
+import { fetchThreadEnrichmentsFromNetwork } from "@/lib/enrichment/thread-view";
 import type { CaptureStore } from "@/lib/local-capture/types";
 import type { MediaStore } from "@/lib/local-capture/media-store";
 import {
@@ -11,12 +13,19 @@ import {
   synchronizePendingMedia,
   type MediaTransport,
 } from "@/lib/sync/media-client";
+import {
+  getThreadsTransport,
+  serverCaptureIdSet,
+  type ThreadsTransport,
+} from "@/lib/sync/threads-client";
 
 export type SyncCycleResult = {
   skippedOffline: boolean;
   capturesPushed: number;
   capturesFailed: number;
   enrichmentResults: number;
+  requeuedForSync: number;
+  requeuedForEnrichment: number;
 };
 
 export type SyncCycleInput = {
@@ -26,6 +35,7 @@ export type SyncCycleInput = {
   mediaStore?: MediaStore;
   captureTransport?: SyncTransport;
   enrichmentTransport?: EnrichmentTransport;
+  threadsTransport?: ThreadsTransport;
   retryFailed?: boolean;
 };
 
@@ -48,7 +58,22 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
       capturesPushed: 0,
       capturesFailed: 0,
       enrichmentResults: 0,
+      requeuedForSync: 0,
+      requeuedForEnrichment: 0,
     };
+  }
+
+  let requeuedForSync = 0;
+  let requeuedForEnrichment = 0;
+  const threadsTransport = input.threadsTransport ?? getThreadsTransport();
+  const listed = await threadsTransport.listThreads();
+  if (!("unavailable" in listed)) {
+    const recovered = await recoverStaleLocalCaptures(input.store, {
+      serverCaptureIds: serverCaptureIdSet(listed),
+      loadEnrichments: fetchThreadEnrichmentsFromNetwork,
+    });
+    requeuedForSync = recovered.requeuedForSync;
+    requeuedForEnrichment = recovered.requeuedForEnrichment;
   }
 
   await synchronizePendingMedia(
@@ -73,6 +98,8 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
     capturesPushed: syncBatch.results.length,
     capturesFailed: syncBatch.failures.length,
     enrichmentResults: enrichBatch.results.length,
+    requeuedForSync,
+    requeuedForEnrichment,
   };
 }
 

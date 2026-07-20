@@ -27,12 +27,12 @@ export function OfflineMapsPage() {
     <main className="offline-maps" data-testid="offline-maps-page">
       <header className="offline-maps-header">
         <div>
-          <p className="eyebrow">Offline</p>
+          <p className="eyebrow">Maps</p>
           <h1>Trail maps on this phone</h1>
           <p>
-            Download one Offline Region before you leave signal. Captures still
-            save locally either way — this pack is what powers Map Journal in
-            airplane mode.
+            Download one Offline Region before you leave signal. This is separate
+            from network online/offline for Captures — the pack powers Map
+            Journal in airplane mode; Captures still save locally either way.
           </p>
         </div>
         <nav className="offline-maps-nav" aria-label="App">
@@ -156,8 +156,8 @@ export function OfflineMapsPage() {
             you are back online
           </li>
           <li>
-            <strong>App cached</strong> in the topbar — only means app screens
-            are cached, not that maps are downloaded
+            <strong>Shell ready</strong> in the topbar — only means app screens
+            are cached, not that trail maps are downloaded
           </li>
         </ul>
       </section>

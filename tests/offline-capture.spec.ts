@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 async function openCaptureShell(page: Page) {
   await page.goto("/offline");
   await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("App cached")).toBeVisible();
+  await expect(page.getByText("Shell ready")).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() =>

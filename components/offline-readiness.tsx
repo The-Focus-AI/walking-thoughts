@@ -35,10 +35,10 @@ export function OfflineReadiness() {
     <Link
       href="/offline-maps"
       className={ready ? "status status-ready" : "status"}
-      title="App screens cached on this device. Open Offline to download trail maps."
+      title="App screens are ready offline. Open Maps to download the Offline Region trail pack."
     >
       <span className="status-dot" aria-hidden="true" />
-      {ready ? "App cached" : "Caching app…"}
+      {ready ? "Shell ready" : "Caching shell…"}
     </Link>
   );
 }

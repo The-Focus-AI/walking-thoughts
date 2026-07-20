@@ -98,9 +98,10 @@ async function queueJobsForThreads(
     if (targetCaptureIds.length === 0) continue;
 
     const basisHistory = freezeHistory(thread);
-    await repository.getOrCreateJob(userId, {
+    const idempotencyKey = `enrich:${thread.id}:r${thread.revision}`;
+    const existing = await repository.getOrCreateJob(userId, {
       id: createJobId(),
-      idempotencyKey: `enrich:${thread.id}:r${thread.revision}`,
+      idempotencyKey,
       threadId: thread.id,
       basisRevision: thread.revision,
       basisEntryIds: basisHistory.map((entry) => entry.id),
@@ -109,6 +110,23 @@ async function queueJobsForThreads(
       model,
       status: "queued",
     });
+
+    // A prior job may be complete while inclusions/enrichments were lost
+    // (memory-only era). Queue a stable orphan recovery job for the same targets.
+    if (existing.status === "complete") {
+      const orphanKey = `enrich:${thread.id}:orphan:${[...targetCaptureIds].sort().join(",")}`;
+      await repository.getOrCreateJob(userId, {
+        id: createJobId(),
+        idempotencyKey: orphanKey,
+        threadId: thread.id,
+        basisRevision: thread.revision,
+        basisEntryIds: basisHistory.map((entry) => entry.id),
+        basisHistory,
+        targetCaptureIds,
+        model,
+        status: "queued",
+      });
+    }
   }
 }
 
