@@ -184,7 +184,7 @@ export function TrailMapHero() {
                     Download Offline Region
                   </button>
                   <Link className="offline-maps-secondary" href="/offline-maps">
-                    Maps details
+                    Offline maps
                   </Link>
                 </div>
               )}
@@ -192,7 +192,7 @@ export function TrailMapHero() {
           ) : (
             <p>
               Trail maps are not published for this install yet. Open{" "}
-              <Link href="/offline-maps">Maps</Link> for status, or the{" "}
+              <Link href="/offline-maps">Offline maps</Link> for status, or the{" "}
               <Link href="/journal?region=fixture">fixture Map Journal</Link>.
             </p>
           )}
@@ -220,7 +220,7 @@ export function TrailMapHero() {
                 Open Map Journal
               </Link>
               <Link className="offline-maps-secondary" href="/offline-maps">
-                Maps
+                Offline maps
               </Link>
             </div>
           </div>

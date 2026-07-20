@@ -7,7 +7,7 @@ test("offline mixed-media Capture keeps attachments readable after restart", asy
   await expect(page.getByLabel("Capture text")).toBeVisible();
   await expect(page.getByText("Shell ready")).toBeVisible();
 
-  await page.getByLabel("Choose existing media").setInputFiles({
+  await page.getByLabel("Choose photo or video from device").setInputFiles({
     name: "fungus.jpg",
     mimeType: "image/jpeg",
     buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),

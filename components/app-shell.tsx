@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { AccountExport } from "@/components/account-export";
+import { AppNav } from "@/components/app-nav";
 import { CaptureComposer } from "@/components/capture-composer";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { OfflineReadiness } from "@/components/offline-readiness";
@@ -13,8 +14,8 @@ type AppShellProps = {
 };
 
 /**
- * Trail home — Density A + Sync C + Map A fold from the trail-cleanup prototype.
- * Map hero first; sticky Capture dock + sync footer live in CaptureComposer.
+ * Trail home — Capture front and center. Screen-to-screen navigation lives in
+ * the shared bottom tab bar (AppNav); the topbar stays glanceable.
  */
 export function AppShell({ account, configurationRequired }: AppShellProps) {
   return (
@@ -28,15 +29,6 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <span>Walking Thoughts</span>
         </Link>
         <div className="topbar-actions">
-          <Link className="topbar-link" href="/threads">
-            Threads
-          </Link>
-          <Link className="topbar-link" href="/journal">
-            Map Journal
-          </Link>
-          <Link className="topbar-link" href="/offline-maps">
-            Maps
-          </Link>
           <OfflineReadiness />
           {account}
         </div>
@@ -71,6 +63,8 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         <span aria-hidden="true">·</span>
         <span>Private cloud media · no end-to-end encryption claim</span>
       </footer>
+
+      <AppNav />
     </main>
   );
 }
