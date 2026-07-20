@@ -169,4 +169,29 @@ export type CaptureStore = {
     expiresAt: string;
     attachmentIds: string[];
   }>): Promise<void>;
+  /**
+   * Import server Threads/Captures missing locally. Remote Captures arrive as
+   * Complete so they do not re-enter the outbound outbox.
+   */
+  applyRemoteThreads(
+    threads: Array<{
+      id: string;
+      title: string;
+      revision: number;
+      updatedAt: string;
+      captures: Array<{
+        id: string;
+        text: string;
+        createdAt: string;
+        location: CaptureLocation | null;
+        sequence: number;
+        attachments: Array<{
+          id: string;
+          kind: MediaKind;
+          mimeType: string;
+          fileName: string;
+        }>;
+      }>;
+    }>,
+  ): Promise<{ importedCaptureIds: string[] }>;
 };

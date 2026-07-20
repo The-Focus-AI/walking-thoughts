@@ -23,6 +23,7 @@ export type SyncCycleResult = {
   skippedOffline: boolean;
   capturesPushed: number;
   capturesFailed: number;
+  capturesImported: number;
   enrichmentResults: number;
   requeuedForSync: number;
   requeuedForEnrichment: number;
@@ -57,6 +58,7 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
       skippedOffline: true,
       capturesPushed: 0,
       capturesFailed: 0,
+      capturesImported: 0,
       enrichmentResults: 0,
       requeuedForSync: 0,
       requeuedForEnrichment: 0,
@@ -65,9 +67,13 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
 
   let requeuedForSync = 0;
   let requeuedForEnrichment = 0;
+  let capturesImported = 0;
   const threadsTransport = input.threadsTransport ?? getThreadsTransport();
   const listed = await threadsTransport.listThreads();
   if (!("unavailable" in listed)) {
+    const hydrated = await input.store.applyRemoteThreads(listed);
+    capturesImported = hydrated.importedCaptureIds.length;
+
     const recovered = await recoverStaleLocalCaptures(input.store, {
       serverCaptureIds: serverCaptureIdSet(listed),
       loadEnrichments: fetchThreadEnrichmentsFromNetwork,
@@ -97,6 +103,7 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
     skippedOffline: false,
     capturesPushed: syncBatch.results.length,
     capturesFailed: syncBatch.failures.length,
+    capturesImported,
     enrichmentResults: enrichBatch.results.length,
     requeuedForSync,
     requeuedForEnrichment,
@@ -104,8 +111,9 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
 }
 
 /**
- * Single foreground outbox drain: media → Capture metadata → Enrichment.
- * Serialized so home, chat, journal, and SyncRuntime cannot race the same IDB.
+ * Single foreground sync cycle: hydrate remote Threads, then drain the outbox
+ * (media → Capture metadata → Enrichment). Serialized so home, chat, journal,
+ * and SyncRuntime cannot race the same IDB.
  */
 export function runSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult> {
   const globals = globalThis as SyncCycleGlobals;
