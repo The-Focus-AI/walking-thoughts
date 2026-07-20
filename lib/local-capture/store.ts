@@ -1,4 +1,6 @@
+import { mergeRemoteThreads } from "@/lib/sync/hydrate";
 import { expiresAtFrom } from "@/lib/sync/trash";
+import type { ServerThread } from "@/lib/sync/types";
 import {
   createIdbMediaStore,
   createMemoryMediaStore,
@@ -520,6 +522,16 @@ export function createMemoryCaptureStore(
         ),
         ...remoteRecords,
       ];
+    },
+    async applyRemoteThreads(remoteThreads: ServerThread[]) {
+      const merged = mergeRemoteThreads({
+        localCaptures: captures,
+        localThreads: threads,
+        remoteThreads,
+      });
+      captures = merged.captures;
+      threads = merged.threads;
+      return { importedCaptureIds: merged.importedCaptureIds };
     },
   };
 }
@@ -1233,6 +1245,40 @@ export function createIdbCaptureStore(): CaptureStore {
           ),
           ...remoteRecords,
         ]);
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyRemoteThreads(remoteThreads: ServerThread[]) {
+      const db = await openDatabase();
+      try {
+        const existingCaptures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const existingThreads = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").getAll(),
+        )) as LocalThread[];
+
+        const merged = mergeRemoteThreads({
+          localCaptures: existingCaptures,
+          localThreads: existingThreads,
+          remoteThreads,
+        });
+
+        const transaction = db.transaction(["captures", "threads"], "readwrite");
+        const captureStore = transaction.objectStore("captures");
+        const threadStore = transaction.objectStore("threads");
+        for (const capture of merged.captures) {
+          captureStore.put(capture);
+        }
+        for (const thread of merged.threads) {
+          threadStore.put(thread);
+        }
+        await transactionDone(transaction);
+        return { importedCaptureIds: merged.importedCaptureIds };
       } finally {
         db.close();
       }
