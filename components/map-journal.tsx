@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AppNav } from "@/components/app-nav";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { CaptureEntryView } from "@/components/thread-entries";
@@ -367,7 +368,7 @@ export function MapJournal() {
         </Link>
         <div className="journal-status" role="status">
           <Link className="topbar-link" href="/offline-maps">
-            Maps
+            Offline maps
           </Link>
           <span data-testid="journal-gps">{gpsLabel}</span>
           <span data-testid="journal-connectivity">
@@ -500,6 +501,7 @@ export function MapJournal() {
       ) : null}
 
       <DataHandlingDisclosure />
+      <AppNav />
     </div>
   );
 }

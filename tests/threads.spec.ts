@@ -27,7 +27,8 @@ test.describe("trail Threads", () => {
       page.getByText(/Adding to .Same ridge, clearer view./),
     ).toBeVisible();
 
-    // Composer lives under the active Thread stream.
+    // Composer lives under the active Thread stream (its sticky dock may
+    // overlap the tail of the stream, so compare bottom edges).
     const composer = thread.getByLabel("New Capture");
     await expect(composer).toBeVisible();
     const streamBox = await thread
@@ -35,7 +36,9 @@ test.describe("trail Threads", () => {
       .boundingBox();
     const composerBox = await composer.boundingBox();
     expect(streamBox && composerBox).toBeTruthy();
-    expect(composerBox!.y).toBeGreaterThan(streamBox!.y);
+    expect(composerBox!.y + composerBox!.height).toBeGreaterThan(
+      streamBox!.y + streamBox!.height,
+    );
 
     await page.getByLabel("Capture text").fill("Correction: marker leans right");
     await page.getByRole("button", { name: "Capture" }).click();
@@ -67,9 +70,12 @@ test.describe("trail Threads", () => {
 
     await page.goto("/threads");
     await expect(
-      page.getByRole("heading", { name: "Threads by day" }),
+      page.getByRole("heading", { name: "Threads", exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("Overlook fungi")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Overlook fungi/ }),
+    ).toBeVisible();
+    await expect(page.getByTestId("thread-sync-chip").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Continue on trail" }).click();
     // / requires Clerk; the sticky day session is shared via localStorage.

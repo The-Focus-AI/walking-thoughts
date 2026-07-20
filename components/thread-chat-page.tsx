@@ -1,5 +1,6 @@
 "use client";
 
+import { AppNav } from "@/components/app-nav";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { ThreadChat } from "@/components/thread-chat";
 
@@ -8,6 +9,7 @@ export function ThreadChatPage({ threadId }: { threadId: string }) {
     <main className="thread-chat-page">
       <SyncRuntime />
       <ThreadChat threadId={threadId} />
+      <AppNav />
     </main>
   );
 }

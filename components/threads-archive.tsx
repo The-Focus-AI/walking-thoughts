@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AppNav } from "@/components/app-nav";
 import { SyncRuntime } from "@/components/sync-runtime";
-import {
-  CaptureEntryView,
-  EnrichmentEntryView,
-} from "@/components/thread-entries";
+import { SyncStatusPill } from "@/components/sync-status-pill";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
@@ -15,26 +14,47 @@ import {
 } from "@/lib/local-capture/calendar-day";
 import { getDestinationSession } from "@/lib/local-capture/destination";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import { chronologicalThreadEntries } from "@/lib/local-capture/thread-timeline";
 import type { LocalCapture, LocalThread } from "@/lib/local-capture/types";
-import { useRouter } from "next/navigation";
+import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
+import { syncRollup } from "@/lib/sync/rollup";
 
-type ThreadArchiveView = {
+type ThreadListView = {
   thread: LocalThread;
   captures: LocalCapture[];
   enrichments: ThreadEnrichment[];
   dayKey: string;
 };
 
+function threadStatusChip(captures: LocalCapture[]): {
+  label: string;
+  tone: "ready" | "busy" | "attention";
+} {
+  const rollup = syncRollup(captures.map((capture) => capture.status));
+  if (rollup.needs_attention > 0) {
+    return { label: "Needs attention", tone: "attention" };
+  }
+  if (rollup.saved_locally > 0 || rollup.syncing > 0) {
+    return { label: "Waiting to sync", tone: "busy" };
+  }
+  if (rollup.enriching > 0) {
+    return { label: "Enriching", tone: "busy" };
+  }
+  return { label: "Synced", tone: "ready" };
+}
+
+/**
+ * Threads home: every Thread is one tap away from its full conversation, and
+ * each row doubles as a sync dashboard entry.
+ */
 export function ThreadsArchive() {
   const router = useRouter();
-  const [threads, setThreads] = useState<ThreadArchiveView[]>([]);
+  const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void (async () => {
+
+    async function load() {
       try {
         const store = getCaptureStore();
         const recent = await store.listRecentThreads();
@@ -53,14 +73,19 @@ export function ThreadsArchive() {
       } catch {
         if (active) setError("Could not load Threads");
       }
-    })();
+    }
+
+    void load();
+    const onCycle = () => void load();
+    window.addEventListener(SYNC_CYCLE_EVENT, onCycle);
     return () => {
       active = false;
+      window.removeEventListener(SYNC_CYCLE_EVENT, onCycle);
     };
   }, []);
 
   const byDay = useMemo(() => {
-    const groups = new Map<string, ThreadArchiveView[]>();
+    const groups = new Map<string, ThreadListView[]>();
     for (const view of threads) {
       const list = groups.get(view.dayKey) ?? [];
       list.push(view);
@@ -79,21 +104,14 @@ export function ThreadsArchive() {
       <SyncRuntime />
       <header className="threads-archive-header">
         <div>
-          <p className="eyebrow">Archive</p>
-          <h1>Threads by day</h1>
+          <p className="eyebrow">By day</p>
+          <h1>Threads</h1>
           <p>
-            Browse every hike Thread with Captures and Walking Thoughts replies
-            in order. Continue one on the trail when you want to append.
+            Tap a Thread to read it and reply. Continue on trail points your
+            next Capture at that Thread.
           </p>
         </div>
-        <nav className="offline-maps-nav" aria-label="App">
-          <Link className="topbar-link" href="/offline-maps">
-            Maps
-          </Link>
-          <Link className="topbar-link" href="/">
-            Back to capture
-          </Link>
-        </nav>
+        <SyncStatusPill />
       </header>
 
       {error ? (
@@ -104,8 +122,8 @@ export function ThreadsArchive() {
 
       {byDay.length === 0 && !error ? (
         <p className="trail-thread-empty">
-          No Threads yet. Capture on the home trail view to start today&apos;s
-          hike.
+          No Threads yet. Add a Capture from the Capture tab to start
+          today&apos;s hike.
         </p>
       ) : null}
 
@@ -118,78 +136,44 @@ export function ThreadsArchive() {
           <h2>{formatDayHeading(dayKey)}</h2>
           <ul className="threads-day-list">
             {dayThreads.map((view) => {
-              const open = expandedId === view.thread.id;
-              const timeline = chronologicalThreadEntries(
-                view.captures,
-                view.enrichments,
-              );
+              const chip = threadStatusChip(view.captures);
               return (
-                <li key={view.thread.id} className="threads-day-card">
-                  <div className="threads-day-card-header">
+                <li key={view.thread.id} className="thread-row">
+                  <Link
+                    className="thread-row-main"
+                    href={`/threads/${view.thread.id}`}
+                  >
+                    <span className="thread-row-title">{view.thread.title}</span>
+                    <span className="thread-row-meta">
+                      {view.captures.length}{" "}
+                      {view.captures.length === 1 ? "Capture" : "Captures"} ·{" "}
+                      {view.enrichments.length}{" "}
+                      {view.enrichments.length === 1 ? "reply" : "replies"}
+                    </span>
+                  </Link>
+                  <div className="thread-row-side">
+                    <span
+                      className={`thread-chip thread-chip-${chip.tone}`}
+                      data-testid="thread-sync-chip"
+                    >
+                      {chip.label}
+                    </span>
                     <button
                       type="button"
-                      className="threads-day-toggle"
-                      aria-expanded={open}
-                      onClick={() =>
-                        setExpandedId(open ? null : view.thread.id)
-                      }
+                      className="capture-retry"
+                      onClick={() => continueOnTrail(view.thread.id)}
                     >
-                      <span>{view.thread.title}</span>
-                      <span className="capture-revision">
-                        {view.captures.length} Captures ·{" "}
-                        {view.enrichments.length} replies · rev{" "}
-                        {view.thread.revision}
-                      </span>
+                      Continue on trail
                     </button>
-                    <div className="threads-day-card-actions">
-                      <Link
-                        className="capture-retry"
-                        href={`/threads/${view.thread.id}`}
-                      >
-                        Open chat
-                      </Link>
-                      <button
-                        type="button"
-                        className="capture-retry"
-                        onClick={() => continueOnTrail(view.thread.id)}
-                      >
-                        Continue on trail
-                      </button>
-                    </div>
                   </div>
-                  {open ? (
-                    <ul className="capture-list trail-timeline">
-                      {timeline.map((entry) =>
-                        entry.kind === "capture" ? (
-                          <li key={entry.capture.id}>
-                            <CaptureEntryView
-                              capture={entry.capture}
-                              showSpeaker
-                              mediaPreviews
-                            />
-                          </li>
-                        ) : (
-                          <li key={entry.enrichment.id}>
-                            <EnrichmentEntryView enrichment={entry.enrichment} />
-                          </li>
-                        ),
-                      )}
-                      <li>
-                        <Link
-                          className="topbar-link"
-                          href={`/threads/${view.thread.id}`}
-                        >
-                          Open as chat →
-                        </Link>
-                      </li>
-                    </ul>
-                  ) : null}
                 </li>
               );
             })}
           </ul>
         </section>
       ))}
+
+      <AppNav />
     </main>
   );
 }

@@ -35,7 +35,7 @@ export function OfflineReadiness() {
     <Link
       href="/offline-maps"
       className={ready ? "status status-ready" : "status"}
-      title="App screens are ready offline. Open Maps to download the Offline Region trail pack."
+      title="App screens are ready offline. Opens the offline maps section to download the Offline Region trail pack."
     >
       <span className="status-dot" aria-hidden="true" />
       {ready ? "Shell ready" : "Caching shell…"}

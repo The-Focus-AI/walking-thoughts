@@ -42,7 +42,7 @@ test("remove-from-device appears only after verified sync and keeps Thread conte
   });
 
   await page.context().setOffline(true);
-  await page.getByLabel("Choose existing media").setInputFiles({
+  await page.getByLabel("Choose photo or video from device").setInputFiles({
     name: "ridge.jpg",
     mimeType: "image/jpeg",
     buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),

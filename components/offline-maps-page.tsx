@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppNav } from "@/components/app-nav";
 import {
   formatRegionMegabytes,
   regionDownloadPercent,
@@ -35,17 +36,6 @@ export function OfflineMapsPage() {
             Journal in airplane mode; Captures still save locally either way.
           </p>
         </div>
-        <nav className="offline-maps-nav" aria-label="App">
-          <Link className="topbar-link" href="/">
-            Home
-          </Link>
-          <Link className="topbar-link" href="/journal">
-            Map Journal
-          </Link>
-          <Link className="topbar-link" href="/threads">
-            Threads
-          </Link>
-        </nav>
       </header>
 
       <section
@@ -161,6 +151,8 @@ export function OfflineMapsPage() {
           </li>
         </ul>
       </section>
+
+      <AppNav />
     </main>
   );
 }

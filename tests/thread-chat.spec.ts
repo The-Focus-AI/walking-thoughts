@@ -177,12 +177,12 @@ test.describe("Thread chat", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("Threads archive Open chat navigates to the Thread chat", async ({
+  test("tapping a Thread row opens the Thread conversation", async ({
     page,
   }) => {
     const threadId = await seedThread(page, "Overlook fungi");
     await page.goto("/threads");
-    await page.getByRole("link", { name: /Open chat/i }).first().click();
+    await page.getByRole("link", { name: /Overlook fungi/ }).first().click();
     await expect(page).toHaveURL(new RegExp(`/threads/${threadId}`));
     await expect(page.getByTestId("thread-chat")).toBeVisible();
   });

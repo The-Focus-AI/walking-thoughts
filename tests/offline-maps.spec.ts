@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-test("Maps topbar opens a dedicated Offline Region section", async ({
+test("shell readiness pill opens the dedicated Offline Region section", async ({
   page,
 }) => {
   await page.goto("/offline");
-  await page.getByRole("link", { name: "Maps", exact: true }).click();
+  await page.getByRole("link", { name: /Shell ready|Caching shell/ }).click();
   await expect(page).toHaveURL(/\/offline-maps$/);
   await expect(page.getByTestId("offline-maps-page")).toBeVisible();
   await expect(

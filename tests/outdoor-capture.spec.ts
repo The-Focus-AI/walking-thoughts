@@ -47,21 +47,17 @@ function installFakeRecorder(page: import("@playwright/test").Page) {
   });
 }
 
-test("Outdoor Quick Capture stages audio for review before Capture", async ({
+test("compact capture dock records audio via tap-to-toggle and stages for review", async ({
   page,
 }) => {
   await installFakeRecorder(page);
   await page.goto("/offline");
-  await expect(page.getByLabel("Capture mode")).toBeVisible();
-  await page.getByRole("button", { name: "Audio" }).click();
+  await expect(page.getByLabel("Capture actions")).toBeVisible();
 
-  const hold = page.getByRole("button", {
-    name: /Hold to record audio|Release to stop audio/,
-  });
-  await hold.dispatchEvent("pointerdown");
+  await page.getByRole("button", { name: "Record audio" }).click();
   await expect(page.getByTestId("recording-banner")).toBeVisible();
   await page.waitForTimeout(80);
-  await hold.dispatchEvent("pointerup");
+  await page.getByRole("button", { name: "Stop recording" }).click();
 
   await expect(page.getByLabel("Selected media")).toBeVisible({
     timeout: 10_000,
@@ -81,16 +77,11 @@ test("video record stages a preview draft instead of auto-committing", async ({
 }) => {
   await installFakeRecorder(page);
   await page.goto("/offline");
-  await expect(page.getByLabel("Capture mode")).toBeVisible();
-  await page.getByRole("button", { name: "Video", exact: true }).click();
+  await expect(page.getByLabel("Capture actions")).toBeVisible();
 
-  const record = page.getByRole("button", {
-    name: /Start video recording|Stop video recording/,
-  });
-  await expect(record).toBeVisible();
-  await record.click();
+  await page.getByRole("button", { name: "Record video" }).click();
   await expect(page.getByTestId("recording-banner")).toBeVisible();
-  await record.click();
+  await page.getByRole("button", { name: "Stop recording" }).click();
 
   const drafts = page.getByLabel("Selected media");
   await expect(drafts).toBeVisible({ timeout: 10_000 });
