@@ -67,10 +67,19 @@ export function createTavilySearchClient(apiKey: string): WebSearchClient {
 
 export function getWebSearchClient(
   environment: Record<string, string | undefined> = process.env,
-): WebSearchClient {
+): WebSearchClient | null {
   const injected = (globalThis as SearchGlobals).__WT_WEB_SEARCH__;
   if (injected) return injected;
   const tavily = environment.TAVILY_API_KEY?.trim();
   if (tavily) return createTavilySearchClient(tavily);
+  // Mirror the gateway's real-model detection: synthetic search results must
+  // never be fed to a real model as citable sources — skip search instead.
+  if (
+    environment.AI_GATEWAY_API_KEY ||
+    environment.VERCEL_OIDC_TOKEN ||
+    environment.NODE_ENV === "production"
+  ) {
+    return null;
+  }
   return createFakeWebSearchClient();
 }

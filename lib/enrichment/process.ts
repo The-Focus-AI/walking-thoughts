@@ -186,7 +186,7 @@ async function runJob(
   system: string,
   blobStore: PrivateBlobStore,
   placeResolver: NearbyPlaceResolver,
-  search: WebSearchClient,
+  search: WebSearchClient | undefined,
   push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
@@ -344,7 +344,7 @@ export async function processPendingEnrichments(
     getPrivateBlobStore(environment as NodeJS.ProcessEnv);
   const placeResolver =
     options.placeResolver ?? getNearbyPlaceResolver(environment);
-  const search = options.search ?? getWebSearchClient(environment);
+  const search = options.search ?? getWebSearchClient(environment) ?? undefined;
   const pushRepository =
     options.pushRepository ??
     getPushRepository(environment as NodeJS.ProcessEnv);
