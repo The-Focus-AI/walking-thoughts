@@ -16,6 +16,7 @@ export type IntegrationHealthReport = {
     database: ServiceReport;
     blob: ServiceReport;
     gateway: ServiceReport;
+    search: ServiceReport;
     queue: ServiceReport;
     push: ServiceReport;
   };
@@ -97,6 +98,10 @@ export function reportIntegrationHealth(
     ? { status: "ready" }
     : { status: "missing", detail: "AI_GATEWAY_API_KEY" };
 
+  const search: ServiceReport = configured(environment.TAVILY_API_KEY)
+    ? { status: "ready" }
+    : { status: "missing", detail: "TAVILY_API_KEY" };
+
   const queue = fromProbe(
     configured(environment.DATABASE_URL),
     probes.queue,
@@ -111,7 +116,7 @@ export function reportIntegrationHealth(
     ? { status: "ready" }
     : { status: "missing", detail: "VAPID_KEYS" };
 
-  const services = { clerk, database, blob, gateway, queue, push };
+  const services = { clerk, database, blob, gateway, search, queue, push };
   const statuses = Object.values(services).map((service) => service.status);
   let status: IntegrationHealthReport["status"] = "ok";
   if (clerk.status !== "ready") {

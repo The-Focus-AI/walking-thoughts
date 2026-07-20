@@ -24,6 +24,7 @@ test("integration health reports each service without embedding secret values", 
       BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_secret",
       AI_GATEWAY_API_KEY: "gateway_secret",
       AI_GATEWAY_MODEL: "anthropic/claude-sonnet-5",
+      TAVILY_API_KEY: "tavily_secret",
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: "vapid_public",
       VAPID_PRIVATE_KEY: "vapid_private",
     },
@@ -36,6 +37,7 @@ test("integration health reports each service without embedding secret values", 
   expect(report.services.blob.status).toBe("ready");
   expect(report.services.blob.private).toBe(true);
   expect(report.services.gateway.status).toBe("ready");
+  expect(report.services.search.status).toBe("ready");
   expect(report.services.queue.status).toBe("ready");
   expect(report.services.push.status).toBe("ready");
   expect(report.status).toBe("ok");
@@ -43,6 +45,7 @@ test("integration health reports each service without embedding secret values", 
   const serialized = JSON.stringify(report);
   expect(serialized).not.toContain("secret-pass");
   expect(serialized).not.toContain("gateway_secret");
+  expect(serialized).not.toContain("tavily_secret");
   expect(serialized).not.toContain("vercel_blob_rw_secret");
   expect(serialized).not.toContain("vapid_private");
   expect(serialized).not.toMatch(/(?:pk|sk)_(?:test|live)_/);
@@ -69,6 +72,8 @@ test("missing or failing probes surface degraded service status", () => {
   expect(report.services.database.status).toBe("error");
   expect(report.services.blob.status).toBe("missing");
   expect(report.services.gateway.status).toBe("missing");
+  expect(report.services.search.status).toBe("missing");
+  expect(report.services.search.detail).toBe("TAVILY_API_KEY");
   expect(report.services.push.status).toBe("missing");
   expect(report.services.queue.status).toBe("error");
   expect(report.status).toBe("degraded");
