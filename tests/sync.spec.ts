@@ -79,7 +79,7 @@ test("client sync batches pending Captures, replays safely, and records failures
 async function openShell(page: Page) {
   await page.goto("/offline");
   await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("App cached")).toBeVisible();
+  await expect(page.getByText("Shell ready")).toBeVisible();
 }
 
 test("browser seam syncs after reconnect and keeps Complete through restart", async ({

@@ -23,6 +23,33 @@ function writeCache(threadId: string, enrichments: ThreadEnrichment[]): void {
   }
 }
 
+function enrichmentHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
+  if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
+  return headers;
+}
+
+/**
+ * Server Enrichments only — no localStorage fallback. Used by sync recovery
+ * so an empty server response can re-queue orphan Completes.
+ * Returns null when the network/API is unavailable.
+ */
+export async function fetchThreadEnrichmentsFromNetwork(
+  threadId: string,
+): Promise<ThreadEnrichment[] | null> {
+  try {
+    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
+      headers: enrichmentHeaders(),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
+    return body.enrichments ?? [];
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Thread Enrichments for review surfaces: fetched from the server when
  * online and retained locally so a previously reviewed Thread keeps its
@@ -32,15 +59,18 @@ export async function loadThreadEnrichments(
   threadId: string,
 ): Promise<ThreadEnrichment[]> {
   try {
-    const headers: Record<string, string> = {};
-    const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;
-    if (testUser) headers["x-walking-thoughts-test-user"] = testUser;
     const response = await fetch(`/api/enrichment/threads/${threadId}`, {
-      headers,
+      headers: enrichmentHeaders(),
     });
     if (!response.ok) return readCache(threadId);
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
     const enrichments = body.enrichments ?? [];
+    // Empty network payloads must not wipe a previously reviewed Thread —
+    // common during brief API blips or after a memory-only server window.
+    if (enrichments.length === 0) {
+      const cached = readCache(threadId);
+      if (cached.length > 0) return cached;
+    }
     writeCache(threadId, enrichments);
     return enrichments;
   } catch {

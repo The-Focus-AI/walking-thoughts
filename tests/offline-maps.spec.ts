@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-test("Offline topbar opens a dedicated Offline Region section", async ({
+test("Maps topbar opens a dedicated Offline Region section", async ({
   page,
 }) => {
   await page.goto("/offline");
-  await page.getByRole("link", { name: "Offline", exact: true }).click();
+  await page.getByRole("link", { name: "Maps", exact: true }).click();
   await expect(page).toHaveURL(/\/offline-maps$/);
   await expect(page.getByTestId("offline-maps-page")).toBeVisible();
   await expect(

@@ -116,7 +116,7 @@ test.describe("Map Journal", () => {
     ).toBeVisible();
     await expect(panel.getByText(/rev 2/)).toBeVisible();
     await expect(page.getByTestId("journal-connectivity")).toHaveText(
-      /Offline — Captures save on this device/,
+      /Network offline — Captures stay on this phone/,
     );
 
     const selected = await journal(page);
@@ -161,7 +161,7 @@ test.describe("Map Journal", () => {
     await waitForIdleMap(page);
     await expect.poll(() => journal(page).then((j) => j?.markerCount)).toBe(3);
     await expect(page.getByTestId("journal-connectivity")).toHaveText(
-      /Offline — Captures save on this device/,
+      /Network offline — Captures stay on this phone/,
     );
   });
 });

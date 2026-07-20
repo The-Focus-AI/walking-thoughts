@@ -30,7 +30,7 @@ test.describe("single-user Clerk boundary", () => {
     await expect(
       page.getByRole("region", { name: "Offline Region map" }),
     ).toBeVisible();
-    await expect(page.getByText("App cached")).toBeVisible();
+    await expect(page.getByText("Shell ready")).toBeVisible();
 
     await context.setOffline(true);
     await page.reload();

@@ -1,9 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("Outdoor Quick Capture dock records audio on press-and-hold and commits locally", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
+function installFakeRecorder(page: import("@playwright/test").Page) {
+  return page.addInitScript(() => {
     class FakeMediaRecorder {
       state: "inactive" | "recording" = "inactive";
       ondataavailable: ((event: { data: Blob }) => void) | null = null;
@@ -47,22 +45,65 @@ test("Outdoor Quick Capture dock records audio on press-and-hold and commits loc
       window as unknown as { MediaRecorder: typeof FakeMediaRecorder }
     ).MediaRecorder = FakeMediaRecorder;
   });
+}
 
+test("Outdoor Quick Capture stages audio for review before Capture", async ({
+  page,
+}) => {
+  await installFakeRecorder(page);
   await page.goto("/offline");
   await expect(page.getByLabel("Capture mode")).toBeVisible();
   await page.getByRole("button", { name: "Audio" }).click();
 
-  const hold = page.getByRole("button", { name: "Hold to record audio" });
+  const hold = page.getByRole("button", {
+    name: /Hold to record audio|Release to stop audio/,
+  });
   await hold.dispatchEvent("pointerdown");
+  await expect(page.getByTestId("recording-banner")).toBeVisible();
   await page.waitForTimeout(80);
   await hold.dispatchEvent("pointerup");
+
+  await expect(page.getByLabel("Selected media")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText(/Recording ready|review/i).first()).toBeVisible();
+  await page.getByRole("button", { name: "Capture" }).click();
 
   await expect(
     page.getByRole("article").filter({ hasText: /audio-/i }),
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Saved locally").first()).toBeVisible();
+  await expect(page.getByText(/Network offline|Network online/)).toBeVisible();
+});
+
+test("video record stages a preview draft instead of auto-committing", async ({
+  page,
+}) => {
+  await installFakeRecorder(page);
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture mode")).toBeVisible();
+  await page.getByRole("button", { name: "Video", exact: true }).click();
+
+  const record = page.getByRole("button", {
+    name: /Start video recording|Stop video recording/,
+  });
+  await expect(record).toBeVisible();
+  await record.click();
+  await expect(page.getByTestId("recording-banner")).toBeVisible();
+  await record.click();
+
+  const drafts = page.getByLabel("Selected media");
+  await expect(drafts).toBeVisible({ timeout: 10_000 });
+  await expect(drafts.locator("video.media-preview")).toBeVisible();
   await expect(
-    page.getByText(/Adding to|First Capture starts today's Thread/),
+    page.getByRole("button", { name: "Add photo or video" }),
   ).toBeVisible();
-  await expect(page.getByText(/GPS:/)).toBeVisible();
+  await expect(
+    page.getByRole("article").filter({ hasText: /video-/i }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Capture" }).click();
+  await expect(
+    page.getByRole("article").filter({ hasText: /video-/i }),
+  ).toBeVisible({ timeout: 10_000 });
 });

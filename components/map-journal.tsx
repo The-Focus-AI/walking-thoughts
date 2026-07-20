@@ -367,13 +367,13 @@ export function MapJournal() {
         </Link>
         <div className="journal-status" role="status">
           <Link className="topbar-link" href="/offline-maps">
-            Offline
+            Maps
           </Link>
           <span data-testid="journal-gps">{gpsLabel}</span>
           <span data-testid="journal-connectivity">
             {online
-              ? "Online — follow-ups enrich automatically"
-              : "Offline — Captures save on this device; Enrichment resumes online"}
+              ? "Network online — follow-ups enrich automatically"
+              : "Network offline — Captures stay on this phone; Enrichment resumes online"}
           </span>
         </div>
       </header>

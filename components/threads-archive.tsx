@@ -88,7 +88,7 @@ export function ThreadsArchive() {
         </div>
         <nav className="offline-maps-nav" aria-label="App">
           <Link className="topbar-link" href="/offline-maps">
-            Offline
+            Maps
           </Link>
           <Link className="topbar-link" href="/">
             Back to capture

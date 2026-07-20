@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { statusLabel } from "@/components/thread-entries";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
+import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
 import { readAvailableLocation } from "@/lib/local-capture/location";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
@@ -14,7 +16,6 @@ import type {
   LocalAttachment,
   LocalCapture,
   LocalThread,
-  MediaKind,
 } from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
 
@@ -24,12 +25,6 @@ type ThreadChatProps = {
   embedded?: boolean;
   onClose?: () => void;
 };
-
-function kindFromMime(mimeType: string): MediaKind {
-  if (mimeType.startsWith("audio/")) return "audio";
-  if (mimeType.startsWith("video/")) return "video";
-  return "image";
-}
 
 function CaptureBubble({
   capture,
@@ -91,6 +86,20 @@ function ChatAttachment({ attachment }: { attachment: LocalAttachment }) {
       <li>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt={attachment.fileName} className="chat-media" />
+      </li>
+    );
+  }
+  if (url && attachment.kind === "video") {
+    return (
+      <li>
+        <video className="chat-media" src={url} controls playsInline />
+      </li>
+    );
+  }
+  if (url && attachment.kind === "audio") {
+    return (
+      <li>
+        <audio className="chat-media" src={url} controls />
       </li>
     );
   }
@@ -261,8 +270,8 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
           <h1>{thread?.title ?? "Thread"}</h1>
           <p className="thread-chat-sub">
             {online
-              ? "Replies arrive here after Enrichment"
-              : "Offline — Captures save on this device"}
+              ? "Network online · Walking Thoughts replies appear here after Enrichment"
+              : "Network offline · Captures stay on this phone until you reconnect"}
             {thread ? ` · rev ${thread.revision}` : null}
           </p>
         </div>
@@ -278,7 +287,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
         ) : (
           <nav className="offline-maps-nav" aria-label="App">
             <Link className="topbar-link" href="/offline-maps">
-              Offline
+              Maps
             </Link>
             <Link className="topbar-link" href="/">
               Trail
@@ -342,34 +351,22 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
             }
           }}
         />
-        {media.length > 0 ? (
-          <ul className="capture-attachment-drafts" aria-label="Selected media">
-            {media.map((attachment, index) => (
-              <li key={`${attachment.fileName}-${index}`}>
-                {attachment.fileName}
-                <button
-                  type="button"
-                  className="capture-retry"
-                  onClick={() =>
-                    setMedia((current) =>
-                      current.filter((_, itemIndex) => itemIndex !== index),
-                    )
-                  }
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <AttachmentDrafts
+          attachments={media}
+          onRemove={(index) =>
+            setMedia((current) =>
+              current.filter((_, itemIndex) => itemIndex !== index),
+            )
+          }
+        />
         <div className="thread-chat-actions">
           <button
             type="button"
-            className="capture-retry"
+            className="capture-add-media"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
           >
-            Add media
+            Add photo or video
           </button>
           <input
             ref={fileRef}
@@ -377,18 +374,15 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
             type="file"
             accept="image/*,audio/*,video/*"
             multiple
-            aria-label="Add follow-up media"
+            aria-label="Add photo or video to follow-up"
             onChange={(event) => {
               const files = event.target.files;
               if (!files?.length) return;
               setMedia((current) => [
                 ...current,
-                ...Array.from(files).map((file) => ({
-                  kind: kindFromMime(file.type || "application/octet-stream"),
-                  mimeType: file.type || "application/octet-stream",
-                  fileName: file.name || "attachment",
-                  bytes: file,
-                })),
+                ...Array.from(files).map((file) =>
+                  attachmentInputFromFile(file),
+                ),
               ]);
               event.target.value = "";
             }}
