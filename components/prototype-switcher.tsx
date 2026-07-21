@@ -35,7 +35,12 @@ export function PrototypeSwitcher({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isProd = process.env.NODE_ENV === "production";
+  // Hide only on the real production deployment. Vercel preview builds run
+  // with NODE_ENV=production too, and previews are exactly where prototypes
+  // get reviewed — keep the switcher there.
+  const isProd = process.env.NEXT_PUBLIC_VERCEL_ENV
+    ? process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
+    : process.env.NODE_ENV === "production";
 
   const currentKey = searchParams.get(param) ?? options[0]?.key ?? "A";
   const currentIndex = Math.max(
