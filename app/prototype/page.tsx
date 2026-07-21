@@ -23,6 +23,19 @@ const TRAIL_CLEANUP = {
   ],
 } as const;
 
+const THREAD_REVIEW = {
+  review: [
+    { key: "A", label: "Field ledger", winner: false },
+    { key: "B", label: "Split lanes", winner: false },
+    { key: "C", label: "Recap first", winner: false },
+  ],
+  enrich: [
+    { key: "A", label: "Annotation card", winner: false },
+    { key: "B", label: "Margin notes", winner: false },
+    { key: "C", label: "Research dossier", winner: false },
+  ],
+} as const;
+
 const VIEWPORTS = [
   { key: "mobile", label: "Mobile" },
   { key: "desktop", label: "Desktop" },
@@ -34,6 +47,14 @@ function trailHref(
   viewport: string,
 ) {
   return `/prototype/trail-cleanup?viewport=${viewport}&area=${area}&variant=${variant}`;
+}
+
+function threadHref(
+  area: keyof typeof THREAD_REVIEW,
+  variant: string,
+  viewport: string,
+) {
+  return `/prototype/thread-review?viewport=${viewport}&area=${area}&variant=${variant}`;
 }
 
 export default function PrototypeIndexPage() {
@@ -114,6 +135,79 @@ export default function PrototypeIndexPage() {
                           <Link
                             key={viewport.key}
                             href={trailHref(area, variant.key, viewport.key)}
+                          >
+                            {viewport.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="proto-index-card" aria-labelledby="thread-review-title">
+        <div className="proto-index-card-head">
+          <div>
+            <h2 id="thread-review-title">Thread review</h2>
+            <p>
+              The Thread page as a post-walk review surface: denser layouts
+              that lead with what you wrote, plus markdown Enrichments with
+              sources, a visible research trace, and a follow-up checklist.
+            </p>
+          </div>
+          <div className="proto-index-open-row">
+            <Link
+              className="proto-index-open"
+              href="/prototype/thread-review?viewport=mobile&area=review&variant=A"
+            >
+              Open mobile
+            </Link>
+            <Link
+              className="proto-index-open secondary"
+              href="/prototype/thread-review?viewport=desktop&area=review&variant=A"
+            >
+              Open desktop
+            </Link>
+          </div>
+        </div>
+
+        <div className="proto-index-areas">
+          {(
+            Object.entries(THREAD_REVIEW) as Array<
+              [
+                keyof typeof THREAD_REVIEW,
+                (typeof THREAD_REVIEW)[keyof typeof THREAD_REVIEW],
+              ]
+            >
+          ).map(([area, variants]) => (
+            <div key={area} className="proto-index-area">
+              <h3>{area}</h3>
+              <ul>
+                {variants.map((variant) => (
+                  <li key={variant.key}>
+                    <div
+                      className={
+                        variant.winner
+                          ? "proto-index-variant winner"
+                          : "proto-index-variant"
+                      }
+                    >
+                      <span className="proto-index-key">{variant.key}</span>
+                      <span className="proto-index-variant-label">
+                        {variant.label}
+                        {variant.winner ? (
+                          <em className="proto-index-winner-tag"> winner</em>
+                        ) : null}
+                      </span>
+                      <div className="proto-index-viewport-links">
+                        {VIEWPORTS.map((viewport) => (
+                          <Link
+                            key={viewport.key}
+                            href={threadHref(area, variant.key, viewport.key)}
                           >
                             {viewport.label}
                           </Link>
