@@ -61,7 +61,8 @@ pack from Blob via `NEXT_PUBLIC_OFFLINE_REGION_HOME_BASE`. Keep
 `BLOB_REGION_READ_WRITE_TOKEN` on the public regions store separate from
 `BLOB_READ_WRITE_TOKEN` (private Capture media).
 
-`pmtiles` comes from mise (`ubi:protomaps/go-pmtiles`); tippecanoe and GDAL
+`pmtiles` installs on demand when `mise run region:build` runs (pinned
+`ubi:protomaps/go-pmtiles` via `mise exec`); tippecanoe and GDAL
 have no mise backend — install GDAL with
 `apt install gdal-bin python3-gdal python3-numpy` and build
 [felt/tippecanoe](https://github.com/felt/tippecanoe) with `make && make install`.

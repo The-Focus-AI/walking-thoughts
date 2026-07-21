@@ -1,18 +1,17 @@
+# GitHub-backed tools are pinned: "latest" forces an api.github.com version
+# lookup on every fresh container, and unauthenticated requests are limited to
+# 60/hour per (shared) IP. `mise run setup` also wires GITHUB_TOKEN into
+# .fnox/env so remaining lookups are authenticated.
 [tools]
-codex = "latest"
-fnox = "latest"
+fnox = "1.31.0"
 node = "24"
-pnpm = "latest"
+pnpm = "11.15.1"
 "npm:vercel" = "latest"
 "npm:skills" = "1.5.13"
-gh = "latest"
-jq = "latest"
-ripgrep = "latest"
+gh = "2.96.0"
+jq = "1.8.2"
+ripgrep = "15.2.0"
 "npm:clerk" = "latest"
-# Offline Region pipeline (region:build). tippecanoe and GDAL have no mise
-# backend; build-region.sh checks for them and they install via
-# `apt install gdal-bin python3-gdal python3-numpy` + felt/tippecanoe make.
-"ubi:protomaps/go-pmtiles" = { version = "latest", exe = "pmtiles" }
 
 # Tasks use bash features (pipefail). Keep inline task shell on bash.
 [settings]
@@ -34,6 +33,10 @@ if [ -z "${VERCEL_TOKEN:-}" ]; then
   VERCEL_TOKEN="$(op read 'op://Walking Thoughts - Development/VERCEL_TOKEN/password' 2>/dev/null || true)"
   export VERCEL_TOKEN
 fi
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  GITHUB_TOKEN="$(op read 'op://Walking Thoughts - Development/GITHUB_TOKEN/password' 2>/dev/null || true)"
+  export GITHUB_TOKEN
+fi
 bash scripts/bootstrap-fnox-env.sh
 if ! grep -q '^OP_SERVICE_ACCOUNT_TOKEN=.\+' .fnox/env 2>/dev/null; then
   echo "Missing OP_SERVICE_ACCOUNT_TOKEN. Add it to Cursor Cloud Secrets or the thefocus vault."
@@ -44,6 +47,11 @@ if grep -q '^VERCEL_TOKEN=.\+' .fnox/env 2>/dev/null; then
   echo "✓ VERCEL_TOKEN present — mise run vercel:sync works."
 else
   echo "ℹ Add VERCEL_TOKEN to Cursor Cloud Secrets (or Development vault) so agents can sync env to Vercel."
+fi
+if grep -q '^GITHUB_TOKEN=.\+' .fnox/env 2>/dev/null; then
+  echo "✓ GITHUB_TOKEN present — mise tool installs use the authenticated GitHub API."
+else
+  echo "ℹ Add GITHUB_TOKEN to Cursor Cloud Secrets (or Development vault) to avoid unauthenticated GitHub API rate limits during tool installs."
 fi
 '''
 
@@ -182,7 +190,11 @@ exit 2
 
 [tasks."region:build"]
 description = "Package one Offline Region (basemap, terrain, contours, fonts, manifest)"
-run = "bash scripts/offline-region/build-region.sh"
+# pmtiles is only needed here, so it installs on demand instead of sitting in
+# the global [tools] list. tippecanoe and GDAL have no mise backend;
+# build-region.sh checks for them and they install via
+# `apt install gdal-bin python3-gdal python3-numpy` + felt/tippecanoe make.
+run = "mise exec 'ubi:protomaps/go-pmtiles[exe=pmtiles]@1.31.1' -- bash scripts/offline-region/build-region.sh"
 
 [tasks."region:publish"]
 description = "Upload a built Offline Region pack to the public Vercel Blob store"
