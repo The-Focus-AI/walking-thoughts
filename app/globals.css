@@ -1437,6 +1437,23 @@ footer {
   box-shadow: 0 0 0 4px rgba(47, 123, 217, 0.25);
 }
 
+.journal-locate {
+  position: absolute;
+  right: 0.9rem;
+  bottom: 0.9rem;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fdf6ec;
+  color: #2f7bd9;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* Desktop: adjacent Thread panel beside the map. */
 @media (min-width: 851px) {
   .journal[data-selected="true"] .journal-surface {

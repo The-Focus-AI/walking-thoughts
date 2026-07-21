@@ -90,6 +90,43 @@ export function MapJournal() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
   const gpsMarkerRef = useRef<import("maplibre-gl").Marker | null>(null);
+  const centeredOnGpsRef = useRef(false);
+  const lastFixRef = useRef<{ latitude: number; longitude: number } | null>(
+    null,
+  );
+
+  // Draws (or moves) the location pin and brings it on screen once per map
+  // mount. Called from both the GPS watcher and map mount because either can
+  // finish first — a fix that lands before the map exists must not be lost.
+  const placeGpsPin = useCallback(
+    async (
+      map: import("maplibre-gl").Map,
+      fix: { latitude: number; longitude: number },
+    ) => {
+      const maplibre = await import("maplibre-gl");
+      if (!gpsMarkerRef.current) {
+        const dot = document.createElement("div");
+        dot.className = "journal-gps-dot";
+        gpsMarkerRef.current = new maplibre.default.Marker({ element: dot });
+        gpsMarkerRef.current.setLngLat([fix.longitude, fix.latitude]);
+        gpsMarkerRef.current.addTo(map);
+      } else {
+        gpsMarkerRef.current.setLngLat([fix.longitude, fix.latitude]);
+      }
+      if (!centeredOnGpsRef.current) {
+        const bounds = map.getMaxBounds();
+        if (!bounds || bounds.contains([fix.longitude, fix.latitude])) {
+          centeredOnGpsRef.current = true;
+          map.easeTo({
+            center: [fix.longitude, fix.latitude],
+            zoom: Math.max(map.getZoom(), 15),
+            duration: 800,
+          });
+        }
+      }
+    },
+    [],
+  );
   const hookRef = useRef({
     state: "loading" as JournalState["phase"],
     gps,
@@ -219,6 +256,7 @@ export function MapJournal() {
         return;
       }
       mapRef.current = map;
+      if (lastFixRef.current) void placeGpsPin(map, lastFixRef.current);
 
       const captures = await getCaptureStore().list();
       const markers = captureMarkers(captures);
@@ -260,10 +298,11 @@ export function MapJournal() {
       disposed = true;
       gpsMarkerRef.current?.remove();
       gpsMarkerRef.current = null;
+      centeredOnGpsRef.current = false;
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [state, baseUrl, region, openCapture]);
+  }, [state, baseUrl, region, openCapture, placeGpsPin]);
 
   // Live GPS only while the map surface is active; honest about absence.
   useEffect(() => {
@@ -285,20 +324,9 @@ export function MapJournal() {
           accuracy: position.coords.accuracy ?? null,
         };
         setGps(next);
-        void (async () => {
-          const map = mapRef.current;
-          if (!map) return;
-          const maplibre = await import("maplibre-gl");
-          if (!gpsMarkerRef.current) {
-            const dot = document.createElement("div");
-            dot.className = "journal-gps-dot";
-            gpsMarkerRef.current = new maplibre.default.Marker({ element: dot });
-            gpsMarkerRef.current.setLngLat([next.longitude, next.latitude]);
-            gpsMarkerRef.current.addTo(map);
-          } else {
-            gpsMarkerRef.current.setLngLat([next.longitude, next.latitude]);
-          }
-        })();
+        lastFixRef.current = next;
+        const map = mapRef.current;
+        if (map) void placeGpsPin(map, next);
       },
       () => setGps({ status: "unavailable" }),
       { enableHighAccuracy: true, maximumAge: 15_000 },
@@ -308,7 +336,7 @@ export function MapJournal() {
       navigator.geolocation.clearWatch(watchId);
       setGps({ status: "off" });
     };
-  }, [state.phase]);
+  }, [state.phase, placeGpsPin]);
 
   useEffect(() => {
     const onOnline = () => setOnline(true);
@@ -442,6 +470,41 @@ export function MapJournal() {
             className="journal-map"
             data-testid="journal-map"
           />
+
+          {gps.status === "tracking" && (
+            <button
+              type="button"
+              className="journal-locate"
+              aria-label="Center the map on my location"
+              data-testid="journal-locate"
+              onClick={() => {
+                const map = mapRef.current;
+                if (!map) return;
+                map.easeTo({
+                  center: [gps.longitude, gps.latitude],
+                  zoom: Math.max(map.getZoom(), 15),
+                  duration: 600,
+                });
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+                <path
+                  d="M12 1v4M12 19v4M1 12h4M19 12h4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+            </button>
+          )}
 
           <aside
             className="journal-panel"
