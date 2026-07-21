@@ -27,7 +27,7 @@ const THREAD_REVIEW = {
   review: [
     { key: "A", label: "Field ledger", winner: false },
     { key: "B", label: "Split lanes", winner: false },
-    { key: "C", label: "Recap first", winner: false },
+    { key: "C", label: "Recap first", winner: true },
   ],
   enrich: [
     { key: "A", label: "Annotation card", winner: false },
@@ -157,6 +157,10 @@ export default function PrototypeIndexPage() {
               The Thread page as a post-walk review surface: denser layouts
               that lead with what you wrote, plus markdown Enrichments with
               sources, a visible research trace, and a follow-up checklist.
+            </p>
+            <p className="proto-index-verdict" role="status">
+              Verdict: Review <strong>C</strong> (Recap first) · Enrich
+              undecided (PR #73). Winner highlighted below.
             </p>
           </div>
           <div className="proto-index-open-row">
