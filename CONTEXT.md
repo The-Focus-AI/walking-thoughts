@@ -5,16 +5,12 @@ Walking Thoughts captures observations and questions when connectivity is unavai
 ## Language
 
 **Capture**:
-A user-authored entry containing text, images, recorded audio, or video plus its available time and location context. It commits locally first and remains available without connectivity, whether created while walking or as an online Thread follow-up.
+A user-authored entry containing text, images, recorded audio, or video plus its available time and location context. It commits locally first, remains available without connectivity, and starts its own Thread unless deliberately added to an existing one.
 _Avoid_: Note, message, thought
 
-**Inbox**:
-A temporary holding place for Captures that have not been assigned to a Thread. When online processing begins, each remaining Inbox Capture becomes its own model-titled Thread.
-_Avoid_: Default thread, uncategorized
-
 **Thread**:
-A durable, chronological, append-only stream of related Captures and Enrichments.
-_Avoid_: Chat, conversation, folder
+A durable, chronological, append-only stream beginning with a single Capture, holding that Capture's Enrichments and any deliberate later additions. Untitled until its first Enrichment names it.
+_Avoid_: Chat, conversation, folder, inbox
 
 **Enrichment**:
 An AI-generated Thread entry based on that Thread's complete history at a recorded point, retaining which gateway model produced it. Examples include identification, explanation, transcription lookup, or research.
