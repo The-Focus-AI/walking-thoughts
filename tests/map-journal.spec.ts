@@ -76,6 +76,24 @@ test.describe("Map Journal", () => {
       latitude: TRAIL_FORK.latitude,
       longitude: TRAIL_FORK.longitude,
     });
+
+    // The first fix brings the location pin on screen.
+    await expect(page.locator(".journal-gps-dot")).toBeVisible();
+    const centerDistance = () =>
+      page.evaluate((fix) => {
+        const center = (window as JournalWindow).__WT_REGION_MAP__!.getCenter();
+        return Math.hypot(
+          center.lat - fix.latitude,
+          center.lng - fix.longitude,
+        );
+      }, TRAIL_FORK);
+    await expect.poll(centerDistance).toBeLessThan(0.0005);
+
+    // Panning away, the locate button returns to the pin.
+    await jumpToIdle(page, [-73.3352, 41.8391], 15);
+    expect(await centerDistance()).toBeGreaterThan(0.0005);
+    await page.getByTestId("journal-locate").click();
+    await expect.poll(centerDistance).toBeLessThan(0.0005);
   });
 
   test("opens a Capture preview with complete Thread context and commits an offline follow-up", async ({
