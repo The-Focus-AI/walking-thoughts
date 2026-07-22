@@ -41,7 +41,7 @@
       "source": "vercel-labs/skills",
       "sourceType": "github",
       "skillPath": "skills/find-skills/SKILL.md",
-      "computedHash": "781bd6d3f9b19f8c9af6b53d8d0e4876d0183841b565db34ca7092ffa412d111"
+      "computedHash": "913b9d37d0d54047dd65222bb8c67b2bf04e3cb87dcad1729068d7a8b2c8c396"
     },
     "firecrawl": {
       "source": "firecrawl/cli",
@@ -215,7 +215,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/to-tickets/SKILL.md",
-      "computedHash": "5d79577541b5cf6dade61c69844432ea20ce7b12527cdda1dd4d6fe8d59a135d"
+      "computedHash": "0349eee265e7005e667b4543de849672106c46d545e998f37d3319300bb07751"
     },
     "triage": {
       "source": "mattpocock/skills",
@@ -233,7 +233,7 @@
       "source": "vercel-labs/webreel",
       "sourceType": "github",
       "skillPath": "skills/webreel/SKILL.md",
-      "computedHash": "9acf843b0d7baf0afed49309127b4ded8d6c45ce43c9603492e048ba76e5d2d9"
+      "computedHash": "dd65fb3d4e09979f966d1efc33f9dc2efe2b21fa3900e87bb6f8192844b70d6d"
     },
     "writing-great-skills": {
       "source": "mattpocock/skills",
