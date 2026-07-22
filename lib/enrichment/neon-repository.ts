@@ -497,6 +497,17 @@ export function createNeonEnrichmentRepository(
       };
     },
 
+    async resetInclusions(userId, captureIds) {
+      await ensure();
+      if (captureIds.length === 0) return 0;
+      const deleted = (await sql`
+        DELETE FROM enrichment_inclusions
+        WHERE user_id = ${userId} AND capture_id = ANY(${captureIds})
+        RETURNING capture_id
+      `) as Array<{ capture_id: string }>;
+      return deleted.length;
+    },
+
     async requeueFailed(userId, jobId) {
       await ensure();
       if (jobId) {

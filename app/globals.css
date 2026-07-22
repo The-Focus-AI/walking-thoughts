@@ -2133,3 +2133,11 @@ footer {
   color: var(--moss);
   border-color: rgba(169, 209, 143, 0.4);
 }
+
+.thread-split {
+  color: var(--sun);
+}
+
+.thread-split:hover {
+  border-color: var(--sun);
+}

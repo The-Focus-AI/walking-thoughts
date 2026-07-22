@@ -254,6 +254,38 @@ export function createMemoryCaptureStore(
       draft = "";
       return capture;
     },
+    async applyThreadSplit(split) {
+      const moveByCapture = new Map(
+        split.moves.map((move) => [move.captureId, move]),
+      );
+      captures = captures.map((capture) => {
+        const move = moveByCapture.get(capture.id);
+        if (!move) return capture;
+        return {
+          ...capture,
+          threadId: move.threadId,
+          sequence: 1,
+          status: "enriching",
+          syncReason: null,
+          syncRetryable: undefined,
+        };
+      });
+      for (const move of split.moves) {
+        if (!threads.some((thread) => thread.id === move.threadId)) {
+          threads = upsertThread(threads, {
+            id: move.threadId,
+            title: move.title,
+            revision: 1,
+            updatedAt: move.createdAt,
+          });
+        }
+      }
+      if (split.trashedThreadId) {
+        threads = threads.filter(
+          (thread) => thread.id !== split.trashedThreadId,
+        );
+      }
+    },
     async markSyncing(ids) {
       const idSet = new Set(ids);
       captures = captures.map((capture) =>
@@ -826,6 +858,63 @@ export function createIdbCaptureStore(): CaptureStore {
           }),
         );
         throw error;
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyThreadSplit(split) {
+      const db = await openDatabase();
+      try {
+        const existingCaptures = (
+          (await requestToPromise(
+            db.transaction("captures", "readonly").objectStore("captures").getAll(),
+          )) as LocalCapture[]
+        ).map(normalizeCapture);
+        const existingThreads = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").getAll(),
+        )) as LocalThread[];
+
+        const moveByCapture = new Map(
+          split.moves.map((move) => [move.captureId, move]),
+        );
+        const nextCaptures = existingCaptures.map((capture) => {
+          const move = moveByCapture.get(capture.id);
+          if (!move) return capture;
+          return {
+            ...capture,
+            threadId: move.threadId,
+            sequence: 1,
+            status: "enriching" as const,
+            syncReason: null,
+            syncRetryable: undefined,
+          };
+        });
+        let nextThreads = [...existingThreads];
+        for (const move of split.moves) {
+          if (!nextThreads.some((thread) => thread.id === move.threadId)) {
+            nextThreads = upsertThread(nextThreads, {
+              id: move.threadId,
+              title: move.title,
+              revision: 1,
+              updatedAt: move.createdAt,
+            });
+          }
+        }
+
+        const transaction = db.transaction(["captures", "threads"], "readwrite");
+        const captureStore = transaction.objectStore("captures");
+        const threadStore = transaction.objectStore("threads");
+        for (const capture of nextCaptures) {
+          captureStore.put(capture);
+        }
+        for (const thread of nextThreads) {
+          threadStore.put(thread);
+        }
+        if (split.trashedThreadId) {
+          threadStore.delete(split.trashedThreadId);
+        }
+        await transactionDone(transaction);
       } finally {
         db.close();
       }

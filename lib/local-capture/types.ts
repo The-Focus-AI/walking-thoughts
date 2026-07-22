@@ -143,6 +143,20 @@ export type CaptureStore = {
     location: CaptureLocation | null,
     options?: CommitOptions,
   ): Promise<LocalCapture>;
+  /**
+   * Apply a server Thread split locally: each listed Capture moves into its
+   * own Thread (sequence 1, status back to enriching so the redo is visible)
+   * and the emptied source Thread row is dropped.
+   */
+  applyThreadSplit(split: {
+    moves: Array<{
+      captureId: string;
+      threadId: string;
+      title: string;
+      createdAt: string;
+    }>;
+    trashedThreadId: string | null;
+  }): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
   applySyncBatch(batch: SyncBatchApplication): Promise<void>;

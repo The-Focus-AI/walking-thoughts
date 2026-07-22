@@ -8,6 +8,7 @@ import type {
   SyncCapturePayload,
   SyncCaptureResult,
   ThreadRepository,
+  ThreadSplitResult,
   TrashBatchResponse,
   TrashMutation,
   TrashMutationResult,
@@ -332,6 +333,60 @@ export function createMemoryThreadRepository(
           } satisfies ServerThread;
         })
         .filter((thread) => thread.captures.length > 0);
+    },
+
+    async splitThread(userId, threadId, now = new Date().toISOString()) {
+      const db = state();
+      const captures = [...db.captures.values()]
+        .filter(
+          (capture) =>
+            capture.userId === userId &&
+            capture.threadId === threadId &&
+            !isTrashed(db, userId, "capture", capture.id),
+        )
+        .sort((a, b) => a.sequence - b.sequence);
+
+      const result: ThreadSplitResult = { moves: [], trashedThreadId: null };
+      if (captures.length <= 1) return result;
+
+      for (const capture of captures) {
+        const newThreadId = capture.id;
+        const title = titleFromText(capture.text || "Capture");
+        const key = `${userId}:${newThreadId}`;
+        if (!db.threads.has(key)) {
+          db.threads.set(key, {
+            id: newThreadId,
+            userId,
+            title,
+            revision: 1,
+            updatedAt: capture.createdAt,
+          });
+        }
+        db.captures.set(`${userId}:${capture.id}`, {
+          ...capture,
+          threadId: newThreadId,
+          sequence: 1,
+        });
+        result.moves.push({
+          captureId: capture.id,
+          threadId: newThreadId,
+          title,
+          createdAt: capture.createdAt,
+        });
+      }
+
+      // Media now belongs to the moved Captures — the emptied Thread's
+      // Trash record must not claim (and later purge) any attachments.
+      applyTrash(db, userId, {
+        action: "trash",
+        kind: "thread",
+        targetId: threadId,
+        trashedAt: now,
+        attachmentIds: [],
+        idempotencyKey: `split:${threadId}`,
+      });
+      result.trashedThreadId = threadId;
+      return result;
     },
 
     async applyTrashMutations(userId, mutations) {

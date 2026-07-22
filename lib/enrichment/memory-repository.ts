@@ -217,6 +217,15 @@ export function createMemoryEnrichmentRepository(
       return { job: nextJob, enrichment: stored, created };
     },
 
+    async resetInclusions(userId, captureIds) {
+      const db = state();
+      let count = 0;
+      for (const captureId of captureIds) {
+        if (db.includedBy.delete(`${userId}:${captureId}`)) count += 1;
+      }
+      return count;
+    },
+
     async requeueFailed(userId, jobId) {
       const db = state();
       let count = 0;
