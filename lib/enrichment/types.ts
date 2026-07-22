@@ -164,6 +164,11 @@ export type EnrichmentRepository = {
     },
   ): Promise<{ job: EnrichmentJob; enrichment: ThreadEnrichment; created: boolean }>;
   requeueFailed(userId: string, jobId?: string): Promise<number>;
+  /**
+   * Forget which Enrichment included these Captures so the queue researches
+   * them again — used after a Thread split moves them into fresh Threads.
+   */
+  resetInclusions(userId: string, captureIds: string[]): Promise<number>;
 };
 
 export type { ResearchClient, ResearchStep, WebSearchClient, WebSearchResult };

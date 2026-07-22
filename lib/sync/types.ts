@@ -112,12 +112,35 @@ export type PurgeExpiredResult = {
   duplicate: boolean;
 };
 
+export type ThreadSplitMove = {
+  captureId: string;
+  threadId: string;
+  title: string;
+  createdAt: string;
+};
+
+export type ThreadSplitResult = {
+  moves: ThreadSplitMove[];
+  /** The emptied source Thread, moved to Trash (30-day recovery). */
+  trashedThreadId: string | null;
+};
+
 export type ThreadRepository = {
   upsertCaptures(
     userId: string,
     captures: SyncCapturePayload[],
   ): Promise<SyncBatchResponse>;
   listThreads(userId: string): Promise<ServerThread[]>;
+  /**
+   * Break a multi-Capture Thread apart (ADR 0011 repair): every Capture
+   * moves into its own Thread (id = capture id, sequence 1) and the emptied
+   * source Thread is trashed with no attachment claims. Idempotent.
+   */
+  splitThread(
+    userId: string,
+    threadId: string,
+    now?: string,
+  ): Promise<ThreadSplitResult>;
   updateThreadTitle?(
     userId: string,
     threadId: string,

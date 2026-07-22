@@ -8,6 +8,7 @@ import type {
   SyncCapturePayload,
   SyncCaptureResult,
   ThreadRepository,
+  ThreadSplitResult,
   TrashBatchResponse,
   TrashMutation,
   TrashMutationResult,
@@ -363,6 +364,59 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         SET title = ${title}
         WHERE user_id = ${userId} AND id = ${threadId}
       `;
+    },
+
+    async splitThread(userId, threadId, now = new Date().toISOString()) {
+      await ensure();
+      const captures = (await sql`
+        SELECT id, text, created_at
+        FROM sync_captures
+        WHERE user_id = ${userId} AND thread_id = ${threadId}
+          AND NOT EXISTS (
+            SELECT 1 FROM sync_trash
+            WHERE sync_trash.user_id = ${userId}
+              AND sync_trash.kind = 'capture'
+              AND sync_trash.target_id = sync_captures.id
+          )
+        ORDER BY sequence ASC
+      `) as Array<{ id: string; text: string; created_at: string }>;
+
+      const result: ThreadSplitResult = { moves: [], trashedThreadId: null };
+      if (captures.length <= 1) return result;
+
+      for (const capture of captures) {
+        const newThreadId = capture.id;
+        const title = titleFromText(capture.text || "Capture");
+        await sql`
+          INSERT INTO sync_threads (id, user_id, title, revision, updated_at)
+          VALUES (${newThreadId}, ${userId}, ${title}, 1, ${capture.created_at})
+          ON CONFLICT (id) DO NOTHING
+        `;
+        await sql`
+          UPDATE sync_captures
+          SET thread_id = ${newThreadId}, sequence = 1
+          WHERE user_id = ${userId} AND id = ${capture.id}
+        `;
+        result.moves.push({
+          captureId: capture.id,
+          threadId: newThreadId,
+          title,
+          createdAt: capture.created_at,
+        });
+      }
+
+      // Media now belongs to the moved Captures — the emptied Thread's
+      // Trash record must not claim (and later purge) any attachments.
+      await applyOneTrash(userId, {
+        action: "trash",
+        kind: "thread",
+        targetId: threadId,
+        trashedAt: now,
+        attachmentIds: [],
+        idempotencyKey: `split:${threadId}`,
+      });
+      result.trashedThreadId = threadId;
+      return result;
     },
 
     async applyTrashMutations(userId, mutations) {

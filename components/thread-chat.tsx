@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
@@ -19,6 +20,7 @@ import type {
   LocalThread,
 } from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
+import { getSplitTransport } from "@/lib/sync/split-client";
 import { threadToMarkdown } from "@/lib/thread-export/markdown";
 
 type ThreadChatProps = {
@@ -147,8 +149,10 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
   const [draft, setDraft] = useState("");
   const [media, setMedia] = useState<AttachmentInput[]>([]);
   const [busy, setBusy] = useState(false);
+  const [splitting, setSplitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+  const router = useRouter();
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -221,6 +225,28 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
     };
   }, []);
 
+  /** ADR 0011 repair: break a merged Thread into one Thread per Capture. */
+  async function splitIntoThreads() {
+    if (splitting) return;
+    setSplitting(true);
+    setError(null);
+    try {
+      const result = await getSplitTransport().splitThread(threadId);
+      if (!result || result.moves.length === 0) {
+        setError("Could not split this Thread — check the connection");
+        return;
+      }
+      const store = getCaptureStore();
+      await store.applyThreadSplit(result);
+      void runSyncCycle({ store });
+      router.push("/threads");
+    } catch {
+      setError("Could not split this Thread");
+    } finally {
+      setSplitting(false);
+    }
+  }
+
   async function copyAsMarkdown() {
     if (!thread) return;
     const markdown = threadToMarkdown({ thread, captures, enrichments });
@@ -288,6 +314,18 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
           </p>
         </div>
         <div className="thread-chat-tools">
+          {!embedded && captures.length > 1 ? (
+            <button
+              type="button"
+              className="thread-copy-markdown thread-split"
+              data-testid="thread-split"
+              onClick={() => void splitIntoThreads()}
+              disabled={splitting || !online}
+              title="Move each Capture into its own Thread and research it again"
+            >
+              {splitting ? "Splitting…" : "Split into Threads"}
+            </button>
+          ) : null}
           <button
             type="button"
             className="thread-copy-markdown"
