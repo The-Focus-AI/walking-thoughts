@@ -57,8 +57,9 @@ export type RemoteThreadMerge = {
 /**
  * Merge server Threads into local Capture/Thread state.
  * Missing remote Captures are imported as Complete (already synchronized).
- * Existing local Captures are never rewritten; Threads with pending local
- * Captures keep their local title until those Captures sync.
+ * Local Captures that still own outbound work are never rewritten; already
+ * synchronized Captures adopt the server's Thread assignment. Threads with
+ * pending local Captures keep their local title until those Captures sync.
  */
 export function mergeRemoteThreads(input: {
   localCaptures: LocalCapture[];
@@ -75,7 +76,21 @@ export function mergeRemoteThreads(input: {
     let importedIntoThread = 0;
 
     for (const remoteCapture of remote.captures) {
-      if (byId.has(remoteCapture.id)) {
+      const existing = byId.get(remoteCapture.id);
+      if (existing) {
+        // Synced Captures follow server re-threading (e.g. legacy day Threads
+        // split into one Thread per Capture) while keeping local media state.
+        if (
+          !isLocalAuthoritative(existing.status) &&
+          (existing.threadId !== remote.id ||
+            existing.sequence !== remoteCapture.sequence)
+        ) {
+          byId.set(remoteCapture.id, {
+            ...existing,
+            threadId: remote.id,
+            sequence: remoteCapture.sequence,
+          });
+        }
         continue;
       }
 

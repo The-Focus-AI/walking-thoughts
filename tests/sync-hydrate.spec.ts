@@ -128,6 +128,63 @@ test("applyRemoteThreads leaves unsynced local Captures and Thread titles author
   expect((await desktop.listRecentThreads())[0]?.title).toBe(localTitle);
 });
 
+test("applyRemoteThreads re-homes synced Captures when the server splits a Thread", async () => {
+  const desktop = createMemoryCaptureStore();
+  await desktop.applyRemoteThreads([
+    phoneThread({
+      title: "Legacy day Thread",
+      revision: 2,
+      captures: [
+        ...phoneThread().captures,
+        {
+          id: "capture-phone-2",
+          text: "Second walk note",
+          createdAt: "2026-07-20T15:00:00.000Z",
+          location: null,
+          sequence: 2,
+          attachments: [],
+        },
+      ],
+    }),
+  ]);
+
+  // Server splits the day Thread: each Capture now lives in its own Thread.
+  await desktop.applyRemoteThreads([
+    phoneThread({ title: "Ridge line opens west" }),
+    {
+      id: "capture-phone-2",
+      title: "Second walk note",
+      revision: 1,
+      updatedAt: "2026-07-20T15:00:00.000Z",
+      captures: [
+        {
+          id: "capture-phone-2",
+          text: "Second walk note",
+          createdAt: "2026-07-20T15:00:00.000Z",
+          location: null,
+          sequence: 1,
+          attachments: [],
+        },
+      ],
+    },
+  ]);
+
+  const captures = await desktop.list();
+  expect(captures.find((c) => c.id === "capture-phone-2")).toMatchObject({
+    threadId: "capture-phone-2",
+    sequence: 1,
+    status: "complete",
+  });
+  expect(captures.find((c) => c.id === "capture-phone")).toMatchObject({
+    threadId: "thread-phone",
+    sequence: 1,
+  });
+  const split = await desktop.listThread("capture-phone-2");
+  expect(split.captures.map((c) => c.id)).toEqual(["capture-phone-2"]);
+  const original = await desktop.listThread("thread-phone");
+  expect(original.captures.map((c) => c.id)).toEqual(["capture-phone"]);
+});
+
 test("applyRemoteThreads does not surface Captures hidden by local Trash", async () => {
   const desktop = createMemoryCaptureStore();
   await desktop.applyRemoteThreads([phoneThread()]);
