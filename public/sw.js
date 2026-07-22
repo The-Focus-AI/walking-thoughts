@@ -1,5 +1,5 @@
 // Keep in sync with SHELL_CACHE_NAME in lib/offline-shell.ts.
-const CACHE_NAME = "walking-thoughts-shell-v9";
+const CACHE_NAME = "walking-thoughts-shell-v10";
 const SHELL = [
   "/offline",
   "/journal",
@@ -33,11 +33,25 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
+    // Network-first, and every successful online visit refreshes the cached
+    // shell copy — otherwise a deploy that leaves sw.js byte-identical would
+    // strand offline walkers on the old build's HTML forever.
     event.respondWith(
-      fetch(request).catch(
-        async () =>
-          (await caches.match(url.pathname)) || caches.match("/offline"),
-      ),
+      fetch(request)
+        .then((response) => {
+          if (response.ok && SHELL.includes(url.pathname)) {
+            const copy = response.clone();
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(url.pathname, copy))
+              .catch(() => undefined);
+          }
+          return response;
+        })
+        .catch(
+          async () =>
+            (await caches.match(url.pathname)) || caches.match("/offline"),
+        ),
     );
     return;
   }
