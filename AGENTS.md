@@ -45,6 +45,28 @@ Cloud Agent tokens often lack `issues:write`. Merging to `main` with
 (`.github/workflows/agent-ticket-claim.yml`) fails `cursor/*` PRs that omit it.
 Details: `docs/agents/issue-workflow.md`.
 
+## Reaching the databases and other secrets
+
+`OP_SERVICE_ACCOUNT_TOKEN` in the session environment is the entry point to
+every secret, including the Neon `DATABASE_URL`. Do not ask the human for
+credentials; resolve them yourself:
+
+1. `mise run setup` — pulls bootstrap tokens into gitignored `.fnox/env`.
+2. `fnox exec --profile <profile> -- <command>` — runs a command with that
+   environment's secrets resolved from its 1Password vault: `default`
+   (Development), `preview`, or `prod` (Production).
+
+Example — run a maintenance script against the Production database:
+
+```sh
+mise run setup
+fnox exec --profile prod -- node scripts/split-grouped-threads.mjs
+```
+
+Production data changes must dry-run first, print exactly what will change,
+and only write behind an explicit `--apply`-style flag. Never print secret
+values; `fnox exec` keeps them out of the transcript.
+
 ## Cursor Cloud specific instructions
 
 `.cursor/environment.json` runs `.cursor/install.sh` on each machine boot. That
