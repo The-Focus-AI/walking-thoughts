@@ -206,11 +206,6 @@ export function createMemoryCaptureStore(
     async list() {
       return newestFirst(visibleCaptures());
     },
-    async listInbox() {
-      return newestFirst(
-        visibleCaptures().filter((capture) => capture.threadId === null),
-      );
-    },
     async listRecentThreads() {
       return [...visibleThreads()].sort((a, b) =>
         a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
@@ -240,9 +235,8 @@ export function createMemoryCaptureStore(
         inputs,
       );
       const resolved = resolveCommitDestination({
-        destination: options.destination ?? { type: "inbox" },
+        destination: options.destination ?? { type: "new_thread" },
         text: base.text || attachments[0]?.fileName || "Capture",
-        captures,
         threads,
         createId,
         now: createTimestamp,
@@ -712,11 +706,6 @@ export function createIdbCaptureStore(): CaptureStore {
       }
     },
 
-    async listInbox() {
-      const captures = await this.list();
-      return captures.filter((capture) => capture.threadId === null);
-    },
-
     async listRecentThreads() {
       const db = await openDatabase();
       try {
@@ -799,16 +788,10 @@ export function createIdbCaptureStore(): CaptureStore {
         const existingThreads = (await requestToPromise(
           db.transaction("threads", "readonly").objectStore("threads").getAll(),
         )) as LocalThread[];
-        const existingCaptures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
 
         const resolved = resolveCommitDestination({
-          destination: options.destination ?? { type: "inbox" },
+          destination: options.destination ?? { type: "new_thread" },
           text: base.text || attachments[0]?.fileName || "Capture",
-          captures: existingCaptures,
           threads: existingThreads,
           createId,
           now: createTimestamp,

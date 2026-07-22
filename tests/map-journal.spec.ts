@@ -142,9 +142,9 @@ test.describe("Map Journal", () => {
 
     // Follow-up goes through the ordinary Capture pipeline, offline.
     await panel
-      .getByLabel("Follow-up Capture")
+      .getByLabel("Reply in this Thread")
       .fill("Returning tomorrow with the trail camera");
-    await panel.getByRole("button", { name: "Send" }).click();
+    await panel.getByRole("button", { name: "Reply", exact: true }).click();
     await expect(
       panel.getByText("Returning tomorrow with the trail camera"),
     ).toBeVisible();

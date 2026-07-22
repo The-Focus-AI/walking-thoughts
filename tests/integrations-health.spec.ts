@@ -73,7 +73,7 @@ test("missing or failing probes surface degraded service status", () => {
   expect(report.services.blob.status).toBe("missing");
   expect(report.services.gateway.status).toBe("missing");
   expect(report.services.search.status).toBe("missing");
-  expect(report.services.search.detail).toBe("TAVILY_API_KEY");
+  expect(report.services.search.detail).toBe("FIRECRAWL_API_KEY");
   expect(report.services.push.status).toBe("missing");
   expect(report.services.queue.status).toBe("error");
   expect(report.status).toBe("degraded");

@@ -68,7 +68,9 @@ test("remove-from-device appears only after verified sync and keeps Thread conte
   await article.getByRole("button", { name: "Remove from device" }).click();
   await expect(article.getByText("Online only")).toBeVisible();
   await expect(article.getByText("ridge.jpg")).toBeVisible();
-  await expect(article.getByText("Ridge wind after rain")).toBeVisible();
+  await expect(
+    article.getByText("Ridge wind after rain", { exact: true }),
+  ).toBeVisible();
 
   await page.context().setOffline(true);
   await page.reload();

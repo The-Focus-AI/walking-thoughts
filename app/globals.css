@@ -1839,3 +1839,297 @@ footer {
   background: #f0b4a0;
   box-shadow: 0 0 0 3px rgba(240, 180, 160, 0.14);
 }
+
+/* --- Walk view: day photo strip + dense rows ------------------------------ */
+
+.threads-day-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.threads-day-photo {
+  display: block;
+  width: 6.4rem;
+  height: 4.8rem;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.threads-day-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thread-row-words {
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Thread page: Capture hero -------------------------------------------- */
+
+.thread-chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.thread-copy-markdown {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  color: var(--moss);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.thread-copy-markdown:hover {
+  border-color: var(--moss);
+}
+
+.thread-capture-hero {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(169, 209, 143, 0.35);
+  background: rgba(169, 209, 143, 0.07);
+}
+
+.thread-capture-words {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.thread-capture-media {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.thread-capture-media .chat-media {
+  max-width: min(100%, 16rem);
+  border-radius: 0.6rem;
+}
+
+.thread-capture-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.thread-media-name {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* --- Enrichment report: markdown + sources + research trace --------------- */
+
+.enrichment-report {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid rgba(244, 207, 114, 0.65);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.enrichment-report-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.7rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.enrichment-report-mark {
+  color: var(--sun);
+}
+
+.enrichment-report-pending p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.enrichment-markdown {
+  display: grid;
+  gap: 0.55rem;
+  line-height: 1.55;
+  color: var(--ink);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.enrichment-markdown p,
+.enrichment-markdown ul,
+.enrichment-markdown ol,
+.enrichment-markdown blockquote,
+.enrichment-markdown pre,
+.enrichment-markdown h1,
+.enrichment-markdown h2,
+.enrichment-markdown h3,
+.enrichment-markdown h4 {
+  margin: 0;
+}
+
+.enrichment-markdown h1,
+.enrichment-markdown h2,
+.enrichment-markdown h3,
+.enrichment-markdown h4 {
+  color: var(--moss);
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.enrichment-markdown ul,
+.enrichment-markdown ol {
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.enrichment-markdown blockquote {
+  padding: 0.4rem 0.75rem;
+  border-left: 3px solid var(--sun);
+  background: rgba(244, 207, 114, 0.08);
+  font-style: italic;
+}
+
+.enrichment-markdown a {
+  color: var(--moss);
+  font-weight: 700;
+}
+
+.enrichment-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.3rem;
+}
+
+.enrichment-markdown pre {
+  overflow-x: auto;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.enrichment-markdown table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.enrichment-markdown th,
+.enrichment-markdown td {
+  border: 1px solid var(--line);
+  padding: 0.3rem 0.55rem;
+  text-align: left;
+}
+
+.enrichment-source-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.enrichment-source-chips li a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(169, 209, 143, 0.35);
+  background: rgba(169, 209, 143, 0.08);
+  color: var(--moss);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.enrichment-source-index {
+  color: var(--sun);
+  font-weight: 800;
+}
+
+.enrichment-trace {
+  border: 1px dashed var(--line);
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.enrichment-trace summary {
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.enrichment-trace ol {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.enrichment-trace li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+}
+
+.enrichment-trace a {
+  color: var(--moss);
+}
+
+.trace-tool {
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.trace-tool-firecrawl {
+  color: #f0c4a0;
+  border-color: rgba(240, 196, 160, 0.4);
+}
+
+.trace-tool-tavily,
+.trace-tool-fake {
+  color: var(--moss);
+  border-color: rgba(169, 209, 143, 0.4);
+}

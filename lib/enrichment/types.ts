@@ -1,4 +1,5 @@
 import type { CaptureLocation, MediaKind } from "@/lib/local-capture/types";
+import type { ResearchClient, ResearchStep } from "./research";
 import type { WebSearchClient, WebSearchResult } from "./search";
 
 export type EnrichmentJobStatus = "queued" | "running" | "failed" | "complete";
@@ -49,6 +50,8 @@ export type ThreadEnrichment = {
   createdAt: string;
   title?: string | null;
   sources: EnrichmentSource[];
+  /** Tool calls (searches, page reads) the model made while researching. */
+  research?: ResearchStep[];
 };
 
 export type EnrichmentCaptureResult = {
@@ -79,6 +82,7 @@ export type GatewayGeneration = {
   model: string;
   title: string | null;
   sources: EnrichmentSource[];
+  research: ResearchStep[];
 };
 
 export type GatewayGenerateInput = {
@@ -88,7 +92,8 @@ export type GatewayGenerateInput = {
   /** When true, ask the model for a short Thread title. */
   requestTitle: boolean;
   media: GatewayMediaPart[];
-  search?: WebSearchClient;
+  /** Research tools (web_search, read_page) offered to the model. */
+  search?: ResearchClient;
 };
 
 export type GatewayClient = {
@@ -155,9 +160,10 @@ export type EnrichmentRepository = {
       model: string;
       title: string | null;
       sources: EnrichmentSource[];
+      research?: ResearchStep[];
     },
   ): Promise<{ job: EnrichmentJob; enrichment: ThreadEnrichment; created: boolean }>;
   requeueFailed(userId: string, jobId?: string): Promise<number>;
 };
 
-export type { WebSearchResult };
+export type { ResearchClient, ResearchStep, WebSearchClient, WebSearchResult };

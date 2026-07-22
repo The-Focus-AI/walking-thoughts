@@ -13,7 +13,12 @@ import {
   type NearbyPlace,
   type NearbyPlaceResolver,
 } from "./place";
-import { getWebSearchClient, type WebSearchClient } from "./search";
+import {
+  getResearchClient,
+  researchClientFromWebSearch,
+  type ResearchClient,
+} from "./research";
+import type { WebSearchClient } from "./search";
 import { buildEnrichmentPrompt } from "./system-instruction";
 import type {
   EnrichmentBatchResponse,
@@ -186,7 +191,7 @@ async function runJob(
   system: string,
   blobStore: PrivateBlobStore,
   placeResolver: NearbyPlaceResolver,
-  search: WebSearchClient | undefined,
+  search: ResearchClient | undefined,
   push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
@@ -282,6 +287,7 @@ async function runJob(
       model: generation.model,
       title: generation.title,
       sources: generation.sources,
+      research: generation.research,
     });
 
     if (completed.created) {
@@ -331,7 +337,7 @@ export async function processPendingEnrichments(
     threadRepository?: ThreadRepository;
     blobStore?: PrivateBlobStore;
     placeResolver?: NearbyPlaceResolver;
-    search?: WebSearchClient;
+    search?: WebSearchClient | ResearchClient;
     pushRepository?: PushRepository;
     pushSender?: PushSender | null;
   } = {},
@@ -344,7 +350,9 @@ export async function processPendingEnrichments(
     getPrivateBlobStore(environment as NodeJS.ProcessEnv);
   const placeResolver =
     options.placeResolver ?? getNearbyPlaceResolver(environment);
-  const search = options.search ?? getWebSearchClient(environment) ?? undefined;
+  const search = options.search
+    ? researchClientFromWebSearch(options.search)
+    : (getResearchClient(environment) ?? undefined);
   const pushRepository =
     options.pushRepository ??
     getPushRepository(environment as NodeJS.ProcessEnv);

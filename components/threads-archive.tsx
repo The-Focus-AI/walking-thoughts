@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { SyncStatusPill } from "@/components/sync-status-pill";
@@ -12,9 +11,13 @@ import {
   calendarDayKey,
   formatDayHeading,
 } from "@/lib/local-capture/calendar-day";
-import { getDestinationSession } from "@/lib/local-capture/destination";
+import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import type { LocalCapture, LocalThread } from "@/lib/local-capture/types";
+import type {
+  LocalAttachment,
+  LocalCapture,
+  LocalThread,
+} from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
 import { syncRollup } from "@/lib/sync/rollup";
 
@@ -37,17 +40,53 @@ function threadStatusChip(captures: LocalCapture[]): {
     return { label: "Waiting to sync", tone: "busy" };
   }
   if (rollup.enriching > 0) {
-    return { label: "Enriching", tone: "busy" };
+    return { label: "Researching", tone: "busy" };
   }
-  return { label: "Synced", tone: "ready" };
+  return { label: "Report ready", tone: "ready" };
+}
+
+function DayPhoto({
+  attachment,
+  threadId,
+}: {
+  attachment: LocalAttachment;
+  threadId: string;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const key = attachment.localObjectKey ?? attachment.thumbnailObjectKey;
+    if (!key) return;
+    let objectUrl: string | null = null;
+    let active = true;
+    void createIdbMediaStore()
+      .get(key)
+      .then((blob) => {
+        if (!blob || !active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.localObjectKey, attachment.thumbnailObjectKey]);
+
+  if (!url) return null;
+  return (
+    <Link href={`/threads/${threadId}`} className="threads-day-photo">
+      {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
+      <img src={url} alt={attachment.fileName} />
+    </Link>
+  );
 }
 
 /**
- * Threads home: every Thread is one tap away from its full conversation, and
- * each row doubles as a sync dashboard entry.
+ * The walk view: Threads grouped by day. Each day leads with its photos;
+ * each Thread is one dense row — your words, the report's title, and where
+ * research stands — one tap from the full Thread.
  */
 export function ThreadsArchive() {
-  const router = useRouter();
   const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,11 +133,6 @@ export function ThreadsArchive() {
     return [...groups.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   }, [threads]);
 
-  function continueOnTrail(threadId: string) {
-    getDestinationSession().set({ type: "thread", threadId });
-    router.push("/");
-  }
-
   return (
     <main className="threads-archive">
       <SyncRuntime />
@@ -107,8 +141,8 @@ export function ThreadsArchive() {
           <p className="eyebrow">By day</p>
           <h1>Threads</h1>
           <p>
-            Tap a Thread to read it and reply. Continue on trail points your
-            next Capture at that Thread.
+            Every Capture is its own Thread. Tap one to read its report, reply,
+            or copy it as markdown.
           </p>
         </div>
         <SyncStatusPill />
@@ -122,56 +156,84 @@ export function ThreadsArchive() {
 
       {byDay.length === 0 && !error ? (
         <p className="trail-thread-empty">
-          No Threads yet. Add a Capture from the Capture tab to start
-          today&apos;s hike.
+          No Threads yet. Add a Capture from the Capture tab — it starts its
+          own Thread.
         </p>
       ) : null}
 
-      {byDay.map(([dayKey, dayThreads]) => (
-        <section
-          key={dayKey}
-          className="threads-day"
-          aria-label={formatDayHeading(dayKey)}
-        >
-          <h2>{formatDayHeading(dayKey)}</h2>
-          <ul className="threads-day-list">
-            {dayThreads.map((view) => {
-              const chip = threadStatusChip(view.captures);
-              return (
-                <li key={view.thread.id} className="thread-row">
-                  <Link
-                    className="thread-row-main"
-                    href={`/threads/${view.thread.id}`}
-                  >
-                    <span className="thread-row-title">{view.thread.title}</span>
-                    <span className="thread-row-meta">
-                      {view.captures.length}{" "}
-                      {view.captures.length === 1 ? "Capture" : "Captures"} ·{" "}
-                      {view.enrichments.length}{" "}
-                      {view.enrichments.length === 1 ? "reply" : "replies"}
-                    </span>
-                  </Link>
-                  <div className="thread-row-side">
-                    <span
-                      className={`thread-chip thread-chip-${chip.tone}`}
-                      data-testid="thread-sync-chip"
+      {byDay.map(([dayKey, dayThreads]) => {
+        const dayPhotos = dayThreads.flatMap((view) =>
+          view.captures.flatMap((capture) =>
+            capture.attachments
+              .filter((attachment) => attachment.kind === "image")
+              .map((attachment) => ({
+                attachment,
+                threadId: view.thread.id,
+              })),
+          ),
+        );
+        return (
+          <section
+            key={dayKey}
+            className="threads-day"
+            aria-label={formatDayHeading(dayKey)}
+          >
+            <h2>{formatDayHeading(dayKey)}</h2>
+            {dayPhotos.length > 0 ? (
+              <div className="threads-day-photos" aria-label="Photos from this day">
+                {dayPhotos.map(({ attachment, threadId }) => (
+                  <DayPhoto
+                    key={attachment.id}
+                    attachment={attachment}
+                    threadId={threadId}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <ul className="threads-day-list">
+              {dayThreads.map((view) => {
+                const chip = threadStatusChip(view.captures);
+                const words = view.captures[0]?.text ?? "";
+                const mediaCount = view.captures.reduce(
+                  (count, capture) => count + capture.attachments.length,
+                  0,
+                );
+                return (
+                  <li key={view.thread.id} className="thread-row">
+                    <Link
+                      className="thread-row-main"
+                      href={`/threads/${view.thread.id}`}
                     >
-                      {chip.label}
-                    </span>
-                    <button
-                      type="button"
-                      className="capture-retry"
-                      onClick={() => continueOnTrail(view.thread.id)}
-                    >
-                      Continue on trail
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+                      <span className="thread-row-title">{view.thread.title}</span>
+                      {words && words !== view.thread.title ? (
+                        <span className="thread-row-words">{words}</span>
+                      ) : null}
+                      <span className="thread-row-meta">
+                        {view.enrichments.length}{" "}
+                        {view.enrichments.length === 1 ? "report" : "reports"}
+                        {view.captures.length > 1
+                          ? ` · ${view.captures.length} Captures`
+                          : ""}
+                        {mediaCount > 0
+                          ? ` · ${mediaCount} media`
+                          : ""}
+                      </span>
+                    </Link>
+                    <div className="thread-row-side">
+                      <span
+                        className={`thread-chip thread-chip-${chip.tone}`}
+                        data-testid="thread-sync-chip"
+                      >
+                        {chip.label}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
 
       <AppNav />
     </main>

@@ -8,7 +8,9 @@ test.beforeEach(() => {
   resetMemoryThreadRepository("sync-tests");
 });
 
-test("Inbox Captures become independent Threads and replays stay idempotent", async () => {
+// Legacy clients may still push unassigned Captures; the server keeps
+// turning each into its own Thread (ADR 0011 made this the only path).
+test("unassigned Captures become independent Threads and replays stay idempotent", async () => {
   const repository = createMemoryThreadRepository("sync-tests");
 
   const first = await repository.upsertCaptures("user_a", [

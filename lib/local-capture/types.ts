@@ -4,8 +4,11 @@ export type CaptureLocation = {
   accuracy: number;
 };
 
+/**
+ * Where a Capture commits (ADR 0011): its own new Thread by default, or an
+ * existing Thread when deliberately replying from that Thread's page.
+ */
 export type ThreadDestination =
-  | { type: "inbox" }
   | { type: "thread"; threadId: string }
   | { type: "new_thread" };
 
@@ -131,7 +134,6 @@ export type CaptureStore = {
   getDraft(): Promise<string>;
   setDraft(text: string): Promise<void>;
   list(): Promise<LocalCapture[]>;
-  listInbox(): Promise<LocalCapture[]>;
   listRecentThreads(): Promise<LocalThread[]>;
   listThread(
     threadId: string,

@@ -69,8 +69,10 @@ test("client sync batches pending Captures, replays safely, and records failures
 
   const threads = await store.listRecentThreads();
   expect(threads.length).toBeGreaterThanOrEqual(1);
-  const inbox = await store.listInbox();
-  expect(inbox.find((capture) => capture.id === first.id)).toBeUndefined();
+  const syncedFirst = (await store.list()).find(
+    (capture) => capture.id === first.id,
+  );
+  expect(syncedFirst?.threadId).toEqual(expect.any(String));
   const synced = await store.list();
   expect(synced.every((capture) => capture.status === "enriching")).toBe(true);
   expect(pushes).toBe(2);
