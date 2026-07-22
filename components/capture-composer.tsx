@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
-import { EnrichmentEntryView, statusLabel } from "@/components/thread-entries";
+import { statusLabel } from "@/components/thread-entries";
 import { FOREGROUND_SYNC_IDLE } from "@/lib/disclosures/copy";
-import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
-import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
-import { getDestinationSession } from "@/lib/local-capture/destination";
+import { calendarDayKey } from "@/lib/local-capture/calendar-day";
 import {
   prefetchLocation,
   readAvailableLocation,
@@ -31,14 +29,12 @@ import {
   createRecorder,
 } from "@/lib/local-capture/recording";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import { chronologicalThreadEntries } from "@/lib/local-capture/thread-timeline";
 import type {
   AttachmentInput,
   LocalAttachment,
   LocalCapture,
   LocalThread,
   PersistenceResult,
-  ThreadDestination,
 } from "@/lib/local-capture/types";
 import {
   enablePushNotifications,
@@ -64,20 +60,17 @@ function formatRecordingClock(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-type ThreadView = {
-  thread: LocalThread;
-  captures: LocalCapture[];
-  enrichments: ThreadEnrichment[];
-};
-
+/**
+ * Capture-first home surface. Every Capture starts its own Thread
+ * (ADR 0011) — no destination picking, no Inbox. Today's Captures list
+ * below the composer links through to each Capture's Thread.
+ */
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
-  const [inbox, setInbox] = useState<LocalCapture[]>([]);
   const [allCaptures, setAllCaptures] = useState<LocalCapture[]>([]);
-  const [threads, setThreads] = useState<ThreadView[]>([]);
-  const [destination, setDestinationState] = useState<ThreadDestination>({
-    type: "new_thread",
-  });
+  const [threadsById, setThreadsById] = useState<Map<string, LocalThread>>(
+    new Map(),
+  );
   const [error, setError] = useState<string | null>(null);
   const [persistence, setPersistence] = useState<PersistenceResult | null>(null);
   const [ready, setReady] = useState(false);
@@ -106,21 +99,12 @@ export function CaptureComposer() {
 
   async function refreshLists() {
     const store = getCaptureStore();
-    const [nextInbox, recent, listed] = await Promise.all([
-      store.listInbox(),
-      store.listRecentThreads(),
+    const [listed, recent] = await Promise.all([
       store.list(),
+      store.listRecentThreads(),
     ]);
-    const threadViews = await Promise.all(
-      recent.map(async (thread) => {
-        const view = await store.listThread(thread.id);
-        const enrichments = await loadThreadEnrichments(thread.id);
-        return { ...view, enrichments };
-      }),
-    );
-    setInbox(nextInbox);
     setAllCaptures(listed);
-    setThreads(threadViews);
+    setThreadsById(new Map(recent.map((thread) => [thread.id, thread])));
   }
 
   async function runForegroundSync() {
@@ -219,14 +203,12 @@ export function CaptureComposer() {
   useEffect(() => {
     let active = true;
     prefetchLocation();
-    const session = getDestinationSession();
 
     (async () => {
       const store = getCaptureStore();
       const savedDraft = await store.getDraft();
       if (!active) return;
       setDraft(savedDraft);
-      setDestinationState(session.get());
       await refreshLists();
       if (active) setReady(true);
     })().catch(() => {
@@ -289,9 +271,6 @@ export function CaptureComposer() {
     const generation = ++draftSaveGeneration.current;
     const handle = window.setTimeout(() => {
       if (generation !== draftSaveGeneration.current) return;
-      const session = getDestinationSession();
-      session.touch();
-      setDestinationState(session.get());
       getCaptureStore()
         .setDraft(draft)
         .catch(() => {
@@ -303,15 +282,6 @@ export function CaptureComposer() {
 
     return () => window.clearTimeout(handle);
   }, [draft, ready, isPending]);
-
-  function syncDestinationFromSession() {
-    setDestinationState(getDestinationSession().get());
-  }
-
-  function onStartNewThread() {
-    getDestinationSession().startNewThread();
-    setDestinationState(getDestinationSession().get());
-  }
 
   async function onFilesSelected(fileList: FileList | null) {
     if (!fileList?.length) return;
@@ -331,19 +301,15 @@ export function CaptureComposer() {
     setError(null);
     setSaveConfirmation(null);
     draftSaveGeneration.current += 1;
-    syncDestinationFromSession();
     startTransition(async () => {
       const store = getCaptureStore();
-      const session = getDestinationSession();
       try {
         const location = readAvailableLocation();
-        const capture = await store.commit(text, location, {
-          destination: session.get(),
+        await store.commit(text, location, {
+          destination: { type: "new_thread" },
           attachments: attachmentsSnapshot,
         });
-        session.rememberCommit(capture);
-        setDestinationState(session.get());
-        setSaveConfirmation("Saved locally");
+        setSaveConfirmation("Saved locally — its own Thread");
       } catch {
         setError("Could not save Capture");
         const preserved = await store.getDraft().catch(() => draftSnapshot);
@@ -429,21 +395,10 @@ export function CaptureComposer() {
   }
 
   const gps = readAvailableLocation();
-  const activeThreadId =
-    destination.type === "thread" ? destination.threadId : null;
-  const activeView =
-    threads.find((view) => view.thread.id === activeThreadId) ?? null;
-  const timeline = activeView
-    ? chronologicalThreadEntries(activeView.captures, activeView.enrichments)
-    : [];
-  const isEnriching = Boolean(
-    activeView?.captures.some((capture) => capture.status === "enriching"),
+  const todayKey = calendarDayKey(new Date());
+  const todaysCaptures = allCaptures.filter(
+    (capture) => calendarDayKey(new Date(capture.createdAt)) === todayKey,
   );
-  const trailTitle = activeView?.thread.title ?? "Today's hike";
-  const trailStatus =
-    destination.type === "thread"
-      ? `Adding to “${trailTitle}”`
-      : "First Capture starts today's Thread";
 
   const rollup = syncRollup(allCaptures.map((capture) => capture.status));
   const footerSummary = syncFooterSummary(rollup, { running: isSyncing });
@@ -585,7 +540,7 @@ export function CaptureComposer() {
         />
       </div>
       <p className="capture-context" role="status">
-        <span>{trailStatus}</span>
+        <span>Each Capture starts its own Thread</span>
         <span aria-hidden="true">·</span>
         <span>GPS {gps ? "on" : "off"}</span>
         <span aria-hidden="true">·</span>
@@ -642,18 +597,22 @@ export function CaptureComposer() {
         </p>
       ) : null}
 
-      {inbox.length > 0 ? (
-        <section className="capture-section" aria-label="Inbox">
-          <h2 className="capture-section-title">Inbox</h2>
-          <p className="capture-persistence">
-            Older unassigned Captures. Prefer today&apos;s Thread below for the
-            trail.
-          </p>
-          <ul className="capture-list trail-gutter-list">
-            {inbox.map((capture) => (
+      <section className="capture-section trail-thread" aria-label="Today">
+        <div className="capture-section-header">
+          <h1 className="capture-section-title">Today</h1>
+        </div>
+
+        {todaysCaptures.length > 0 ? (
+          <ul className="capture-list trail-timeline trail-gutter-list">
+            {todaysCaptures.map((capture) => (
               <li key={capture.id}>
                 <CaptureEntry
                   capture={capture}
+                  threadTitle={
+                    capture.threadId
+                      ? threadsById.get(capture.threadId)?.title ?? null
+                      : null
+                  }
                   gutter
                   onRetry={() => void runForegroundSync()}
                   onRemoveLocalMedia={onRemoveLocalMedia}
@@ -662,78 +621,10 @@ export function CaptureComposer() {
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
-
-      <section className="capture-section trail-thread" aria-label={trailTitle}>
-        <div className="capture-section-header">
-          <h1 className="capture-section-title">{trailTitle}</h1>
-          {activeView ? (
-            <span className="capture-revision">
-              Revision {activeView.thread.revision}
-            </span>
-          ) : null}
-        </div>
-        {destination.type === "thread" ? (
-          <div className="trail-thread-actions">
-            <Link
-              className="topbar-link"
-              href={`/threads/${destination.threadId}`}
-            >
-              Open Thread
-            </Link>
-            <button
-              type="button"
-              className="capture-retry"
-              onClick={onStartNewThread}
-              disabled={!ready || isPending}
-            >
-              Start new Thread
-            </button>
-          </div>
-        ) : null}
-
-        {timeline.length > 0 ? (
-          <ul className="capture-list trail-timeline trail-gutter-list">
-            {timeline.map((entry) =>
-              entry.kind === "capture" ? (
-                <li key={entry.capture.id}>
-                  <CaptureEntry
-                    capture={entry.capture}
-                    showSpeaker
-                    gutter
-                    onRetry={() => void runForegroundSync()}
-                    onRemoveLocalMedia={onRemoveLocalMedia}
-                    onRestoreLocalMedia={onRestoreLocalMedia}
-                  />
-                </li>
-              ) : (
-                <li key={entry.enrichment.id}>
-                  <EnrichmentEntryView enrichment={entry.enrichment} />
-                </li>
-              ),
-            )}
-            {isEnriching ? (
-              <li>
-                <article
-                  className="capture-entry enrichment-pending thread-speaker-agent capture-gutter gutter-enriching"
-                  aria-label="Walking Thoughts is preparing a reply"
-                >
-                  <span className="gutter-label">Enriching</span>
-                  <div>
-                    <div className="capture-entry-meta">
-                      <span className="thread-speaker">Walking Thoughts</span>
-                    </div>
-                    <p>Preparing a reply from this Thread&apos;s history…</p>
-                  </div>
-                </article>
-              </li>
-            ) : null}
-          </ul>
         ) : (
           <p className="trail-thread-empty">
-            Nothing on today&apos;s hike yet. Your next Capture opens a Thread;
-            replies from Walking Thoughts show up here after sync.
+            Nothing on today&apos;s walk yet. Each Capture starts its own
+            Thread; research lands there after sync.
           </p>
         )}
 
@@ -768,17 +659,17 @@ export function CaptureComposer() {
 
 function CaptureEntry({
   capture,
+  threadTitle,
   onRetry,
   onRemoveLocalMedia,
   onRestoreLocalMedia,
-  showSpeaker = false,
   gutter = false,
 }: {
   capture: LocalCapture;
+  threadTitle?: string | null;
   onRetry: () => void;
   onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
   onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
-  showSpeaker?: boolean;
   gutter?: boolean;
 }) {
   const label =
@@ -788,7 +679,7 @@ function CaptureEntry({
 
   return (
     <article
-      className={`capture-entry${showSpeaker ? " thread-speaker-you" : ""}${
+      className={`capture-entry${
         gutter ? ` capture-gutter gutter-${capture.status}` : ""
       }`}
       aria-label={label}
@@ -798,16 +689,19 @@ function CaptureEntry({
       ) : null}
       <div className={gutter ? "capture-gutter-body" : undefined}>
       <div className="capture-entry-meta">
-        {showSpeaker ? <span className="thread-speaker">You</span> : null}
         {gutter ? null : (
           <span className={`capture-status status-${capture.status}`}>
             {statusLabel(capture.status)}
           </span>
         )}
-        <span className="capture-sequence">#{capture.sequence}</span>
         <time dateTime={capture.createdAt}>
           {new Date(capture.createdAt).toLocaleString()}
         </time>
+        {capture.threadId ? (
+          <Link className="topbar-link" href={`/threads/${capture.threadId}`}>
+            {threadTitle ? `Thread: ${threadTitle}` : "Open Thread"}
+          </Link>
+        ) : null}
       </div>
       {capture.text ? <p>{capture.text}</p> : null}
       {capture.attachments.length > 0 ? (

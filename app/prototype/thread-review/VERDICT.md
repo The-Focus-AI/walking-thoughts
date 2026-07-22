@@ -1,11 +1,19 @@
 # Verdict — thread review prototype
 
-**Picked:** Review **C** (Recap first) · Enrich — undecided
+**Picked:** Review **C** (Recap first) · Enrich **A** (Annotation card)
 
 | Area | Winner | Name | Keep |
 | --- | --- | --- | --- |
-| Review | **C** | Recap first | Photo grid + aggregated follow-up checklist up top (with jump links back to the source Capture); dense full transcript below with annotations expanded inline |
-| Enrich | — | _undecided_ | Candidates: A annotation card / B margin notes / C research dossier |
+| Review | **C** | Recap first | Photo grid + open-Thread overview up top; dense entries below |
+| Enrich | **A** | Annotation card | Markdown report leads; numbered source chips; research trace folded in a collapsible |
+
+> **Superseded in part by ADR 0011** (every Capture starts its own Thread):
+> the Recap-first layout was designed for a many-Capture Thread. Its ideas
+> now land on the **Threads list grouped by day** (the walk view: photo
+> grid + one dense row per Thread), while the Thread page slims to
+> Capture + Enrichment (variant A) + conversation + export. The follow-up
+> checklist concept was dropped — what follows a Capture is simply the
+> model's report-style Enrichment.
 
 ## Production intent (Review)
 

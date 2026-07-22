@@ -2,11 +2,19 @@ import type { ThreadEnrichment } from "./types";
 
 const CACHE_PREFIX = "wt-thread-enrichments:";
 
+function normalize(enrichments: ThreadEnrichment[]): ThreadEnrichment[] {
+  // Older cached payloads predate `sources`; `research` stays optional.
+  return enrichments.map((enrichment) => ({
+    ...enrichment,
+    sources: enrichment.sources ?? [],
+  }));
+}
+
 function readCache(threadId: string): ThreadEnrichment[] {
   try {
     const raw = localStorage.getItem(`${CACHE_PREFIX}${threadId}`);
     if (!raw) return [];
-    return JSON.parse(raw) as ThreadEnrichment[];
+    return normalize(JSON.parse(raw) as ThreadEnrichment[]);
   } catch {
     return [];
   }
@@ -44,7 +52,7 @@ export async function fetchThreadEnrichmentsFromNetwork(
     });
     if (!response.ok) return null;
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
-    return body.enrichments ?? [];
+    return normalize(body.enrichments ?? []);
   } catch {
     return null;
   }
@@ -64,7 +72,7 @@ export async function loadThreadEnrichments(
     });
     if (!response.ok) return readCache(threadId);
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
-    const enrichments = body.enrichments ?? [];
+    const enrichments = normalize(body.enrichments ?? []);
     // Empty network payloads must not wipe a previously reviewed Thread —
     // common during brief API blips or after a memory-only server window.
     if (enrichments.length === 0) {

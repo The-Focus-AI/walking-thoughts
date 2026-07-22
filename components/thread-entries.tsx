@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { EnrichmentSource, ThreadEnrichment } from "@/lib/enrichment/types";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import type {
   CaptureSyncStatus,
@@ -114,40 +113,3 @@ export function CaptureEntryView({
   );
 }
 
-export function EnrichmentEntryView({
-  enrichment,
-}: {
-  enrichment: ThreadEnrichment;
-}) {
-  return (
-    <article
-      className="capture-entry enrichment-entry thread-speaker-agent"
-      aria-label={`Walking Thoughts reply · ${enrichment.model}`}
-    >
-      <div className="capture-entry-meta">
-        <span className="thread-speaker">Walking Thoughts</span>
-        <span className="capture-status status-complete">Reply</span>
-        <time dateTime={enrichment.createdAt}>
-          {new Date(enrichment.createdAt).toLocaleString()}
-        </time>
-        <span className="enrichment-model">{enrichment.model}</span>
-      </div>
-      <p className="capture-text">{enrichment.text}</p>
-      {enrichment.sources.length > 0 ? (
-        <ul className="enrichment-sources" aria-label="Sources">
-          {enrichment.sources.map((source: EnrichmentSource) => (
-            <li key={`${source.url}-${source.retrievedAt}`}>
-              <a href={source.url} target="_blank" rel="noreferrer">
-                {source.title}
-              </a>
-              <span className="enrichment-source-meta">
-                {" "}
-                · retrieved {new Date(source.retrievedAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </article>
-  );
-}

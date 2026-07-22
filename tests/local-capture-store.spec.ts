@@ -10,14 +10,14 @@ test("memory Capture store commits text and clears the draft only after success"
     text: "Cedar bark peeling",
     location: null,
     status: "saved_locally",
-    threadId: null,
     sequence: 1,
   });
+  // ADR 0011: a Capture starts its own Thread by default.
+  expect(capture.threadId).toEqual(expect.any(String));
   expect(capture.id.length).toBeGreaterThan(0);
   expect(Date.parse(capture.createdAt)).not.toBeNaN();
   await expect(store.getDraft()).resolves.toBe("");
   await expect(store.list()).resolves.toEqual([capture]);
-  await expect(store.listInbox()).resolves.toEqual([capture]);
 });
 
 test("memory Capture store rejects empty commits without clearing the draft", async () => {

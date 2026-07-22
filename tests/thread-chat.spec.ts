@@ -2,8 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Public seams:
- * - `/threads/[threadId]` is a chat-style Thread surface
- * - Follow-up Capture → sync → Enrichment appears in-chat
+ * - `/threads/[threadId]` is the Thread review surface: Capture hero,
+ *   markdown report, conversation, copy-as-markdown
+ * - Reply Capture → sync → Enrichment report appears in the Thread
  */
 
 async function seedThread(page: Page, text: string): Promise<string> {
@@ -27,22 +28,23 @@ async function seedThread(page: Page, text: string): Promise<string> {
 }
 
 test.describe("Thread chat", () => {
-  test("opens a Thread as a chat with You turns and a sticky composer", async ({
+  test("opens a Thread with the Capture hero, reply composer, and copy action", async ({
     page,
   }) => {
     const threadId = await seedThread(page, "Ferns by the brook");
     await page.goto(`/threads/${threadId}`);
 
     await expect(page.getByTestId("thread-chat")).toBeVisible();
-    await expect(page.getByRole("log", { name: "Thread conversation" })).toBeVisible();
-    await expect(page.getByTestId("chat-turn-you").first()).toContainText(
+    await expect(page.getByRole("log", { name: "Thread review" })).toBeVisible();
+    await expect(page.getByTestId("thread-capture-hero")).toContainText(
       "Ferns by the brook",
     );
-    await expect(page.getByLabel("Follow-up Capture")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+    await expect(page.getByLabel("Reply in this Thread")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reply", exact: true })).toBeVisible();
+    await expect(page.getByTestId("thread-copy-markdown")).toBeVisible();
   });
 
-  test("follow-up syncs and shows the Walking Thoughts reply in chat", async ({
+  test("reply syncs and shows the Walking Thoughts report in the Thread", async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -166,18 +168,18 @@ test.describe("Thread chat", () => {
 
     const threadId = await seedThread(page, "What bird is calling?");
     await page.goto(`/threads/${threadId}`);
-    await page.getByLabel("Follow-up Capture").fill("It was near the creek");
-    await page.getByRole("button", { name: "Send" }).click();
+    await page.getByLabel("Reply in this Thread").fill("It was near the creek");
+    await page.getByRole("button", { name: "Reply", exact: true }).click();
 
     await expect(
       page.getByTestId("chat-turn-you").filter({ hasText: "creek" }),
     ).toBeVisible();
     await expect(
-      page.getByTestId("chat-turn-agent").filter({ hasText: "hermit thrush" }),
+      page.getByTestId("enrichment-report").filter({ hasText: "hermit thrush" }),
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("tapping a Thread row opens the Thread conversation", async ({
+  test("tapping a Thread row opens the Thread review page", async ({
     page,
   }) => {
     const threadId = await seedThread(page, "Overlook fungi");

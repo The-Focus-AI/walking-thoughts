@@ -98,9 +98,11 @@ export function reportIntegrationHealth(
     ? { status: "ready" }
     : { status: "missing", detail: "AI_GATEWAY_API_KEY" };
 
-  const search: ServiceReport = configured(environment.TAVILY_API_KEY)
+  const search: ServiceReport = configured(environment.FIRECRAWL_API_KEY)
     ? { status: "ready" }
-    : { status: "missing", detail: "TAVILY_API_KEY" };
+    : configured(environment.TAVILY_API_KEY)
+      ? { status: "ready", detail: "search_only_fallback" }
+      : { status: "missing", detail: "FIRECRAWL_API_KEY" };
 
   const queue = fromProbe(
     configured(environment.DATABASE_URL),

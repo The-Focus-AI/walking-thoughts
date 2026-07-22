@@ -1,16 +1,8 @@
-import type { LocalCapture, LocalThread, ThreadDestination } from "./types";
+import type { LocalThread, ThreadDestination } from "./types";
 
 export function titleFromText(text: string): string {
   const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? text;
   return firstLine.slice(0, 80) || "Thread";
-}
-
-export function nextInboxSequence(captures: LocalCapture[]): number {
-  return (
-    captures
-      .filter((capture) => capture.threadId === null)
-      .reduce((max, capture) => Math.max(max, capture.sequence), 0) + 1
-  );
 }
 
 export type ResolvedDestination = {
@@ -22,7 +14,6 @@ export type ResolvedDestination = {
 type ResolveInput = {
   destination: ThreadDestination;
   text: string;
-  captures: LocalCapture[];
   threads: LocalThread[];
   createId: () => string;
   now: () => string;
@@ -31,19 +22,10 @@ type ResolveInput = {
 export function resolveCommitDestination({
   destination,
   text,
-  captures,
   threads,
   createId,
   now,
 }: ResolveInput): ResolvedDestination {
-  if (destination.type === "inbox") {
-    return {
-      threadId: null,
-      sequence: nextInboxSequence(captures),
-      thread: null,
-    };
-  }
-
   if (destination.type === "new_thread") {
     const thread: LocalThread = {
       id: createId(),

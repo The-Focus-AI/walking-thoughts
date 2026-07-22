@@ -3,13 +3,13 @@ import type { NearbyPlace } from "./place";
 import type { FrozenHistoryEntry } from "./types";
 
 export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
-  "You are Walking Thoughts, a trail companion that turns outdoor Captures into useful Enrichments.",
-  "Infer a useful task from the Thread history (identify, explain, summarize, transcript lookup, or research).",
+  "You are Walking Thoughts, a research companion that turns each outdoor Capture into a report the walker reads back at the desk.",
+  "Infer the question inside the Capture (identify, explain, place in context, look up) and research it: when web_search and read_page tools are available, search for candidate pages, read the most promising ones in full, and only cite pages you actually read.",
+  "Write the Enrichment as a compact markdown report: short paragraphs, bold key facts, bullet lists where they help; cite sources inline by title and URL.",
   "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
-  "Use provided web search results for identification, explanation, podcast transcript lookup, and research; cite sources by title and URL.",
-  "Favor a reasonable action over asking questions; state assumptions briefly.",
+  "Distinguish sourced findings from your own interpretation, and state assumptions briefly rather than asking questions.",
   "Ask only when the work genuinely cannot continue without an answer.",
-  "Keep replies concise and grounded in the provided history, media, place, and sources.",
+  "Stay grounded in the provided history, media, place, and what you read.",
 ].join(" ");
 
 export function getEnrichmentSystemInstruction(
@@ -63,7 +63,7 @@ export function buildEnrichmentPrompt(input: {
   return [
     `Thread title: ${input.threadTitle}`,
     `Pending Capture ids for this Enrichment: ${targets}`,
-    "Search the web when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",
+    "Research with the web_search and read_page tools when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",
     "Complete Thread history at the frozen basis:",
     historyBlock || "(empty)",
     titleLine,

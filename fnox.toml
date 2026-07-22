@@ -84,11 +84,17 @@ value = "AI_GATEWAY_MODEL"
 if_missing = "ignore"
 description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-5)"
 
+[secrets.FIRECRAWL_API_KEY]
+provider = "op"
+value = "FIRECRAWL_API_KEY"
+if_missing = "ignore"
+description = "Firecrawl API key for Enrichment research (web search + full page reads)"
+
 [secrets.TAVILY_API_KEY]
 provider = "op"
 value = "TAVILY_API_KEY"
 if_missing = "ignore"
-description = "Optional Tavily API key for Enrichment web search"
+description = "Optional Tavily API key for search-only Enrichment fallback"
 
 [secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY]
 provider = "op"

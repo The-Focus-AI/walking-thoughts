@@ -5,12 +5,12 @@ async function openCaptureShell(page: Page) {
   await expect(page.getByLabel("Capture text")).toBeVisible();
   await expect(page.getByText("Shell ready")).toBeVisible();
   await expect(
-    page.getByText("First Capture starts today's Thread"),
+    page.getByText("Each Capture starts its own Thread").first(),
   ).toBeVisible();
 }
 
 test.describe("trail Threads", () => {
-  test("starts a Thread, sticks appends, shows composer under the stream, and keeps the day sticky", async ({
+  test("each Capture starts its own Thread and Today lists them", async ({
     page,
   }) => {
     await openCaptureShell(page);
@@ -18,20 +18,16 @@ test.describe("trail Threads", () => {
     await page.getByLabel("Capture text").fill("Same ridge, clearer view");
     await page.getByRole("button", { name: "Capture" }).click();
 
-    const thread = page.getByRole("region", { name: /Same ridge, clearer view/ });
+    const today = page.getByRole("region", { name: "Today" });
     await expect(
-      thread.getByRole("article", { name: /Same ridge, clearer view/ }),
-    ).toBeVisible();
-    await expect(thread.getByText("You").first()).toBeVisible();
-    await expect(
-      page.getByText(/Adding to .Same ridge, clearer view./),
+      today.getByRole("article", { name: /Same ridge, clearer view/ }),
     ).toBeVisible();
 
-    // Composer lives under the active Thread stream (its sticky dock may
-    // overlap the tail of the stream, so compare bottom edges).
-    const composer = thread.getByLabel("New Capture");
+    // Composer lives under the Today stream (its sticky dock may overlap
+    // the tail of the stream, so compare bottom edges).
+    const composer = today.getByLabel("New Capture");
     await expect(composer).toBeVisible();
-    const streamBox = await thread
+    const streamBox = await today
       .getByRole("article", { name: /Same ridge, clearer view/ })
       .boundingBox();
     const composerBox = await composer.boundingBox();
@@ -44,21 +40,31 @@ test.describe("trail Threads", () => {
     await page.getByRole("button", { name: "Capture" }).click();
 
     await expect(
-      thread.getByRole("article", { name: /Correction: marker leans right/ }),
+      today.getByRole("article", { name: /Correction: marker leans right/ }),
     ).toBeVisible();
+
+    // ADR 0011: consecutive Captures land in separate Threads.
+    const firstLink = today
+      .getByRole("article", { name: /Same ridge, clearer view/ })
+      .getByRole("link", { name: /Thread/ });
+    const secondLink = today
+      .getByRole("article", { name: /Correction: marker leans right/ })
+      .getByRole("link", { name: /Thread/ });
+    const firstHref = await firstLink.getAttribute("href");
+    const secondHref = await secondLink.getAttribute("href");
+    expect(firstHref).toMatch(/^\/threads\//);
+    expect(secondHref).toMatch(/^\/threads\//);
+    expect(secondHref).not.toBe(firstHref);
 
     await page.reload();
     await expect(
-      page.getByText(/Adding to .Same ridge, clearer view./),
-    ).toBeVisible();
-    await expect(
       page
-        .getByRole("region", { name: /Same ridge, clearer view/ })
+        .getByRole("region", { name: "Today" })
         .getByRole("article", { name: /Correction: marker leans right/ }),
     ).toBeVisible();
   });
 
-  test("Threads archive groups by day and can continue on trail", async ({
+  test("Threads archive groups by day with one row per Thread", async ({
     page,
   }) => {
     await openCaptureShell(page);
@@ -76,10 +82,5 @@ test.describe("trail Threads", () => {
       page.getByRole("link", { name: /Overlook fungi/ }),
     ).toBeVisible();
     await expect(page.getByTestId("thread-sync-chip").first()).toBeVisible();
-
-    await page.getByRole("button", { name: "Continue on trail" }).click();
-    // / requires Clerk; the sticky day session is shared via localStorage.
-    await page.goto("/offline");
-    await expect(page.getByText(/Adding to .Overlook fungi./)).toBeVisible();
   });
 });

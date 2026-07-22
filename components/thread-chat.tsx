@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
+import { EnrichmentReport } from "@/components/enrichment-report";
 import { statusLabel } from "@/components/thread-entries";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
@@ -18,6 +19,7 @@ import type {
   LocalThread,
 } from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
+import { threadToMarkdown } from "@/lib/thread-export/markdown";
 
 type ThreadChatProps = {
   threadId: string;
@@ -26,41 +28,7 @@ type ThreadChatProps = {
   onClose?: () => void;
 };
 
-function CaptureBubble({
-  capture,
-}: {
-  capture: LocalCapture;
-}) {
-  return (
-    <article
-      className="chat-turn chat-turn-you"
-      data-testid="chat-turn-you"
-      aria-label={capture.text || "Capture"}
-    >
-      <div className="chat-bubble chat-bubble-you">
-        {capture.text ? <p>{capture.text}</p> : null}
-        {capture.attachments.length > 0 ? (
-          <ul className="chat-attachments">
-            {capture.attachments.map((attachment) => (
-              <ChatAttachment key={attachment.id} attachment={attachment} />
-            ))}
-          </ul>
-        ) : null}
-      </div>
-      <div className="chat-meta">
-        <span>You</span>
-        <span className={`capture-status status-${capture.status}`}>
-          {statusLabel(capture.status)}
-        </span>
-        <time dateTime={capture.createdAt}>
-          {new Date(capture.createdAt).toLocaleTimeString()}
-        </time>
-      </div>
-    </article>
-  );
-}
-
-function ChatAttachment({ attachment }: { attachment: LocalAttachment }) {
+function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     const key = attachment.localObjectKey ?? attachment.thumbnailObjectKey;
@@ -83,56 +51,83 @@ function ChatAttachment({ attachment }: { attachment: LocalAttachment }) {
 
   if (url && attachment.kind === "image") {
     return (
-      <li>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt={attachment.fileName} className="chat-media" />
-      </li>
+      // eslint-disable-next-line @next/next/no-img-element -- local blob URL
+      <img src={url} alt={attachment.fileName} className="chat-media" />
     );
   }
   if (url && attachment.kind === "video") {
-    return (
-      <li>
-        <video className="chat-media" src={url} controls playsInline />
-      </li>
-    );
+    return <video className="chat-media" src={url} controls playsInline />;
   }
   if (url && attachment.kind === "audio") {
-    return (
-      <li>
-        <audio className="chat-media" src={url} controls />
-      </li>
-    );
+    return <audio className="chat-media" src={url} controls />;
   }
-  return <li>{attachment.fileName}</li>;
+  return <span className="thread-media-name">{attachment.fileName}</span>;
 }
 
-function AgentBubble({ enrichment }: { enrichment: ThreadEnrichment }) {
+/** The Thread's base Capture, presented as the page's subject. */
+function CaptureHero({ capture }: { capture: LocalCapture }) {
   return (
     <article
-      className="chat-turn chat-turn-agent"
-      data-testid="chat-turn-agent"
-      aria-label={`Walking Thoughts reply · ${enrichment.model}`}
+      className="thread-capture-hero"
+      data-testid="thread-capture-hero"
+      aria-label={capture.text || "Capture"}
     >
-      <div className="chat-bubble chat-bubble-agent">
-        <p>{enrichment.text}</p>
-        {enrichment.sources.length > 0 ? (
-          <ul className="enrichment-sources" aria-label="Sources">
-            {enrichment.sources.map((source) => (
-              <li key={`${source.url}-${source.retrievedAt}`}>
-                <a href={source.url} target="_blank" rel="noreferrer">
-                  {source.title}
-                </a>
+      {capture.text ? <p className="thread-capture-words">{capture.text}</p> : null}
+      {capture.attachments.length > 0 ? (
+        <ul className="thread-capture-media">
+          {capture.attachments.map((attachment) => (
+            <li key={attachment.id}>
+              <MediaPreview attachment={attachment} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="thread-capture-meta">
+        <span>You</span>
+        <time dateTime={capture.createdAt}>
+          {new Date(capture.createdAt).toLocaleString()}
+        </time>
+        {capture.location ? (
+          <span>
+            {capture.location.latitude.toFixed(4)},{" "}
+            {capture.location.longitude.toFixed(4)}
+          </span>
+        ) : null}
+        <span className={`capture-status status-${capture.status}`}>
+          {statusLabel(capture.status)}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+/** A later Capture in the Thread's conversation. */
+function ConversationCapture({ capture }: { capture: LocalCapture }) {
+  return (
+    <article
+      className="chat-turn chat-turn-you"
+      data-testid="chat-turn-you"
+      aria-label={capture.text || "Capture"}
+    >
+      <div className="chat-bubble chat-bubble-you">
+        {capture.text ? <p>{capture.text}</p> : null}
+        {capture.attachments.length > 0 ? (
+          <ul className="chat-attachments">
+            {capture.attachments.map((attachment) => (
+              <li key={attachment.id}>
+                <MediaPreview attachment={attachment} />
               </li>
             ))}
           </ul>
         ) : null}
       </div>
       <div className="chat-meta">
-        <span>Walking Thoughts</span>
-        <span className="capture-status status-complete">Reply</span>
-        <span className="enrichment-model">{enrichment.model}</span>
-        <time dateTime={enrichment.createdAt}>
-          {new Date(enrichment.createdAt).toLocaleTimeString()}
+        <span>You</span>
+        <span className={`capture-status status-${capture.status}`}>
+          {statusLabel(capture.status)}
+        </span>
+        <time dateTime={capture.createdAt}>
+          {new Date(capture.createdAt).toLocaleTimeString()}
         </time>
       </div>
     </article>
@@ -140,9 +135,10 @@ function AgentBubble({ enrichment }: { enrichment: ThreadEnrichment }) {
 }
 
 /**
- * Chat-style Thread surface: Captures (You) and Enrichments (Walking Thoughts)
- * as conversation turns, with a sticky follow-up composer wired through
- * local commit → sync → Enrichment.
+ * Thread review page: the base Capture up top, its report-style Enrichment
+ * rendered as markdown beneath it, the conversation after, and the whole
+ * Thread one "Copy as markdown" away. Replying here is the explicit way to
+ * add to this Thread — new Captures elsewhere start their own.
  */
 export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatProps) {
   const [thread, setThread] = useState<LocalThread | null>(null);
@@ -152,11 +148,12 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
   const [media, setMedia] = useState<AttachmentInput[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
-  const logRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const copyResetRef = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     const store = getCaptureStore();
@@ -202,7 +199,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
 
   const isEnriching = captures.some((capture) => capture.status === "enriching");
 
-  // Keep pulling while Enrichment is in flight so the reply lands in-chat.
+  // Keep pulling while Enrichment is in flight so the report lands in view.
   useEffect(() => {
     if (!isEnriching || !online) return;
     const timer = window.setInterval(() => {
@@ -211,7 +208,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
           await runSyncCycle({ store: getCaptureStore() });
           await refresh();
         } catch {
-          // Retryable; the enriching gutter stays visible.
+          // Retryable; the researching notice stays visible.
         }
       })();
     }, 2500);
@@ -219,10 +216,23 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
   }, [isEnriching, online, refresh]);
 
   useEffect(() => {
-    const node = logRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [captures, enrichments, isEnriching]);
+    return () => {
+      if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+    };
+  }, []);
+
+  async function copyAsMarkdown() {
+    if (!thread) return;
+    const markdown = threadToMarkdown({ thread, captures, enrichments });
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopied("copied");
+    } catch {
+      setCopied("failed");
+    }
+    if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
+    copyResetRef.current = window.setTimeout(() => setCopied("idle"), 2500);
+  }
 
   async function send() {
     if (busy || (!draft.trim() && media.length === 0)) return;
@@ -242,18 +252,20 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
         try {
           await runSyncCycle({ store });
         } catch {
-          // Statuses remain visible on turns.
+          // Statuses remain visible on entries.
         }
         await refresh();
       }
     } catch {
-      setError("Could not send the follow-up Capture");
+      setError("Could not send the reply Capture");
     } finally {
       setBusy(false);
     }
   }
 
   const timeline = chronologicalThreadEntries(captures, enrichments);
+  const baseCapture = timeline.find((entry) => entry.kind === "capture");
+  const conversation = timeline.filter((entry) => entry !== baseCapture);
 
   return (
     <div
@@ -270,47 +282,65 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
           <h1>{thread?.title ?? "Thread"}</h1>
           <p className="thread-chat-sub">
             {online
-              ? "Network online · Walking Thoughts replies appear here after Enrichment"
+              ? "Network online · research lands here after Enrichment"
               : "Network offline · Captures stay on this phone until you reconnect"}
             {thread ? ` · rev ${thread.revision}` : null}
           </p>
         </div>
-        {onClose ? (
+        <div className="thread-chat-tools">
           <button
             type="button"
-            className="journal-close"
-            aria-label="Close Thread chat"
-            onClick={onClose}
+            className="thread-copy-markdown"
+            data-testid="thread-copy-markdown"
+            onClick={() => void copyAsMarkdown()}
+            disabled={!thread}
           >
-            ✕
+            {copied === "copied"
+              ? "Copied"
+              : copied === "failed"
+                ? "Copy failed"
+                : "Copy as markdown"}
           </button>
-        ) : null}
+          {onClose ? (
+            <button
+              type="button"
+              className="journal-close"
+              aria-label="Close Thread"
+              onClick={onClose}
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div
-        ref={logRef}
         className="thread-chat-log"
         role="log"
-        aria-label="Thread conversation"
+        aria-label="Thread review"
         aria-live="polite"
       >
-        {timeline.map((entry) =>
+        {baseCapture?.kind === "capture" ? (
+          <CaptureHero capture={baseCapture.capture} />
+        ) : null}
+        {conversation.map((entry) =>
           entry.kind === "capture" ? (
-            <CaptureBubble key={entry.capture.id} capture={entry.capture} />
+            <ConversationCapture key={entry.capture.id} capture={entry.capture} />
           ) : (
-            <AgentBubble key={entry.enrichment.id} enrichment={entry.enrichment} />
+            <EnrichmentReport
+              key={entry.enrichment.id}
+              enrichment={entry.enrichment}
+            />
           ),
         )}
         {isEnriching ? (
           <article
-            className="chat-turn chat-turn-agent"
+            className="enrichment-report enrichment-report-pending"
             data-testid="chat-turn-pending"
-            aria-label="Walking Thoughts is preparing a reply"
+            aria-label="Walking Thoughts is researching"
           >
-            <div className="chat-bubble chat-bubble-agent chat-pending">
-              <span className="thread-speaker">Walking Thoughts</span>
-              <p>Preparing a reply…</p>
-            </div>
+            <span className="thread-speaker">Walking Thoughts</span>
+            <p>Researching this Capture…</p>
           </article>
         ) : null}
         {timeline.length === 0 && !isEnriching ? (
@@ -326,13 +356,13 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
 
       <footer className="thread-chat-composer">
         <label className="capture-field-label" htmlFor="thread-chat-followup">
-          Follow-up Capture
+          Reply in this Thread
         </label>
         <textarea
           id="thread-chat-followup"
           rows={2}
           value={draft}
-          placeholder="Continue the conversation…"
+          placeholder="Ask a follow-up about this Capture…"
           onChange={(event) => setDraft(event.target.value)}
           disabled={busy}
           onKeyDown={(event) => {
@@ -365,7 +395,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
             type="file"
             accept="image/*,audio/*,video/*"
             multiple
-            aria-label="Add photo or video to follow-up"
+            aria-label="Add photo or video to reply"
             onChange={(event) => {
               const files = event.target.files;
               if (!files?.length) return;
@@ -384,7 +414,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
             onClick={() => void send()}
             disabled={busy || (!draft.trim() && media.length === 0)}
           >
-            {busy ? "Sending…" : "Send"}
+            {busy ? "Sending…" : "Reply"}
           </button>
         </div>
       </footer>
