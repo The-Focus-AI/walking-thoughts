@@ -1,0 +1,917 @@
+/* PROTOTYPE — design directions specimen. Throwaway. */
+
+/* ---------------------------------------------------------------- stage */
+
+.proto-viewport-stage.dd-stage {
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.6rem;
+  padding: 0.75rem 0.75rem 5.5rem;
+  background: #0a0d0b;
+  color: #e8e8e0;
+}
+
+.dd-stage .proto-viewport-chrome {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: #9aa295;
+  padding: 0 0.25rem;
+}
+
+.dd-stage .proto-viewport-frame {
+  justify-self: center;
+  width: 100%;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+}
+
+.dd-stage.viewport-mobile .proto-viewport-frame {
+  max-width: 390px;
+  height: 844px;
+}
+
+.dd-stage.viewport-desktop .proto-viewport-frame {
+  max-width: 1280px;
+  height: 900px;
+  border-radius: 12px;
+}
+
+.dd-loading {
+  padding: 2rem;
+  font-family: ui-monospace, monospace;
+}
+
+/* ----------------------------------------------------------------- root */
+
+.dd-root {
+  min-height: 100%;
+  background: var(--dd-bg);
+  color: var(--dd-text);
+  font-family: var(--dd-f-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  padding: 1.1rem 1rem 2rem;
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+}
+
+.dd-columns {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.viewport-desktop .dd-columns {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.dd-col {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------- head */
+
+.dd-head {
+  display: grid;
+  gap: 0.2rem;
+  padding-bottom: 0.85rem;
+  border-bottom: var(--dd-border-w) solid var(--dd-line);
+}
+
+.dd-eyebrow {
+  margin: 0;
+  font-family: var(--dd-f-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dd-identity);
+}
+
+.dd-name {
+  margin: 0;
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  text-transform: var(--dd-display-transform);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  line-height: 1.05;
+}
+
+.dd-tagline {
+  margin: 0.35rem 0 0;
+  color: var(--dd-muted);
+}
+
+.dd-contests {
+  margin: 0;
+  font-family: var(--dd-f-mono);
+  font-size: 0.7rem;
+  color: var(--dd-muted);
+}
+
+/* ------------------------------------------------------------- sections */
+
+.dd-section {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.95rem 1rem 1.05rem;
+  background: var(--dd-surface);
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-card);
+}
+
+.dd-section-title {
+  margin: 0;
+  font-family: var(--dd-f-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dd-muted);
+}
+
+/* --------------------------------------------------------------- tokens */
+
+.dd-swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.45rem 0.9rem;
+  font-size: 0.72rem;
+}
+
+.dd-swatches li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.dd-swatch {
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 4px;
+  border: 1px solid var(--dd-line);
+}
+
+.dd-swatch-name {
+  font-weight: 700;
+}
+
+.dd-swatches code,
+.dd-token-meta code {
+  font-family: var(--dd-f-mono);
+  font-size: 0.66rem;
+  color: var(--dd-muted);
+  overflow-wrap: anywhere;
+}
+
+.dd-token-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 0.25rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+.dd-token-meta dt {
+  font-family: var(--dd-f-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+  color: var(--dd-muted);
+  padding-top: 0.1rem;
+}
+
+.dd-token-meta dd {
+  margin: 0;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------- type */
+
+.dd-display {
+  margin: 0;
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  text-transform: var(--dd-display-transform);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: clamp(2.1rem, 7vw, 3.2rem);
+  line-height: 0.98;
+}
+
+.dd-h1 {
+  margin: 0;
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  text-transform: var(--dd-display-transform);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: 1.55rem;
+  line-height: 1.15;
+}
+
+.dd-h2 {
+  margin: 0;
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  text-transform: var(--dd-display-transform);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: 1.15rem;
+}
+
+.dd-body {
+  margin: 0;
+  max-width: 52ch;
+}
+
+.dd-small {
+  margin: 0;
+  color: var(--dd-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.dd-mono {
+  margin: 0;
+  font-family: var(--dd-f-mono);
+  font-size: 0.78rem;
+  color: var(--dd-muted);
+}
+
+/* ---------------------------------------------------------------- roles */
+
+.dd-roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--dd-muted);
+}
+
+.dd-roles li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: baseline;
+}
+
+.dd-role {
+  display: inline-block;
+  padding: 0.14rem 0.5rem;
+  border-radius: var(--dd-r-chip);
+  font-family: var(--dd-f-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dd-role-identity {
+  color: var(--dd-identity);
+  background: color-mix(in srgb, var(--dd-identity) 14%, transparent);
+}
+
+.dd-role-action {
+  color: var(--dd-action-text);
+  background: var(--dd-action);
+}
+
+.dd-role-attention {
+  color: var(--dd-attention);
+  background: color-mix(in srgb, var(--dd-attention) 14%, transparent);
+}
+
+.dd-role-machine {
+  color: var(--dd-machine);
+  background: color-mix(in srgb, var(--dd-machine) 14%, transparent);
+}
+
+.dd-role-record {
+  color: var(--dd-record-text);
+  background: var(--dd-record);
+}
+
+/* -------------------------------------------------------------- buttons */
+
+.dd-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.dd-btn {
+  min-height: 2.7rem;
+  padding: 0 1.05rem;
+  border: var(--dd-border-w) solid transparent;
+  border-radius: var(--dd-r-control);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.dd-btn:focus-visible {
+  outline: 2px solid var(--dd-identity);
+  outline-offset: 2px;
+}
+
+.dd-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dd-btn-primary {
+  background: var(--dd-action);
+  color: var(--dd-action-text);
+}
+
+.dd-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.dd-btn-secondary {
+  background: transparent;
+  border-color: var(--dd-line);
+  color: var(--dd-text);
+}
+
+.dd-btn-secondary:hover {
+  border-color: var(--dd-text);
+}
+
+.dd-btn-quiet {
+  background: transparent;
+  color: var(--dd-identity);
+}
+
+.dd-btn-quiet:hover {
+  text-decoration: underline;
+}
+
+.dd-btn-record {
+  background: var(--dd-record);
+  color: var(--dd-record-text);
+}
+
+.dd-btn-sm {
+  min-height: 2.1rem;
+  padding: 0 0.75rem;
+  font-size: 0.8rem;
+  width: fit-content;
+}
+
+/* ----------------------------------------------------------------- form */
+
+.dd-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dd-label {
+  font-family: var(--dd-f-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dd-muted);
+}
+
+.dd-control {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.75rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-control);
+  background: var(--dd-raised);
+  color: var(--dd-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.dd-control::placeholder {
+  color: var(--dd-muted);
+}
+
+.dd-control:focus-visible {
+  outline: 2px solid var(--dd-identity);
+  outline-offset: 1px;
+}
+
+.dd-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dd-form-actions .dd-btn-primary {
+  margin-left: auto;
+}
+
+/* ----------------------------------------------------------- thread card */
+
+.dd-thread-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-card);
+  background: var(--dd-raised);
+}
+
+.dd-thread-card-main {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.dd-thread-card-title {
+  margin: 0;
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: 1.02rem;
+}
+
+.dd-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--dd-r-chip);
+  font-family: var(--dd-f-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--dd-line);
+  color: var(--dd-muted);
+}
+
+.dd-chip-ready {
+  color: var(--dd-identity);
+  border-color: color-mix(in srgb, var(--dd-identity) 45%, transparent);
+  background: color-mix(in srgb, var(--dd-identity) 10%, transparent);
+}
+
+.dd-chip-attention {
+  color: var(--dd-attention);
+  border-color: color-mix(in srgb, var(--dd-attention) 50%, transparent);
+  background: color-mix(in srgb, var(--dd-attention) 10%, transparent);
+}
+
+.dd-chip-source {
+  color: var(--dd-machine);
+  border-color: color-mix(in srgb, var(--dd-machine) 45%, transparent);
+  background: color-mix(in srgb, var(--dd-machine) 10%, transparent);
+  margin-right: 0.35rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* --------------------------------------------------------- trail screen */
+
+.dd-screen {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.9rem 0.85rem 0.75rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-card);
+  background: var(--dd-bg);
+}
+
+.dd-screen-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.dd-screen-title {
+  margin: 0.1rem 0 0;
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  text-transform: var(--dd-display-transform);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+.dd-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.7rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-chip);
+  background: var(--dd-surface);
+  font-family: var(--dd-f-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dd-sync-dot {
+  width: 0.45rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--dd-action);
+}
+
+.dd-map {
+  position: relative;
+  min-height: 7.5rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-card);
+  overflow: hidden;
+  background: var(--dd-surface);
+  display: grid;
+  align-items: end;
+}
+
+.dd-map-contours {
+  position: absolute;
+  inset: -40%;
+  background: repeating-radial-gradient(
+    ellipse at 30% 20%,
+    transparent 0,
+    transparent 14px,
+    var(--dd-line) 15px
+  );
+  opacity: 0.65;
+}
+
+.dd-map-label {
+  position: relative;
+  padding: 0.5rem 0.7rem;
+  font-family: var(--dd-f-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dd-muted);
+}
+
+.dd-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dd-entry {
+  display: grid;
+  grid-template-columns: 5.4rem 1fr;
+  gap: 0.6rem;
+  padding: 0.6rem 0.65rem;
+  border-radius: var(--dd-r-control);
+  background: var(--dd-surface);
+  border-left: 3px solid var(--dd-identity);
+}
+
+.dd-entry-gutter {
+  display: grid;
+  gap: 0.15rem;
+  align-content: start;
+}
+
+.dd-entry-time {
+  font-family: var(--dd-f-mono);
+  font-size: 0.72rem;
+  color: var(--dd-muted);
+}
+
+.dd-entry-status {
+  font-family: var(--dd-f-mono);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dd-identity);
+}
+
+.dd-entry-syncing,
+.dd-entry-enriching {
+  border-left-color: var(--dd-action);
+}
+
+.dd-entry-syncing .dd-entry-status,
+.dd-entry-enriching .dd-entry-status {
+  color: color-mix(in srgb, var(--dd-action) 80%, var(--dd-text));
+}
+
+.dd-entry-local {
+  border-left-color: var(--dd-line);
+}
+
+.dd-entry-local .dd-entry-status {
+  color: var(--dd-muted);
+}
+
+.dd-entry-needs_attention {
+  border-left-color: var(--dd-attention);
+  background: color-mix(in srgb, var(--dd-attention) 7%, var(--dd-surface));
+}
+
+.dd-entry-needs_attention .dd-entry-status {
+  color: var(--dd-attention);
+}
+
+.dd-entry-body {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.dd-entry-body > p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.dd-media-stub {
+  font-family: var(--dd-f-mono);
+  font-size: 0.68rem;
+  color: var(--dd-muted);
+  border: 1px dashed var(--dd-line);
+  border-radius: var(--dd-r-control);
+  padding: 0.35rem 0.55rem;
+  width: fit-content;
+}
+
+.dd-enrichment {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: var(--dd-border-w) solid
+    color-mix(in srgb, var(--dd-machine) 40%, transparent);
+  border-left: 3px solid var(--dd-machine);
+  border-radius: var(--dd-r-control);
+  background: color-mix(in srgb, var(--dd-machine) 8%, var(--dd-bg));
+  font-size: 0.85rem;
+}
+
+.dd-enrichment p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dd-enrichment-head {
+  font-family: var(--dd-f-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dd-machine);
+}
+
+.dd-enrichment-head code {
+  font-family: inherit;
+  text-transform: none;
+}
+
+.dd-enrichment-title {
+  font-family: var(--dd-f-display);
+  font-weight: var(--dd-display-weight);
+  letter-spacing: var(--dd-display-tracking);
+  font-size: 1rem;
+}
+
+.dd-dock {
+  position: sticky;
+  bottom: 2.9rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-card);
+  background: var(--dd-raised);
+}
+
+.dd-tabbar {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  padding: 0.45rem 0.5rem;
+  border: var(--dd-border-w) solid var(--dd-line);
+  border-radius: var(--dd-r-card) var(--dd-r-card) 0 0;
+  background: var(--dd-bg);
+}
+
+.dd-tab {
+  display: grid;
+  place-items: center;
+  padding: 0.4rem 0;
+  border-radius: var(--dd-r-control);
+  font-family: var(--dd-f-mono);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dd-muted);
+}
+
+.dd-tab-active {
+  color: var(--dd-identity);
+  background: color-mix(in srgb, var(--dd-identity) 12%, transparent);
+}
+
+/* =====================================================================
+   Direction B — Field Notebook: flat editorial, ruled not carded
+   ===================================================================== */
+
+.dd-root[data-direction="b"] {
+  line-height: 1.6;
+}
+
+.dd-root[data-direction="b"] .dd-section,
+.dd-root[data-direction="b"] .dd-screen {
+  background: transparent;
+  border: 0;
+  border-top: var(--dd-border-w) solid var(--dd-line);
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.dd-root[data-direction="b"] .dd-entry {
+  background: transparent;
+  border-left: 0;
+  border-top: 1px solid var(--dd-line);
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.dd-root[data-direction="b"] .dd-entry-needs_attention {
+  background: color-mix(in srgb, var(--dd-attention) 7%, transparent);
+}
+
+.dd-root[data-direction="b"] .dd-thread-card {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--dd-line);
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.dd-root[data-direction="b"] .dd-enrichment {
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--dd-machine);
+  border-radius: 0;
+  padding-right: 0;
+}
+
+.dd-root[data-direction="b"] .dd-dock,
+.dd-root[data-direction="b"] .dd-tabbar {
+  background: var(--dd-surface);
+}
+
+/* =====================================================================
+   Direction C — Instrument Panel: dense, mono, hard edges
+   ===================================================================== */
+
+.dd-root[data-direction="c"] {
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.dd-root[data-direction="c"] .dd-section {
+  gap: 0.55rem;
+  padding: 0.7rem 0.75rem 0.8rem;
+}
+
+.dd-root[data-direction="c"] .dd-section-title {
+  color: var(--dd-machine);
+}
+
+.dd-root[data-direction="c"] .dd-entries {
+  gap: 0;
+  border: var(--dd-border-w) solid var(--dd-line);
+}
+
+.dd-root[data-direction="c"] .dd-entry {
+  border-radius: 0;
+  border-left-width: 4px;
+  border-bottom: 1px solid var(--dd-line);
+  background: var(--dd-bg);
+}
+
+.dd-root[data-direction="c"] .dd-entry:last-child {
+  border-bottom: 0;
+}
+
+.dd-root[data-direction="c"] .dd-btn,
+.dd-root[data-direction="c"] .dd-chip,
+.dd-root[data-direction="c"] .dd-label,
+.dd-root[data-direction="c"] .dd-tab {
+  font-family: var(--dd-f-mono);
+}
+
+.dd-root[data-direction="c"] .dd-btn {
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+/* =====================================================================
+   Direction D — Ranger Duotone: poster blocks, inverted panels
+   ===================================================================== */
+
+.dd-root[data-direction="d"] .dd-section,
+.dd-root[data-direction="d"] .dd-screen,
+.dd-root[data-direction="d"] .dd-thread-card,
+.dd-root[data-direction="d"] .dd-entry,
+.dd-root[data-direction="d"] .dd-map,
+.dd-root[data-direction="d"] .dd-dock,
+.dd-root[data-direction="d"] .dd-tabbar {
+  border-color: var(--dd-line);
+}
+
+.dd-root[data-direction="d"] .dd-control,
+.dd-root[data-direction="d"] .dd-thread-card,
+.dd-root[data-direction="d"] .dd-dock {
+  background: var(--dd-surface);
+}
+
+.dd-root[data-direction="d"] .dd-section-title {
+  font-family: var(--dd-f-body);
+  font-weight: 900;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--dd-text);
+}
+
+.dd-root[data-direction="d"] .dd-entry {
+  background: transparent;
+  border: 2px solid var(--dd-line);
+  border-radius: 0;
+}
+
+.dd-root[data-direction="d"] .dd-entry-needs_attention {
+  border-color: var(--dd-attention);
+}
+
+.dd-root[data-direction="d"] .dd-enrichment,
+.dd-root[data-direction="d"] .dd-map,
+.dd-root[data-direction="d"] .dd-tabbar {
+  background: var(--dd-raised);
+  color: var(--dd-bg);
+  border-color: var(--dd-raised);
+}
+
+.dd-root[data-direction="d"] .dd-enrichment-head,
+.dd-root[data-direction="d"] .dd-enrichment-title {
+  color: var(--dd-bg);
+}
+
+.dd-root[data-direction="d"] .dd-chip-source {
+  color: var(--dd-bg);
+  border-color: color-mix(in srgb, var(--dd-bg) 55%, transparent);
+  background: transparent;
+}
+
+.dd-root[data-direction="d"] .dd-map-label {
+  color: color-mix(in srgb, var(--dd-bg) 85%, transparent);
+}
+
+.dd-root[data-direction="d"] .dd-tab {
+  color: color-mix(in srgb, var(--dd-bg) 75%, transparent);
+}
+
+.dd-root[data-direction="d"] .dd-tab-active {
+  color: var(--dd-raised);
+  background: var(--dd-action);
+}
+
+.dd-root[data-direction="d"] .dd-sync-pill {
+  background: var(--dd-action);
+  color: var(--dd-action-text);
+  border-color: var(--dd-raised);
+}
+
+.dd-root[data-direction="d"] .dd-sync-dot {
+  background: var(--dd-raised);
+}

@@ -36,6 +36,13 @@ const THREAD_REVIEW = {
   ],
 } as const;
 
+const DESIGN_DIRECTIONS = [
+  { key: "a", label: "Forest Night", winner: true },
+  { key: "b", label: "Field Notebook", winner: false },
+  { key: "c", label: "Instrument Panel", winner: false },
+  { key: "d", label: "Ranger Duotone", winner: false },
+] as const;
+
 const VIEWPORTS = [
   { key: "mobile", label: "Mobile" },
   { key: "desktop", label: "Desktop" },
@@ -76,6 +83,72 @@ export default function PrototypeIndexPage() {
           <Link href="/">← Back to Walking Thoughts</Link>
         </p>
       </header>
+
+      <section
+        className="proto-index-card"
+        aria-labelledby="design-directions-title"
+      >
+        <div className="proto-index-card-head">
+          <div>
+            <h2 id="design-directions-title">Design directions</h2>
+            <p>
+              Brand + design-system specimen for the root <code>DESIGN.md</code>:
+              four contrasting visual directions rendering the same tokens,
+              type scale, buttons, form, cards, and trail screen.
+            </p>
+          </div>
+          <div className="proto-index-open-row">
+            <Link
+              className="proto-index-open"
+              href="/prototype/design-directions?viewport=mobile&variant=a"
+            >
+              Open mobile
+            </Link>
+            <Link
+              className="proto-index-open secondary"
+              href="/prototype/design-directions?viewport=desktop&variant=a"
+            >
+              Open desktop
+            </Link>
+          </div>
+        </div>
+        <div className="proto-index-areas">
+          <div className="proto-index-area">
+            <h3>direction</h3>
+            <ul>
+              {DESIGN_DIRECTIONS.map((variant) => (
+                <li key={variant.key}>
+                  <div
+                    className={
+                      variant.winner
+                        ? "proto-index-variant winner"
+                        : "proto-index-variant"
+                    }
+                  >
+                    <span className="proto-index-key">{variant.key}</span>
+                    <span className="proto-index-variant-label">
+                      {variant.label}
+                      {variant.winner ? (
+                        <em className="proto-index-winner-tag"> winner</em>
+                      ) : null}
+                    </span>
+                    <div className="proto-index-viewport-links">
+                      {VIEWPORTS.map((viewport) => (
+                        <Link
+                          key={viewport.key}
+                          href={`/prototype/design-directions?viewport=${viewport.key}&variant=${variant.key}`}
+                        >
+                          {viewport.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       <section className="proto-index-card" aria-labelledby="trail-cleanup-title">
         <div className="proto-index-card-head">
