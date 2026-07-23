@@ -79,7 +79,7 @@ the affected variants.
    natural-features convention), system sans body, mono for measured
    facts. The old system-stacks-only rule relaxed to
    self-hosted-webfonts-allowed.
-6. **Non-negotiables** — WCAG AA for every text/background pair; color never
+6. **Non-negotiables** — *(user-confirmed)* — WCAG AA for every text/background pair; color never
    the only status signal (labels always); bottom tab bar + capture dock in
    the thumb zone with safe-area insets; reduced-motion respected; canonical
    domain vocabulary (Capture, Thread, Enrichment, Reviewed, Offline
