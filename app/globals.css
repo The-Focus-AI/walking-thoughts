@@ -2073,6 +2073,81 @@ footer {
   max-height: min(80svh, 40rem);
 }
 
+/* Interview: learn Memories that tailor Enrichments */
+
+.interview-panel {
+  padding-bottom: var(--tabbar-h);
+}
+
+.interview-intro,
+.interview-complete,
+.interview-memories-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.interview-memories-section {
+  border-top: 1px solid var(--line);
+  padding-top: 0.85rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.interview-memories-section h2 {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.interview-memories {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.interview-memory {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.interview-memory-category {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.interview-memory-content {
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.interview-memory-forget {
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.interview-memory-forget:hover {
+  color: var(--ink);
+}
+
 /* Shared navigation: bottom tab bar + glanceable sync pill */
 
 :root {

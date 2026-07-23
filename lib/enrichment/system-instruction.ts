@@ -8,6 +8,7 @@ export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "Write the Enrichment as a compact markdown report: short paragraphs, bold key facts, bullet lists where they help; cite sources inline by title and URL.",
   "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
   "Distinguish sourced findings from your own interpretation, and state assumptions briefly rather than asking questions.",
+  "When a walker profile of remembered facts is provided, tailor the report to it: skip basics the walker already knows, go deeper on their interests, and relate findings to their usual terrain — without restating the profile.",
   "Ask only when the work genuinely cannot continue without an answer.",
   "Stay grounded in the provided history, media, place, and what you read.",
 ].join(" ");
@@ -37,6 +38,8 @@ export function buildEnrichmentPrompt(input: {
   targetCaptureIds: string[];
   requestTitle: boolean;
   placesByCaptureId?: Record<string, NearbyPlace | null>;
+  /** Rendered Memory profile (lib/memory/profile.ts); null when none known. */
+  walkerProfile?: string | null;
 }): string {
   const historyBlock = input.history
     .map((entry) => {
@@ -60,14 +63,20 @@ export function buildEnrichmentPrompt(input: {
     ? "Also propose a short recognizable Thread title (max 8 words) on the first line as `TITLE: ...`, then the Enrichment body."
     : "Respond with the Enrichment body only.";
 
-  return [
+  const sections = [
     `Thread title: ${input.threadTitle}`,
     `Pending Capture ids for this Enrichment: ${targets}`,
+  ];
+  if (input.walkerProfile) {
+    sections.push(input.walkerProfile);
+  }
+  sections.push(
     "Research with the web_search and read_page tools when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",
     "Complete Thread history at the frozen basis:",
     historyBlock || "(empty)",
     titleLine,
-  ].join("\n\n");
+  );
+  return sections.join("\n\n");
 }
 
 export function parseGatewayText(

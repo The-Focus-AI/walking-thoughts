@@ -1,5 +1,8 @@
 import type { MediaKind } from "@/lib/local-capture/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
+import { renderWalkerProfile } from "@/lib/memory/profile";
+import { getWalkerMemoryRepository } from "@/lib/memory/repository";
+import type { WalkerMemoryRepository } from "@/lib/memory/types";
 import type { PrivateBlobStore } from "@/lib/media/memory-blob-store";
 import { notifyEnrichmentOutcome } from "@/lib/push/notify";
 import { getPushRepository } from "@/lib/push/repository";
@@ -200,6 +203,7 @@ async function runJob(
   blobStore: PrivateBlobStore,
   placeResolver: NearbyPlaceResolver,
   search: ResearchClient | undefined,
+  walkerProfile: string | null,
   push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
@@ -281,6 +285,7 @@ async function runJob(
       targetCaptureIds: running.targetCaptureIds,
       requestTitle,
       placesByCaptureId,
+      walkerProfile,
     });
     const generation = await gateway.generate({
       model: running.model,
@@ -346,6 +351,7 @@ export async function processPendingEnrichments(
     blobStore?: PrivateBlobStore;
     placeResolver?: NearbyPlaceResolver;
     search?: WebSearchClient | ResearchClient;
+    memoryRepository?: WalkerMemoryRepository;
     pushRepository?: PushRepository;
     pushSender?: PushSender | null;
   } = {},
@@ -372,6 +378,19 @@ export async function processPendingEnrichments(
     ? { repository: pushRepository, sender: pushSender }
     : undefined;
 
+  const memoryRepository =
+    options.memoryRepository ??
+    getWalkerMemoryRepository(environment as NodeJS.ProcessEnv);
+  // A Memory outage degrades to an untailored report, never a failed job.
+  let walkerProfile: string | null = null;
+  try {
+    walkerProfile = renderWalkerProfile(
+      await memoryRepository.listMemories(userId),
+    );
+  } catch {
+    walkerProfile = null;
+  }
+
   if (options.retryFailed) {
     await repository.requeueFailed(userId);
   }
@@ -397,6 +416,7 @@ export async function processPendingEnrichments(
       blobStore,
       placeResolver,
       search,
+      walkerProfile,
       push,
     );
     results.push(...jobResults);
