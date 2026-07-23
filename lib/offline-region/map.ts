@@ -43,6 +43,9 @@ export type RegionMapOptions = {
   /** Open the map here instead of the region center when the point is a
    * real fix inside the pack bounds. */
   center?: { latitude: number; longitude: number } | null;
+  /** Always collapse the attribution to its toggle — for glance surfaces
+   * (the home hero) where the full credit line would cover the overlay. */
+  compactAttribution?: boolean;
 };
 
 /** True when the point sits inside the manifest's [w, s, e, n] bounds. */
@@ -84,11 +87,34 @@ function mountRegionMap(
       [manifest.bounds[0], manifest.bounds[1]],
       [manifest.bounds[2], manifest.bounds[3]],
     ],
-    attributionControl: { compact: false },
+    // Compact on glance surfaces; elsewhere responsive (collapses on
+    // narrow maps, full credit line on wide ones).
+    attributionControl: options?.compactAttribution
+      ? { compact: true }
+      : {},
     // Lets tests read pixels back to prove the region actually painted.
     canvasContextAttributes: { preserveDrawingBuffer: true },
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+
+  if (options?.compactAttribution) {
+    // maplibre expands compact attribution (maplibregl-compact-show) once the
+    // style's credits load, and only minimizes on the first map drag. Strip
+    // that first automatic expansion so the credit line never covers the
+    // hero overlay; after the map settles the toggle is the user's.
+    const attrib = container.querySelector(".maplibregl-ctrl-attrib");
+    if (attrib) {
+      attrib.classList.remove("maplibregl-compact-show");
+      const guard = new MutationObserver(() => {
+        if (attrib.classList.contains("maplibregl-compact-show")) {
+          attrib.classList.remove("maplibregl-compact-show");
+          guard.disconnect();
+        }
+      });
+      guard.observe(attrib, { attributes: true, attributeFilter: ["class"] });
+      map.once("idle", () => guard.disconnect());
+    }
+  }
 
   const firstRenderMs = new Promise<number>((resolve) => {
     map.once("idle", () => resolve(performance.now() - constructed));
