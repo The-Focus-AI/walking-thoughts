@@ -49,6 +49,14 @@ function createJobId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Failures that no retry can fix — the source data is gone. These jobs must
+ * not re-enter the queue (one did 6,400 futile attempts in production).
+ */
+export function isPermanentEnrichmentError(reason: string): boolean {
+  return reason.startsWith("missing_original_media_");
+}
+
 function pendingCaptureIds(thread: EnrichmentThreadSnapshot): string[] {
   return thread.entries
     .filter(
@@ -322,7 +330,7 @@ async function runJob(
       threadId: running.threadId,
       status: "needs_attention" as const,
       reason,
-      retryable: true,
+      retryable: !isPermanentEnrichmentError(reason),
     }));
   }
 }
