@@ -141,10 +141,13 @@ folder). Rules below that came from a losing variant say so.
 
 ## Colors
 
-The palette is the woods at dusk: a deep green ground, warm off-white ink,
-and five accents with **strict, non-transferable jobs**. Color roles are the
-grammar of the app — an agent who knows nothing else about a screen should
-still color it correctly from this table.
+The palette is a Northeastern woodland at dusk — the Adirondacks, the
+Appalachian Trail under a hardwood canopy: a deep green ground, warm
+off-white ink, and five accents with **strict, non-transferable jobs**.
+Think of the accents like ADK trail-marker discs nailed to trees: each
+color is a specific trail, and following the wrong one gets you lost.
+Color roles are the grammar of the app — an agent who knows nothing else
+about a screen should still color it correctly from this table.
 
 | Token | Value | Role — and nothing else |
 | --- | --- | --- |

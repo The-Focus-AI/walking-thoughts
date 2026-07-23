@@ -61,7 +61,8 @@ the affected variants.
    rows; soft-rounded; flat with faint elevation reserved for floating
    layers. *(Evidence: `app/globals.css`, trail-cleanup and thread-review
    VERDICTs, user direction.)*
-4. **Color feelings** — warm, muted, drawn from the woods at dusk. Accents
+4. **Color feelings** — *(user-confirmed: "foresty feels, like the ADK or
+   AT")* — warm, muted, a Northeastern woodland at dusk. Accents
    have strict jobs: moss = you/identity/success, sun = primary action and
    work in progress, clay = needs attention, sky = the machine's voice
    (Enrichment), signal red only while recording. Off-limits: neon
