@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createMemoryCaptureStore } from "@/lib/local-capture/store";
+import { resetSyncCycleForTests, runSyncCycle } from "@/lib/sync/cycle";
 import {
   createMemoryBlobStore,
   resetMemoryBlobStore,
@@ -192,12 +193,6 @@ test("remote Trash pull applies server records without rewriting Capture history
 });
 
 test("runSyncCycle drains local Trash mutations to the server", async () => {
-  const { resetSyncCycleForTests, runSyncCycle } = await import(
-    "@/lib/sync/cycle"
-  );
-  const { createMemoryCaptureStore } = await import(
-    "@/lib/local-capture/store"
-  );
   resetSyncCycleForTests();
 
   const store = createMemoryCaptureStore();
@@ -215,8 +210,8 @@ test("runSyncCycle drains local Trash mutations to the server", async () => {
       },
     },
     mediaTransport: {
-      async upload() {
-        return { remoteObjectKey: "media/none" };
+      async upload(input) {
+        return { attachmentId: input.attachmentId, duplicate: false };
       },
     },
     enrichmentTransport: {
