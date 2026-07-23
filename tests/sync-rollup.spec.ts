@@ -26,7 +26,7 @@ test("syncRollup counts each Capture status for the glance footer", () => {
   expect(syncFooterSummary(rollup)).toBe("Working on 4 of 6");
   expect(syncFooterSummary(rollup, { running: true })).toBe("Sync running…");
   expect(syncFooterSummary(syncRollup(["complete", "complete"]))).toBe(
-    "All caught up",
+    "All Captures synced",
   );
   expect(syncFooterSummary(syncRollup([]))).toBe("No Captures yet");
 });

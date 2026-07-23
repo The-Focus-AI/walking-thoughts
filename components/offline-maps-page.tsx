@@ -146,8 +146,8 @@ export function OfflineMapsPage() {
             you are back online
           </li>
           <li>
-            <strong>Shell ready</strong> in the topbar — only means app screens
-            are cached, not that trail maps are downloaded
+            <strong>Shell ready</strong> in the topbar — only means app
+            screens open offline, not that trail maps are downloaded
           </li>
         </ul>
       </section>

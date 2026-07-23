@@ -1335,6 +1335,12 @@ h1 {
   animation: recording-pulse 1.2s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .capture-card .capture-icon-btn[aria-pressed="true"] {
+    animation: none;
+  }
+}
+
 .capture-actions .capture-commit {
   flex: 1 1 auto;
   min-height: 2.9rem;
