@@ -79,9 +79,6 @@ export function CaptureEntryView({
       aria-label={label}
     >
       <div className="capture-entry-meta">
-        {showSpeaker ? (
-          <span className="thread-speaker">You</span>
-        ) : null}
         <span className={`capture-status status-${capture.status}`}>
           {statusLabel(capture.status)}
         </span>

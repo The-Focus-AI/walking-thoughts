@@ -1664,13 +1664,20 @@ footer {
 }
 
 .journal-close {
-  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--ink);
   border-radius: 4px;
-  width: 2rem;
-  height: 2rem;
+  width: 2.2rem;
+  height: 2.2rem;
   cursor: pointer;
+}
+
+.journal-close svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .journal-preview {
@@ -1928,68 +1935,31 @@ footer {
   align-content: start;
 }
 
-.chat-turn {
+/* Thread log entries: station gutter left, the walker's words right. The
+   italic serif itself marks the walker — no speaker labels, no bubbles. */
+.thread-entry {
   display: grid;
-  gap: 0.3rem;
-  max-width: 92%;
+  grid-template-columns: 4.9rem 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.chat-turn-you {
-  justify-self: end;
+.thread-entry-body {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
-.chat-turn-agent {
-  justify-self: start;
-}
-
-.chat-bubble {
-  padding: 0.75rem 0.9rem;
-  border-radius: 0;
-  line-height: 1.45;
-}
-
-.chat-bubble p {
+.capture-words {
   margin: 0;
-  white-space: pre-wrap;
-}
-
-/* The walker's words are the natural feature: italic serif, only here. */
-.chat-bubble-you p {
   font-family: var(--font-capture);
   font-style: italic;
   font-size: 1.06rem;
   line-height: 1.45;
-}
-
-.chat-bubble-you {
-  background: rgba(169, 209, 143, 0.18);
-  border: 1px solid rgba(169, 209, 143, 0.35);
-  border-bottom-right-radius: 0.3rem;
-}
-
-.chat-bubble-agent {
-  background: rgba(143, 184, 216, 0.14);
-  border: 1px solid rgba(143, 184, 216, 0.35);
-  border-bottom-left-radius: 0.3rem;
-}
-
-.chat-pending {
-  color: var(--muted);
-}
-
-.chat-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.65rem;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.65rem;
-  padding: 0 0.25rem;
-}
-
-.chat-turn-you .chat-meta {
-  justify-content: flex-end;
+  color: var(--ink);
+  white-space: pre-wrap;
 }
 
 .chat-attachments {
