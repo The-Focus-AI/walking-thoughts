@@ -39,6 +39,6 @@ export function syncFooterSummary(
   const total =
     pending + rollup.complete;
   if (total === 0) return "No Captures yet";
-  if (pending === 0) return "All caught up";
+  if (pending === 0) return "All Captures synced";
   return `Working on ${pending} of ${total}`;
 }

@@ -65,31 +65,31 @@ function ResearchTrace({ steps }: { steps: ResearchStep[] }) {
 }
 
 /**
- * A report-style Enrichment: markdown body, numbered source chips, and the
- * research trace folded away (thread-review prototype, Enrich variant A).
+ * An Enrichment rendered as the machine's Annotation (DESIGN.md): sky left
+ * rule, mono sky header with the model ID, upright markdown body, numbered
+ * source citations, and the research trace folded away.
  */
 export function EnrichmentReport({
   enrichment,
-  heading = "Walking Thoughts",
 }: {
   enrichment: ThreadEnrichment;
-  heading?: string;
 }) {
   return (
     <article
       className="enrichment-report"
       data-testid="enrichment-report"
-      aria-label={`${heading} report · ${enrichment.model}`}
+      aria-label={`Annotation · ${enrichment.model}`}
     >
       <header className="enrichment-report-head">
-        <span className="enrichment-report-mark" aria-hidden="true">
-          ✦
-        </span>
-        <span className="thread-speaker">{heading}</span>
-        <span className="enrichment-model">{enrichment.model}</span>
+        <span>Annotation</span>
         <time dateTime={enrichment.createdAt}>
-          {new Date(enrichment.createdAt).toLocaleString()}
+          {new Date(enrichment.createdAt).toLocaleTimeString(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })}
         </time>
+        <span className="enrichment-model">{enrichment.model}</span>
       </header>
       <EnrichmentMarkdown text={enrichment.text} />
       {enrichment.sources.length > 0 ? (

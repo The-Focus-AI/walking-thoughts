@@ -5,6 +5,7 @@ import { AppNav } from "@/components/app-nav";
 import { CaptureComposer } from "@/components/capture-composer";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { OfflineReadiness } from "@/components/offline-readiness";
+import { InstrumentStrip, SheetMasthead } from "@/components/sheet";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { TrailMapHero } from "@/components/trail-map-hero";
 
@@ -19,20 +20,22 @@ type AppShellProps = {
  */
 export function AppShell({ account, configurationRequired }: AppShellProps) {
   return (
-    <main className="shell trail-shell">
+    <main className="shell trail-shell sheet">
       {!configurationRequired ? <SyncRuntime /> : null}
       <header className="topbar">
         <Link className="brand" href="/" aria-label="Walking Thoughts home">
           <span className="brand-mark" aria-hidden="true">
             W
           </span>
-          <span>Walking Thoughts</span>
         </Link>
         <div className="topbar-actions">
           <OfflineReadiness />
           {account}
         </div>
       </header>
+
+      <SheetMasthead />
+      <InstrumentStrip />
 
       <div className="trail-layout">
         <TrailMapHero />

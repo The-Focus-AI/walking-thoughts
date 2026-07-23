@@ -12,6 +12,10 @@ import {
   resolveJournalRegion,
   resolveRegionBaseUrl,
 } from "@/lib/map-journal/region";
+import {
+  prefetchLocation,
+  readAvailableLocation,
+} from "@/lib/local-capture/location";
 import { createRegionStore } from "@/lib/offline-region/store";
 import type {
   RegionDownloadProgress,
@@ -21,7 +25,7 @@ import type {
 type HeroState =
   | { phase: "loading" }
   | { phase: "region-missing"; manifest: RegionManifest | null }
-  | { phase: "ready"; manifest: RegionManifest };
+  | { phase: "ready"; manifest: RegionManifest; source: "local" | "remote" };
 
 /**
  * Map-as-home-hero (prototype Map A): Offline Region is the first plane.
@@ -48,7 +52,11 @@ export function TrailMapHero() {
     try {
       const store = createRegionStore(baseUrl, region);
       await store.install(manifest, (next) => setProgress(next));
-      setState({ phase: "ready", manifest });
+      setState((current) =>
+        current.phase === "ready"
+          ? { ...current, source: "local" }
+          : { phase: "ready", manifest, source: "local" },
+      );
     } catch {
       setError(
         "The Offline Region download could not be verified. Stay online and try again.",
@@ -66,7 +74,7 @@ export function TrailMapHero() {
       const installed = await store.installed();
       if (!active) return;
       if (installed) {
-        setState({ phase: "ready", manifest: installed });
+        setState({ phase: "ready", manifest: installed, source: "local" });
         return;
       }
       const manifest = await store.manifest();
@@ -75,7 +83,13 @@ export function TrailMapHero() {
         setState({ phase: "region-missing", manifest: null });
         return;
       }
-      setState({ phase: "region-missing", manifest });
+      // First paint from the published pack while the install runs — a fresh
+      // origin or device should still open on the map, not a download gate.
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        setState({ phase: "ready", manifest, source: "remote" });
+      } else {
+        setState({ phase: "region-missing", manifest });
+      }
       setDownloading(true);
       setProgress({
         downloadedBytes: 0,
@@ -86,7 +100,13 @@ export function TrailMapHero() {
         await store.install(manifest, (next) => {
           if (active) setProgress(next);
         });
-        if (active) setState({ phase: "ready", manifest });
+        if (active) {
+          setState((current) =>
+            current.phase === "ready"
+              ? { ...current, source: "local" }
+              : { phase: "ready", manifest, source: "local" },
+          );
+        }
       } catch {
         if (active) {
           setError(
@@ -106,16 +126,31 @@ export function TrailMapHero() {
   }, [baseUrl, region]);
 
   useEffect(() => {
+    prefetchLocation();
+  }, []);
+
+  useEffect(() => {
     if (state.phase !== "ready" || mapRef.current || !containerRef.current) {
       return;
     }
     const manifest = state.manifest;
+    const source = state.source;
     const container = containerRef.current;
     let disposed = false;
     void (async () => {
-      const { renderInstalledRegion } = await import("@/lib/offline-region/map");
-      const store = createRegionStore(baseUrl, region);
-      const { map } = await renderInstalledRegion(container, store, manifest);
+      const { renderInstalledRegion, renderRemoteRegion } = await import(
+        "@/lib/offline-region/map"
+      );
+      const options = { center: readAvailableLocation() };
+      const { map } =
+        source === "local"
+          ? await renderInstalledRegion(
+              container,
+              createRegionStore(baseUrl, region),
+              manifest,
+              options,
+            )
+          : await renderRemoteRegion(container, baseUrl, manifest, options);
       if (disposed) {
         map.remove();
         return;
@@ -127,7 +162,10 @@ export function TrailMapHero() {
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [state, baseUrl, region]);
+    // The mounted map keeps serving when the background install completes;
+    // only a fresh mount switches to the installed pack.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- remount only on phase/manifest change
+  }, [state.phase, state.phase === "ready" ? state.manifest : null, baseUrl, region]);
 
   const percent =
     state.phase === "region-missing" && state.manifest
@@ -211,8 +249,13 @@ export function TrailMapHero() {
               <p className="eyebrow">Offline Region</p>
               <p className="trail-map-hero-name">{state.manifest.name}</p>
               <p className="trail-map-hero-meta">
-                Maps ready offline · v{state.manifest.version} ·{" "}
-                {state.manifest.radiusKm} km
+                {state.source === "local"
+                  ? `Maps ready offline · v${state.manifest.version} · ${state.manifest.radiusKm} km`
+                  : downloading
+                    ? `Streaming online · saving for offline${
+                        progress ? ` · ${regionDownloadPercent(progress)}%` : ""
+                      }`
+                    : "Streaming online · not yet saved offline"}
               </p>
             </div>
             <div className="offline-maps-actions">

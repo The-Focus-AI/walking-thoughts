@@ -121,7 +121,6 @@ function CaptureHero({ capture }: { capture: LocalCapture }) {
         </ul>
       ) : null}
       <div className="thread-capture-meta">
-        <span>You</span>
         <time dateTime={capture.createdAt}>
           {new Date(capture.createdAt).toLocaleString()}
         </time>
@@ -146,16 +145,34 @@ function CaptureHero({ capture }: { capture: LocalCapture }) {
   );
 }
 
-/** A later Capture in the Thread's conversation. */
+/**
+ * A later Capture in the Thread, as a survey-log entry: station gutter
+ * (time over status) with the walker's words in italic serif — the italic
+ * itself says "you said this"; no speaker labels, no bubbles.
+ */
 function ConversationCapture({ capture }: { capture: LocalCapture }) {
   return (
     <article
-      className="chat-turn chat-turn-you"
+      className="thread-entry capture-gutter"
       data-testid="chat-turn-you"
       aria-label={capture.text || "Capture"}
     >
-      <div className="chat-bubble chat-bubble-you">
-        {capture.text ? <p>{capture.text}</p> : null}
+      <div className="station-gutter">
+        <time className="station-time" dateTime={capture.createdAt}>
+          {new Date(capture.createdAt).toLocaleTimeString(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          })}
+        </time>
+        <span className={`gutter-label capture-status status-${capture.status}`}>
+          {statusLabel(capture.status)}
+        </span>
+      </div>
+      <div className="thread-entry-body">
+        {capture.text ? (
+          <p className="capture-words">{capture.text}</p>
+        ) : null}
         {capture.attachments.length > 0 ? (
           <ul className="chat-attachments">
             {capture.attachments.map((attachment) => (
@@ -165,15 +182,6 @@ function ConversationCapture({ capture }: { capture: LocalCapture }) {
             ))}
           </ul>
         ) : null}
-      </div>
-      <div className="chat-meta">
-        <span>You</span>
-        <span className={`capture-status status-${capture.status}`}>
-          {statusLabel(capture.status)}
-        </span>
-        <time dateTime={capture.createdAt}>
-          {new Date(capture.createdAt).toLocaleTimeString()}
-        </time>
       </div>
     </article>
   );
@@ -433,7 +441,7 @@ export function ThreadChat({
               {reviewBusy
                 ? "Saving…"
                 : thread?.reviewedAt
-                  ? "Reviewed ✓"
+                  ? "Reviewed"
                   : "Mark reviewed"}
             </button>
           ) : null}
@@ -481,7 +489,16 @@ export function ThreadChat({
               aria-label="Close Thread"
               onClick={onClose}
             >
-              ✕
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.9}
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
             </button>
           ) : null}
         </div>
@@ -510,10 +527,13 @@ export function ThreadChat({
           <article
             className="enrichment-report enrichment-report-pending"
             data-testid="chat-turn-pending"
-            aria-label="Walking Thoughts is researching"
+            aria-label="Enriching"
           >
-            <span className="thread-speaker">Walking Thoughts</span>
-            <p>Researching this Capture…</p>
+            <header className="enrichment-report-head">
+              <span>Annotation</span>
+              <span>Enriching</span>
+            </header>
+            <p>Enriching — researching your Capture.</p>
           </article>
         ) : null}
         {timeline.length === 0 && !isEnriching ? (

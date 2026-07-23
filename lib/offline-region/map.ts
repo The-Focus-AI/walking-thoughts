@@ -39,10 +39,72 @@ export type RegionMap = {
   firstRenderMs: Promise<number>;
 };
 
+export type RegionMapOptions = {
+  /** Open the map here instead of the region center when the point is a
+   * real fix inside the pack bounds. */
+  center?: { latitude: number; longitude: number } | null;
+};
+
+/** True when the point sits inside the manifest's [w, s, e, n] bounds. */
+export function withinRegionBounds(
+  manifest: RegionManifest,
+  point: { latitude: number; longitude: number },
+): boolean {
+  const [west, south, east, north] = manifest.bounds;
+  return (
+    point.longitude >= west &&
+    point.longitude <= east &&
+    point.latitude >= south &&
+    point.latitude <= north
+  );
+}
+
+function mountRegionMap(
+  container: HTMLElement,
+  manifest: RegionManifest,
+  style: ReturnType<typeof trailFirstStyle>,
+  options?: RegionMapOptions,
+): RegionMap {
+  const fix =
+    options?.center && withinRegionBounds(manifest, options.center)
+      ? options.center
+      : null;
+
+  const constructed = performance.now();
+  const map = new maplibregl.Map({
+    container,
+    style,
+    center: fix
+      ? [fix.longitude, fix.latitude]
+      : [manifest.center.longitude, manifest.center.latitude],
+    zoom: fix ? 15 : 13,
+    minZoom: 8,
+    maxZoom: 18,
+    maxBounds: [
+      [manifest.bounds[0], manifest.bounds[1]],
+      [manifest.bounds[2], manifest.bounds[3]],
+    ],
+    attributionControl: { compact: false },
+    // Lets tests read pixels back to prove the region actually painted.
+    canvasContextAttributes: { preserveDrawingBuffer: true },
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+
+  const firstRenderMs = new Promise<number>((resolve) => {
+    map.once("idle", () => resolve(performance.now() - constructed));
+  });
+
+  (window as Window & { __WT_REGION_MAP__?: maplibregl.Map }).__WT_REGION_MAP__ =
+    map;
+
+  return { map, firstRenderMs };
+}
+
 export async function renderInstalledRegion(
   container: HTMLElement,
   store: RegionStore,
   manifest: RegionManifest,
+  options?: RegionMapOptions,
 ): Promise<RegionMap> {
   const protocol = ensureProtocols();
   glyphStores.set(manifest.region, store);
@@ -65,30 +127,33 @@ export async function renderInstalledRegion(
     glyphsUrl: `region-glyphs://${manifest.region}/{fontstack}/{range}.pbf`,
   });
 
-  const constructed = performance.now();
-  const map = new maplibregl.Map({
-    container,
-    style,
-    center: [manifest.center.longitude, manifest.center.latitude],
-    zoom: 13,
-    minZoom: 8,
-    maxZoom: 18,
-    maxBounds: [
-      [manifest.bounds[0], manifest.bounds[1]],
-      [manifest.bounds[2], manifest.bounds[3]],
-    ],
-    attributionControl: { compact: false },
-    // Lets tests read pixels back to prove the region actually painted.
-    canvasContextAttributes: { preserveDrawingBuffer: true },
+  return mountRegionMap(container, manifest, style, options);
+}
+
+/**
+ * First paint without the install: stream the published pack over HTTP range
+ * requests while the download runs in the background. Online-only by nature —
+ * the installed pack takes over on the next mount once it lands.
+ */
+export async function renderRemoteRegion(
+  container: HTMLElement,
+  baseUrl: string,
+  manifest: RegionManifest,
+  options?: RegionMapOptions,
+): Promise<RegionMap> {
+  ensureProtocols();
+  const root = new URL(
+    baseUrl.replace(/\/+$/, ""),
+    window.location.origin,
+  ).toString();
+
+  const style = trailFirstStyle({
+    manifest,
+    basemapUrl: `pmtiles://${root}/basemap.pmtiles`,
+    terrainUrl: `pmtiles://${root}/terrain.pmtiles`,
+    contoursUrl: `pmtiles://${root}/contours.pmtiles`,
+    glyphsUrl: `${root}/fonts/{fontstack}/{range}.pbf`,
   });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
 
-  const firstRenderMs = new Promise<number>((resolve) => {
-    map.once("idle", () => resolve(performance.now() - constructed));
-  });
-
-  (window as Window & { __WT_REGION_MAP__?: maplibregl.Map }).__WT_REGION_MAP__ =
-    map;
-
-  return { map, firstRenderMs };
+  return mountRegionMap(container, manifest, style, options);
 }

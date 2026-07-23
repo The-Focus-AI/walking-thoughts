@@ -1,5 +1,5 @@
 // Keep in sync with SHELL_CACHE_NAME in lib/offline-shell.ts.
-const CACHE_NAME = "walking-thoughts-shell-v10";
+const CACHE_NAME = "walking-thoughts-shell-v11";
 const SHELL = [
   "/offline",
   "/journal",
@@ -7,6 +7,8 @@ const SHELL = [
   "/manifest.webmanifest",
   "/icon-192.svg",
   "/icon-512.svg",
+  "/fonts/barlow-condensed-500.woff2",
+  "/fonts/barlow-condensed-600.woff2",
 ];
 
 self.addEventListener("install", (event) => {

@@ -34,6 +34,7 @@ export function journal(page: Page) {
     return hook
       ? {
           state: hook.state,
+          source: hook.source,
           markerCount: hook.markerCount,
           gps: hook.gps,
           selectedCaptureId: hook.selectedCaptureId,
@@ -44,13 +45,17 @@ export function journal(page: Page) {
 
 export async function installFixtureRegion(page: Page) {
   await page.goto(JOURNAL_URL);
-  // The published fixture pack installs automatically on first visit.
+  // The published fixture pack installs automatically on first visit. The map
+  // may stream remotely before the install lands — wait for the local pack.
   await expect(page.getByTestId("journal-map")).toBeVisible({
     timeout: 45_000,
   });
   await expect
     .poll(() => journal(page).then((hook) => hook?.state), { timeout: 45_000 })
     .toBe("ready");
+  await expect
+    .poll(() => journal(page).then((hook) => hook?.source), { timeout: 45_000 })
+    .toBe("local");
 }
 
 export async function waitForIdleMap(page: Page) {

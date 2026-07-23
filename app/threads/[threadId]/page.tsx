@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ThreadsArchive } from "@/components/threads-archive";
+import { ThreadsQueue } from "@/components/threads-queue";
 
 export const metadata = {
   title: "Thread — Walking Thoughts",
@@ -13,7 +13,7 @@ export default async function ThreadPage({ params }: PageProps) {
   const { threadId } = await params;
   return (
     <Suspense fallback={<p className="proto-pad">Opening Thread…</p>}>
-      <ThreadsArchive selectedThreadId={threadId} />
+      <ThreadsQueue selectedThreadId={threadId} />
     </Suspense>
   );
 }
