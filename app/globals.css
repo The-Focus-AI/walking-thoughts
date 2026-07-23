@@ -172,9 +172,12 @@ a {
 
 .trail-map-hero-name {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
   font-size: clamp(1.5rem, 4vw, 2.2rem);
-  font-weight: 500;
 }
 
 .trail-map-hero-meta,
@@ -194,9 +197,12 @@ a {
 
 .trail-map-hero-missing h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
   font-size: clamp(1.6rem, 5vw, 2.4rem);
-  font-weight: 500;
 }
 
 /* Secondary on the trail home — Commit Capture holds the viewport's one
@@ -270,9 +276,12 @@ a {
 
 .offline-maps-header h1 {
   margin: 0.2rem 0 0.5rem;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
   font-size: clamp(1.8rem, 6vw, 2.6rem);
-  font-weight: 500;
 }
 
 .offline-maps-header p {
@@ -299,7 +308,12 @@ a {
 
 .offline-maps-card h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  font-size: 1.15rem;
 }
 
 .offline-maps-card p,
@@ -388,10 +402,11 @@ a {
 }
 
 .gutter-label {
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-size: 0.62rem;
   color: var(--moss);
   padding-top: 0.15rem;
 }
@@ -476,8 +491,6 @@ a {
 
 .trail-shell h1.capture-section-title {
   max-width: none;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
 }
 
 .topbar,
@@ -547,20 +560,22 @@ footer {
 .capture-label {
   margin: 0 0 1rem;
   color: var(--moss);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
 h1 {
   max-width: 720px;
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
   font-size: clamp(3rem, 9vw, 6.8rem);
-  font-weight: 500;
-  letter-spacing: -0.065em;
-  line-height: 0.92;
 }
 
 .lede {
@@ -695,17 +710,21 @@ h1 {
 .capture-section-title {
   margin: 0;
   color: var(--ink);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
   font-size: 1.35rem;
-  font-weight: 500;
-  letter-spacing: -0.03em;
 }
 
 .capture-revision {
   color: var(--muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-size: 0.62rem;
 }
 
 .capture-list {
@@ -730,14 +749,18 @@ h1 {
   gap: 0.65rem 0.9rem;
   align-items: baseline;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
 }
 
 .capture-status {
   color: var(--moss);
-  font-weight: 800;
+  font-family: var(--font-mono);
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-size: 0.62rem;
 }
 
 .capture-status.status-syncing {
@@ -764,9 +787,11 @@ h1 {
 
 .thread-speaker {
   color: var(--ink);
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-size: 0.62rem;
 }
 
 .trail-thread {
@@ -828,6 +853,11 @@ h1 {
 
 .threads-day h2 {
   margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
   font-size: 1.05rem;
   color: var(--moss);
 }
@@ -872,7 +902,9 @@ h1 {
 
 .thread-row-meta {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
 }
 
 .thread-row-side {
@@ -1147,7 +1179,9 @@ h1 {
   gap: 0.25rem 0.5rem;
   margin: 0;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
 }
 
 .trail-dock-card .capture-composer textarea {
@@ -1171,7 +1205,10 @@ h1 {
 .capture-entry p {
   margin: 0;
   color: var(--ink);
-  line-height: 1.5;
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.45;
   white-space: pre-wrap;
 }
 
@@ -1205,9 +1242,12 @@ h1 {
 .data-handling h2 {
   margin: 0 0 0.55rem;
   color: var(--ink);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
   font-size: 1.15rem;
-  font-weight: 500;
 }
 
 .data-handling p {
@@ -1228,7 +1268,12 @@ h1 {
 
 .account-export-header h2 {
   margin: 0 0 0.35rem;
-  font-size: 1.35rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  font-size: 1.2rem;
 }
 
 .account-export-header p,
@@ -1371,8 +1416,12 @@ footer {
   gap: 1rem;
   flex-wrap: wrap;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
   font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .journal-empty {
@@ -1434,6 +1483,11 @@ footer {
 
 .journal-panel-head h2 {
   margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
   font-size: 1.2rem;
 }
 
@@ -1459,7 +1513,9 @@ footer {
 
 .journal-thread h3 {
   margin: 1rem 0 0.5rem;
-  font-size: 0.9rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.68rem;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1632,11 +1688,17 @@ footer {
 
 .region-tracer-metrics dt {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
 }
 
 .region-tracer-metrics dd {
   margin: 0.15rem 0 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
 
@@ -1679,14 +1741,17 @@ footer {
   margin: 0.35rem 0 0;
   font-size: clamp(1.35rem, 4vw, 1.85rem);
   max-width: none;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.05;
 }
 
 .thread-chat-sub {
   margin: 0.35rem 0 0;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .thread-chat-log {
@@ -1722,6 +1787,14 @@ footer {
   white-space: pre-wrap;
 }
 
+/* The walker's words are the natural feature: italic serif, only here. */
+.chat-bubble-you p {
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.45;
+}
+
 .chat-bubble-you {
   background: rgba(169, 209, 143, 0.18);
   border: 1px solid rgba(169, 209, 143, 0.35);
@@ -1736,7 +1809,6 @@ footer {
 
 .chat-pending {
   color: var(--muted);
-  font-style: italic;
 }
 
 .chat-meta {
@@ -1744,7 +1816,9 @@ footer {
   flex-wrap: wrap;
   gap: 0.4rem 0.65rem;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.65rem;
   padding: 0 0.25rem;
 }
 
@@ -1843,10 +1917,11 @@ footer {
   border-radius: 4px;
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-size: 0.62rem;
 }
 
 .app-tab svg {
@@ -1898,8 +1973,12 @@ footer {
   background: rgba(0, 0, 0, 0.25);
   color: var(--ink);
   text-decoration: none;
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.65rem;
   white-space: nowrap;
 }
 
@@ -1953,7 +2032,9 @@ footer {
 
 .thread-row-words {
   color: var(--ink);
-  font-size: 0.9rem;
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-size: 0.95rem;
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1997,9 +2078,10 @@ footer {
 
 .thread-capture-words {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.1rem;
-  line-height: 1.5;
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.45;
   color: var(--ink);
 }
 
@@ -2023,12 +2105,15 @@ footer {
   align-items: center;
   gap: 0.35rem 0.75rem;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
 }
 
 .thread-media-name {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
 }
 
 /* --- Enrichment report: markdown + sources + research trace --------------- */
@@ -2048,8 +2133,12 @@ footer {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35rem 0.7rem;
-  color: var(--muted);
-  font-size: 0.75rem;
+  color: var(--machine);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .enrichment-report-mark {
@@ -2064,7 +2153,7 @@ footer {
 .enrichment-markdown {
   display: grid;
   gap: 0.55rem;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--ink);
   font-size: 0.95rem;
   overflow-wrap: anywhere;
@@ -2086,8 +2175,10 @@ footer {
 .enrichment-markdown h2,
 .enrichment-markdown h3,
 .enrichment-markdown h4 {
-  color: var(--moss);
-  font-size: 0.82rem;
+  color: var(--machine);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
