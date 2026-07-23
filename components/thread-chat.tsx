@@ -232,11 +232,18 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
     setError(null);
     try {
       const result = await getSplitTransport().splitThread(threadId);
-      if (!result || result.moves.length === 0) {
+      if (!result) {
         setError("Could not split this Thread — check the connection");
         return;
       }
       const store = getCaptureStore();
+      if (result.moves.length === 0) {
+        // Server already has these Captures in their own Threads (or never
+        // saw this local grouping) — hydration rehomes them to server truth.
+        await runSyncCycle({ store });
+        router.push("/threads");
+        return;
+      }
       await store.applyThreadSplit(result);
       void runSyncCycle({ store });
       router.push("/threads");

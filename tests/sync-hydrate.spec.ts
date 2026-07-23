@@ -253,3 +253,99 @@ test("runSyncCycle hydrates phone Threads onto desktop then accepts a desktop fo
     followUp.id,
   ]);
 });
+
+test("applyRemoteThreads rehomes settled Captures to the server's Thread placement", async () => {
+  // A stale-build device merged two Captures into one local Thread; the
+  // server holds them as individual Threads. Hydration must converge.
+  const store = createMemoryCaptureStore({
+    threads: [
+      {
+        id: "local-merged",
+        title: "Today's hike",
+        revision: 2,
+        updatedAt: "2026-07-22T10:30:00.000Z",
+      },
+    ],
+    captures: [
+      {
+        id: "cap-a",
+        text: "Wet this morning",
+        createdAt: "2026-07-22T10:00:00.000Z",
+        location: null,
+        status: "complete",
+        threadId: "local-merged",
+        sequence: 1,
+        attachments: [],
+      },
+      {
+        id: "cap-b",
+        text: "Honda Acty stalling",
+        createdAt: "2026-07-22T10:06:00.000Z",
+        location: null,
+        status: "complete",
+        threadId: "local-merged",
+        sequence: 2,
+        attachments: [],
+      },
+      {
+        id: "cap-outbox",
+        text: "Still waiting to sync",
+        createdAt: "2026-07-22T10:10:00.000Z",
+        location: null,
+        status: "saved_locally",
+        threadId: "local-merged",
+        sequence: 3,
+        attachments: [],
+      },
+    ],
+  });
+
+  await store.applyRemoteThreads([
+    {
+      id: "cap-a",
+      title: "The Science of a Wet Morning",
+      revision: 1,
+      updatedAt: "2026-07-22T10:00:00.000Z",
+      captures: [
+        {
+          id: "cap-a",
+          text: "Wet this morning",
+          createdAt: "2026-07-22T10:00:00.000Z",
+          location: null,
+          sequence: 1,
+          attachments: [],
+        },
+      ],
+    },
+    {
+      id: "cap-b",
+      title: "Honda Acty Stalling Causes",
+      revision: 1,
+      updatedAt: "2026-07-22T10:06:00.000Z",
+      captures: [
+        {
+          id: "cap-b",
+          text: "Honda Acty stalling",
+          createdAt: "2026-07-22T10:06:00.000Z",
+          location: null,
+          sequence: 1,
+          attachments: [],
+        },
+      ],
+    },
+  ]);
+
+  const rehomedA = await store.listThread("cap-a");
+  expect(rehomedA.thread.title).toBe("The Science of a Wet Morning");
+  expect(rehomedA.captures.map((capture) => capture.id)).toEqual(["cap-a"]);
+  expect(rehomedA.captures[0].sequence).toBe(1);
+
+  const rehomedB = await store.listThread("cap-b");
+  expect(rehomedB.captures.map((capture) => capture.id)).toEqual(["cap-b"]);
+
+  // Outbox Captures keep their local placement until they sync.
+  const stillLocal = await store.listThread("local-merged");
+  expect(stillLocal.captures.map((capture) => capture.id)).toEqual([
+    "cap-outbox",
+  ]);
+});
