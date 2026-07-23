@@ -2141,3 +2141,18 @@ footer {
 .thread-split:hover {
   border-color: var(--sun);
 }
+
+.thread-trash {
+  color: #f0b4a0;
+}
+
+.thread-trash:hover {
+  border-color: #f0b4a0;
+}
+
+.thread-capture-reason {
+  margin: 0;
+  color: #f0b4a0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

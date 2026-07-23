@@ -189,3 +189,23 @@ test.describe("Thread chat", () => {
     await expect(page.getByTestId("thread-chat")).toBeVisible();
   });
 });
+
+test.describe("Thread trash", () => {
+  test("Trash hides the Thread and returns to the walk view", async ({
+    page,
+  }) => {
+    const threadId = await seedThread(page, "Blurry test photo");
+    await page.goto(`/threads/${threadId}`);
+    await expect(page.getByTestId("thread-capture-hero")).toContainText(
+      "Blurry test photo",
+    );
+
+    page.on("dialog", (dialog) => void dialog.accept());
+    await page.getByTestId("thread-trash").click();
+
+    await expect(page).toHaveURL(/\/threads$/);
+    await expect(
+      page.getByRole("link", { name: /Blurry test photo/ }),
+    ).toHaveCount(0);
+  });
+});
