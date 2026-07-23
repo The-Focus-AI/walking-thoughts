@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { SyncStatusPill } from "@/components/sync-status-pill";
+import { ThreadChat } from "@/components/thread-chat";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
@@ -96,9 +97,15 @@ function DayPhoto({
 /**
  * The walk view: Threads grouped by day. Each day leads with its photos;
  * each Thread is one dense row — your words, the report's title, and where
- * research stands — one tap from the full Thread.
+ * research stands. On desktop this is a master-detail workspace: the day
+ * list on the left, the selected Thread's review page on the right. On
+ * phones, selection swaps the panes (list ↔ Thread).
  */
-export function ThreadsArchive() {
+export function ThreadsArchive({
+  selectedThreadId,
+}: {
+  selectedThreadId?: string;
+} = {}) {
   const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -146,8 +153,15 @@ export function ThreadsArchive() {
   }, [threads]);
 
   return (
-    <main className="threads-archive">
+    <main
+      className={
+        selectedThreadId
+          ? "threads-archive threads-workspace has-selection"
+          : "threads-archive threads-workspace"
+      }
+    >
       <SyncRuntime />
+      <div className="threads-list-pane">
       <header className="threads-archive-header">
         <div>
           <p className="eyebrow">By day</p>
@@ -211,7 +225,14 @@ export function ThreadsArchive() {
                   0,
                 );
                 return (
-                  <li key={view.thread.id} className="thread-row">
+                  <li
+                    key={view.thread.id}
+                    className={
+                      view.thread.id === selectedThreadId
+                        ? "thread-row thread-row-selected"
+                        : "thread-row"
+                    }
+                  >
                     <Link
                       className="thread-row-main"
                       href={`/threads/${view.thread.id}`}
@@ -246,6 +267,18 @@ export function ThreadsArchive() {
           </section>
         );
       })}
+
+      </div>
+
+      <div className="threads-detail-pane">
+        {selectedThreadId ? (
+          <ThreadChat key={selectedThreadId} threadId={selectedThreadId} />
+        ) : (
+          <div className="threads-detail-empty" aria-hidden="true">
+            <p>Select a Thread to read its report.</p>
+          </div>
+        )}
+      </div>
 
       <AppNav />
     </main>

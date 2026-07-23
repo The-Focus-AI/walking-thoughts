@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ThreadChatPage } from "@/components/thread-chat-page";
+import { ThreadsArchive } from "@/components/threads-archive";
 
 export const metadata = {
   title: "Thread — Walking Thoughts",
@@ -13,7 +13,7 @@ export default async function ThreadPage({ params }: PageProps) {
   const { threadId } = await params;
   return (
     <Suspense fallback={<p className="proto-pad">Opening Thread…</p>}>
-      <ThreadChatPage threadId={threadId} />
+      <ThreadsArchive selectedThreadId={threadId} />
     </Suspense>
   );
 }
