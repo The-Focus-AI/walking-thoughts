@@ -177,6 +177,98 @@ export function directionFor(key: string | null): Direction {
   return DIRECTIONS.find((d) => d.key === key) ?? DIRECTIONS[0];
 }
 
+/**
+ * Type voices — typography-only variants rendered over the winning
+ * Forest Night tokens. Webfont voices load from Google Fonts in the
+ * prototype only; committing one means self-hosting the woff2 files in
+ * the offline shell.
+ */
+export type TypeVoice = {
+  key: DirectionKey;
+  name: string;
+  tagline: string;
+  display: string;
+  body: string;
+  mono: string;
+  displayWeight: string;
+  displayTransform: "none" | "uppercase";
+  displayTracking: string;
+  bodyLineHeight: string;
+  webfont: boolean;
+};
+
+export const TYPE_VOICES: TypeVoice[] = [
+  {
+    key: "a",
+    name: "Georgia journal",
+    tagline: "The incumbent: Georgia names things, system sans does the work.",
+    display: 'Georgia, "Times New Roman", serif',
+    body: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    mono: "ui-monospace, SFMono-Regular, Menlo, monospace",
+    displayWeight: "500",
+    displayTransform: "none",
+    displayTracking: "-0.03em",
+    bodyLineHeight: "1.5",
+    webfont: false,
+  },
+  {
+    key: "b",
+    name: "Bookish",
+    tagline: "Serif body everywhere — a printed journal page, denser ink.",
+    display: 'Charter, Georgia, "Times New Roman", serif',
+    body: 'Charter, Georgia, "Times New Roman", serif',
+    mono: "ui-monospace, SFMono-Regular, Menlo, monospace",
+    displayWeight: "500",
+    displayTransform: "none",
+    displayTracking: "-0.02em",
+    bodyLineHeight: "1.58",
+    webfont: false,
+  },
+  {
+    key: "c",
+    name: "Fraunces field guide",
+    tagline: "A warm old-style display serif — almost hand-set. Webfont.",
+    display: '"Fraunces", Georgia, "Times New Roman", serif',
+    body: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+    displayWeight: "550",
+    displayTransform: "none",
+    displayTracking: "-0.02em",
+    bodyLineHeight: "1.5",
+    webfont: true,
+  },
+  {
+    key: "d",
+    name: "Typewriter logbook",
+    tagline: "Courier Prime titles and facts — expedition log energy. Webfont.",
+    display: '"Courier Prime", "Courier New", monospace',
+    body: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    mono: '"Courier Prime", "Courier New", monospace',
+    displayWeight: "700",
+    displayTransform: "none",
+    displayTracking: "-0.01em",
+    bodyLineHeight: "1.5",
+    webfont: true,
+  },
+];
+
+export function typeVoiceFor(key: string | null): TypeVoice {
+  return TYPE_VOICES.find((v) => v.key === key) ?? TYPE_VOICES[0];
+}
+
+export function cssVarsForTypeVoice(voice: TypeVoice): Record<string, string> {
+  const base = cssVarsFor(DIRECTIONS[0]);
+  return {
+    ...base,
+    "--dd-f-display": voice.display,
+    "--dd-f-body": voice.body,
+    "--dd-f-mono": voice.mono,
+    "--dd-display-weight": voice.displayWeight,
+    "--dd-display-transform": voice.displayTransform,
+    "--dd-display-tracking": voice.displayTracking,
+  };
+}
+
 export function cssVarsFor(d: Direction): Record<string, string> {
   return {
     "--dd-bg": d.colors.background,

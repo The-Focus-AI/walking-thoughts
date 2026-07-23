@@ -14,7 +14,16 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PrototypeSwitcher } from "@/components/prototype-switcher";
-import { DIRECTIONS, cssVarsFor, directionFor, type Direction } from "./directions";
+import {
+  DIRECTIONS,
+  TYPE_VOICES,
+  cssVarsFor,
+  cssVarsForTypeVoice,
+  directionFor,
+  typeVoiceFor,
+  type Direction,
+  type TypeVoice,
+} from "./directions";
 import "./prototype-design.css";
 
 const VIEWPORTS = [
@@ -22,7 +31,17 @@ const VIEWPORTS = [
   { key: "desktop", label: "Desktop" },
 ] as const;
 
+const AREAS = [
+  { key: "direction", label: "Direction" },
+  { key: "type", label: "Type voice" },
+] as const;
+
 const OPTIONS = DIRECTIONS.map((d) => ({ key: d.key, label: d.name }));
+const TYPE_OPTIONS = TYPE_VOICES.map((v) => ({ key: v.key, label: v.name }));
+
+/** Prototype-only webfonts (committing a webfont voice means self-hosting). */
+const WEBFONT_CSS =
+  "https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Fraunces:opsz,wght@9..144,400..700&family=JetBrains+Mono:wght@400;700&display=swap";
 
 /* ---------------------------------------------------------------- fixture */
 
@@ -364,59 +383,132 @@ function TrailScreen({ d }: { d: Direction }) {
   );
 }
 
+/* ------------------------------------------------------- type voice area */
+
+function TypeVoiceSheet({ voice }: { voice: TypeVoice }) {
+  return (
+    <section className="dd-section" aria-label="Type voice stacks">
+      <h3 className="dd-section-title">Stacks</h3>
+      <dl className="dd-token-meta">
+        <dt>display</dt>
+        <dd>
+          <code>{voice.display}</code> · {voice.displayWeight} ·{" "}
+          {voice.displayTracking}
+        </dd>
+        <dt>body</dt>
+        <dd>
+          <code>{voice.body}</code> · line-height {voice.bodyLineHeight}
+        </dd>
+        <dt>mono</dt>
+        <dd>
+          <code>{voice.mono}</code>
+        </dd>
+        <dt>fonts</dt>
+        <dd>
+          {voice.webfont
+            ? "Webfont — committing this voice means self-hosting woff2 in the offline shell."
+            : "System stacks only — nothing to download, nothing to cache."}
+        </dd>
+      </dl>
+    </section>
+  );
+}
+
 /* ----------------------------------------------------------------- page */
 
 function DesignDirectionsPrototype() {
   const searchParams = useSearchParams();
+  const area = searchParams.get("area") === "type" ? "type" : "direction";
   const direction = directionFor(searchParams.get("variant"));
+  const voice = typeVoiceFor(searchParams.get("variant"));
   const viewport =
     searchParams.get("viewport") === "desktop" ? "desktop" : "mobile";
+
+  const chromeLabel =
+    area === "type"
+      ? `type · ${voice.key} — ${voice.name}`
+      : `${direction.key} — ${direction.name}`;
 
   return (
     <div
       className={`proto-viewport-stage dd-stage viewport-${viewport}`}
       data-viewport={viewport}
     >
+      {/* Prototype-only: webfont candidates for the type-voice area. */}
+      <link rel="stylesheet" href={WEBFONT_CSS} />
       <div className="proto-viewport-chrome" aria-hidden="true">
         <span>
           {viewport === "mobile" ? "Pixel · 390×844" : "Desktop · 1280×900"}
         </span>
-        <span>
-          {direction.key} — {direction.name}
-        </span>
+        <span>{chromeLabel}</span>
       </div>
       <div className="proto-viewport-frame">
-        <main
-          className="dd-root"
-          data-direction={direction.key}
-          style={cssVarsFor(direction) as React.CSSProperties}
-        >
-          <header className="dd-head">
-            <p className="dd-eyebrow">Direction {direction.key}</p>
-            <h2 className="dd-name">{direction.name}</h2>
-            <p className="dd-tagline">{direction.tagline}</p>
-            <p className="dd-contests">{direction.contests}</p>
-          </header>
-          <div className="dd-columns">
-            <div className="dd-col">
-              <TokenSheet d={direction} />
-              <TypeScale />
-              <ColorRoles />
-              <Buttons />
-              <CaptureForm />
-              <ThreadCard />
+        {area === "type" ? (
+          <main
+            className="dd-root"
+            data-direction="a"
+            data-voice={voice.key}
+            style={
+              {
+                ...cssVarsForTypeVoice(voice),
+                "--dd-body-leading": voice.bodyLineHeight,
+              } as React.CSSProperties
+            }
+          >
+            <header className="dd-head">
+              <p className="dd-eyebrow">Type voice {voice.key}</p>
+              <h2 className="dd-name">{voice.name}</h2>
+              <p className="dd-tagline">{voice.tagline}</p>
+              <p className="dd-contests">
+                Rendered over the winning Forest Night tokens.
+              </p>
+            </header>
+            <div className="dd-columns">
+              <div className="dd-col">
+                <TypeVoiceSheet voice={voice} />
+                <TypeScale />
+                <ThreadCard />
+              </div>
+              <div className="dd-col">
+                <TrailScreen d={DIRECTIONS[0]} />
+              </div>
             </div>
-            <div className="dd-col">
-              <TrailScreen d={direction} />
+          </main>
+        ) : (
+          <main
+            className="dd-root"
+            data-direction={direction.key}
+            style={cssVarsFor(direction) as React.CSSProperties}
+          >
+            <header className="dd-head">
+              <p className="dd-eyebrow">Direction {direction.key}</p>
+              <h2 className="dd-name">{direction.name}</h2>
+              <p className="dd-tagline">{direction.tagline}</p>
+              <p className="dd-contests">{direction.contests}</p>
+            </header>
+            <div className="dd-columns">
+              <div className="dd-col">
+                <TokenSheet d={direction} />
+                <TypeScale />
+                <ColorRoles />
+                <Buttons />
+                <CaptureForm />
+                <ThreadCard />
+              </div>
+              <div className="dd-col">
+                <TrailScreen d={direction} />
+              </div>
             </div>
-          </div>
-        </main>
+          </main>
+        )}
       </div>
       <PrototypeSwitcher
+        areaParam="area"
+        areas={[...AREAS]}
         viewportParam="viewport"
         viewports={[...VIEWPORTS]}
         param="variant"
-        options={OPTIONS}
+        options={area === "type" ? TYPE_OPTIONS : OPTIONS}
       />
     </div>
   );
