@@ -287,3 +287,35 @@ Only the composer select/textarea have focus styles, and both use
 transparent moss instead of the solid 2px `focus-ring` + 2px offset. Every
 button, link, tab, pill, and the remaining inputs rely on browser
 defaults.
+
+---
+
+## Implementation status (2026-07-23, this branch)
+
+All five phases landed on `claude/app-design-normalization-tqxtza`, one
+commit per phase slice; the full Playwright suite (130 tests) and
+typecheck are green. Notes against the plan:
+
+- **Done:** full token set + accent/tint sweep; Barlow Condensed 500/600
+  self-hosted with preload and shell-cache precache (v11); four voice
+  classes and the global focus ring; complete radius/shadow/de-pill
+  sweep; enrichment moved to sky; moss/action button roles corrected;
+  off-palette outliers gone; trail home composed as a survey sheet
+  (masthead, instrument strip, station gutter, scale-bar footer,
+  neatline); Thread review de-messengered into a survey log with mono
+  ANNOTATION headers; Threads queue renamed off "archive" with ruled
+  rows and canonical status labels; cache/congratulation/glyph copy
+  fixes; reduced-motion honored on the recording pulse.
+- **Deliberately not done:** corner marginalia (no per-corner data
+  source yet); weather instrument cell + conditions note (requires the
+  forecast-in-Region-pack capability DESIGN.md names as future);
+  bespoke mastheads on secondary surfaces (queue/offline/journal keep
+  their working headers, which now speak the display voice); the dead
+  `OfflineRegionPanel` component (unrendered; removal is a code-cleanup
+  ticket, not design); `chat-*` data-testids (internal to tests);
+  7 pre-existing lint errors (prototype `<a>` links,
+  `set-state-in-effect`) that predate the sweep.
+- **Known flake:** `offline-maps.spec.ts:22` (pack install) times out
+  intermittently when its file runs both specs together; reproduces on
+  the pre-sweep tree, passes in isolation and passed in the final full
+  run.
