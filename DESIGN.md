@@ -113,24 +113,26 @@ components:
 
 ## Overview
 
-Walking Thoughts is a private field companion for one walker: commit
-Captures on the trail without signal, trust they are safe, and return to
-enriched Threads at the desk. The UI should feel like a calm, capable
-outdoor instrument — the woods at dusk, a good notebook, a quiet trail
-partner. In the first five seconds it should say: *your notes are safe
-here.*
+Walking Thoughts is one walker's **private journal**: commit Captures on
+the trail without signal, trust they are safe, and return to enriched
+Threads at the desk. In the first five seconds it should feel intimate —
+*this is mine, and my notes are safe here* — the woods at dusk, a good
+notebook, no one else in the room.
 
-The one thing this UI must never evoke is **urgency**. No feed mechanics,
+The one thing this UI must never evoke is **the social**. Nothing may
+smell like a shared or public feed: no avatars-in-a-row, no share sheets
+as primary actions, no follower/like/comment shapes, no "activity"
+framing, no presence indicators. A close second: never **urgency** — no
 badges, streaks, unread counts, confetti, or engagement noise. Offline is
 the normal state, not an error state. Waiting is calm: work in flight is
-reported factually ("Syncing", "Enriching"), never dramatized with spinners
-that imply something might be wrong.
+reported factually ("Syncing", "Enriching"), never dramatized with
+spinners that imply something might be wrong.
 
-Five personality traits govern every choice: **calm** (a Rite-in-the-Rain
-notebook — works anywhere, never panics), **observant** (a Peterson field
-guide — precise and warm), **honest** (an instrument readout — status is
-always true and always visible), **unhurried** (national-park wayside
-signage), and **companionable** (present, quiet, warm).
+Four personality traits govern every choice: **intimate** (a personal
+field notebook — private warmth, addressed to one reader), **calm** (a
+Rite-in-the-Rain notebook — works anywhere, never panics), **observant**
+(a Peterson field guide — precise and warm), and **honest** (an
+instrument readout — status is always true and always visible).
 
 This direction ("Forest Night") won a four-way specimen prototype against a
 light editorial paper direction, a cool GPS-instrument direction, and a
@@ -222,9 +224,15 @@ permanent. Long-form Enrichment prose reads at `line-height: 1.55–1.6`
   `min(100%, 40rem)`; reading surfaces (Thread review) `min(100%, 46–48rem)`;
   the map-and-trail split uses `minmax(0, 1.1fr) minmax(20rem, 1fr)` at
   ≥ 900px with the map sticky.
-- **Airy at rest, dense in queues.** Resting screens breathe (24–48px
-  section gaps). Working lists (today's Thread, review queue) tighten to
-  8–12px gaps with the status gutter carrying structure.
+- **Dense on mobile, spacious on desktop.** The phone is the field
+  instrument — think notebook page, topo map, flight-planning kneeboard:
+  tight 8–12px gaps, the mono status gutter carrying structure, as much
+  of today's Thread in one viewport as legibility allows, no decorative
+  padding. The desktop is the processing room — where thoughts get worked
+  through, filed, and marked Reviewed: generous 24–48px section gaps, wide
+  reading measures, one Thread in focus at a time. Density follows the
+  job, not the component: the same list renders tight on the trail and
+  open at the desk.
 - **The status gutter** is the signature layout element: a `6.2rem` left
   column holding time over status label in mono microtype, with the entry
   body to the right. Every Capture row uses it; never hide status behind a
@@ -332,13 +340,19 @@ fill over a bigger shadow.
   stacks and inline SVG icons.
 - **Don't** put marketing-scale type on working surfaces. **Do** reserve
   `hero` for the signed-out shell.
+- **Don't** borrow social shapes — avatar stacks, like/comment/follow
+  affordances, share buttons in primary positions, "activity" feeds.
+  **Do** keep the journal private-by-shape: the only voices are the walker
+  (moss) and the machine (sky), and export is a deliberate desk action,
+  not a share.
 
 ## Voice & Tone
 
-Voice is fixed: a calm, observant, honest, unhurried companion. Tone
-adapts by surface — **terse and glanceable on the trail** (short labels,
-mono facts, nothing to read twice in sunlight), **expansive and editorial
-at the desk** (full sentences, serif titles, room to think).
+Voice is fixed: intimate, calm, observant, honest — a private journal
+speaking to its one reader, never to an audience. Tone adapts by surface —
+**terse and glanceable on the trail** (short labels, mono facts, nothing
+to read twice in sunlight), **expansive and editorial at the desk** (full
+sentences, serif titles, room to think).
 
 Rules:
 
@@ -349,6 +363,8 @@ Rules:
   theatrically, or exclaims. No emoji in product copy.
 - Offline is normal: copy treats missing signal as expected weather, not
   failure.
+- Speak to one reader. "Your Captures", "your Thread" — never "users",
+  never audience framing ("share your walk!"), never community language.
 
 | On-brand | Off-brand |
 | --- | --- |
@@ -356,6 +372,7 @@ Rules:
 | "Photo upload stalled. It will retry when you're back in range." | "Oops! Something went wrong 😢 Please try again!" |
 | "Enriching — researching your Capture from 08:05." | "✨ AI magic is happening… hang tight!" |
 | "No Offline Region yet. Download one to render maps in airplane mode." | "It's empty in here! Get started by adding your first map 🗺️" |
+| "Export your history — every Capture, Thread, and Enrichment, yours to keep." | "Share your walk with friends and followers!" |
 
 ## Agent Prompt Guide
 
@@ -371,8 +388,10 @@ Reusable snippets for prompting UI work under this system.
 > primary act + work in flight, clay `attention` = stuck work, sky
 > `machine` = Enrichment only, `record` red only while recording. One
 > primary button per viewport. Every status color ships with its text
-> label. Thumb-zone actions, safe-area insets, 44px touch targets, 2px
-> moss focus ring, contrast ≥ 4.5:1 (aim 7:1).
+> label. Density follows the surface: mobile is a dense field instrument
+> (kneeboard/topo-map tightness), desktop is a spacious processing room.
+> Thumb-zone actions, safe-area insets, 44px touch targets, 2px moss
+> focus ring, contrast ≥ 4.5:1 (aim 7:1).
 
 **Capture/Thread list rows:**
 
@@ -385,8 +404,9 @@ Reusable snippets for prompting UI work under this system.
 
 **Copy pass:**
 
-> Rewrite this copy in Walking Thoughts voice: calm, factual, unhurried.
-> Use Capture / Thread / Enrichment / Offline Region vocabulary. No
-> exclamation points, no emoji, no apology theater, no "AI magic".
-> Offline is normal. Trail surfaces: fragments under six words. Desk
-> surfaces: complete quiet sentences.
+> Rewrite this copy in Walking Thoughts voice: intimate, calm, observant,
+> honest — a private journal speaking to its one reader. Use Capture /
+> Thread / Enrichment / Offline Region vocabulary. No exclamation points,
+> no emoji, no apology theater, no "AI magic", no audience or sharing
+> language. Offline is normal. Trail surfaces: fragments under six words.
+> Desk surfaces: complete quiet sentences.

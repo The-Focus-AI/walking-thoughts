@@ -38,25 +38,29 @@ strongest available evidence instead of live answers. Each decision below is
 the recommended answer and is open to veto; overturning one means re-running
 the affected variants.
 
-1. **Positioning** — A private field companion for a single walker: commit
+1. **Positioning** — *(user-confirmed after the fact, overriding the
+   autonomous recommendation)* — One walker's **private journal**: commit
    Captures on the trail without signal, trust they are safe, return to
-   enriched Threads at the desk. First five seconds should feel like a calm,
-   capable outdoor instrument: *"my notes are safe here."* The UI must never
-   evoke **urgency** — no feed mechanics, badges, streaks, or engagement
-   noise. *(Evidence: README.md, CONTEXT.md vocabulary and its "Avoid"
-   lists, ADR 0003 local-first visible processing, single-user Clerk
-   allowlist.)*
-2. **Personality** — calm (Rite-in-the-Rain notebook), observant (Peterson
-   field guides), honest (Garmin instrument readouts — status is always
-   true, never spinner theater), unhurried (national-park wayside signage),
-   companionable (a quiet trail partner). Voice fixed; tone goes terse and
+   enriched Threads at the desk. First five seconds should feel intimate:
+   *"this is mine, and my notes are safe here."* The UI must never evoke
+   **the social** — nothing that smells like a shared or public feed; and
+   as a close second, never urgency (badges, streaks, engagement noise).
+   *(Evidence: README.md, CONTEXT.md vocabulary and its "Avoid" lists,
+   ADR 0003 local-first visible processing, single-user Clerk allowlist.)*
+2. **Personality** — *(user-confirmed)* — intimate (a personal field
+   notebook, addressed to one reader), calm (Rite-in-the-Rain notebook),
+   observant (Peterson field guides), honest (instrument readouts — status
+   is always true, never spinner theater). Voice fixed; tone goes terse and
    glanceable on trail surfaces, expansive and editorial at the desk.
-3. **Atmosphere** — dark by default (dawn starts, battery, the shipped
-   identity); airy at rest, dense in working queues (trail-cleanup verdict:
-   sticky dock + status gutters won); editorial headings over utilitarian
-   working rows; soft-rounded; flat with faint elevation reserved for
-   floating layers. *(Evidence: `app/globals.css`, trail-cleanup and
-   thread-review VERDICTs.)*
+3. **Atmosphere** — *(density user-confirmed, dark default uncontested)* —
+   dark by default (dawn starts, battery, the shipped identity). Density
+   follows the surface: **mobile is tight and information-dense** — a
+   notebook page, a topo map, a flight-planning kneeboard — while
+   **desktop is spacious**, the room where thoughts get processed, filed
+   away, and marked Reviewed. Editorial headings over utilitarian working
+   rows; soft-rounded; flat with faint elevation reserved for floating
+   layers. *(Evidence: `app/globals.css`, trail-cleanup and thread-review
+   VERDICTs, user direction.)*
 4. **Color feelings** — warm, muted, drawn from the woods at dusk. Accents
    have strict jobs: moss = you/identity/success, sun = primary action and
    work in progress, clay = needs attention, sky = the machine's voice
