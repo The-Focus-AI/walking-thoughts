@@ -21,8 +21,12 @@ A Thread state set when the walker has processed it back at the desk. Threads st
 _Avoid_: Archived, done, read
 
 **Memory**:
-One durable fact about the walker (who they are, where they walk, what they know, what draws their attention) stored per user and injected into every Enrichment as a walker profile. Learned in the Interview, always visible, and forgettable one at a time.
+One durable fact about the walker (who they are, where they walk, what they know, what draws their attention) injected into every Enrichment as a walker profile. Learned in the Interview or by an Enrichment as it works, and materialized from the Memory Patch log rather than stored directly.
 _Avoid_: Preference, setting, profile field
+
+**Memory Patch**:
+One append-only entry in the log that is the primary record of what the system believes about the walker: an add, update, or remove of a single Memory, carrying its source and diff. Always visible in the Changes timeline and revertible by appending its inverse — never rewritten or hard-deleted.
+_Avoid_: Edit, migration, sync
 
 **Interview**:
 A short guided conversation where Walking Thoughts asks the walker questions — seed questions first, then follow-ups grounded in earlier answers — and distills each answer into Memories that tailor future Enrichments.

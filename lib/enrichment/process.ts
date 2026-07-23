@@ -1,6 +1,7 @@
 import type { MediaKind } from "@/lib/local-capture/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
-import { renderWalkerProfile } from "@/lib/memory/profile";
+import { applyMemoryPatch } from "@/lib/memory/patches";
+import { EMPTY_PROFILE_HINT, renderWalkerProfile } from "@/lib/memory/profile";
 import { getWalkerMemoryRepository } from "@/lib/memory/repository";
 import type { WalkerMemoryRepository } from "@/lib/memory/types";
 import type { PrivateBlobStore } from "@/lib/media/memory-blob-store";
@@ -27,11 +28,13 @@ import type {
   EnrichmentBatchResponse,
   EnrichmentCaptureResult,
   EnrichmentJob,
+  EnrichmentMemoryPatch,
   EnrichmentRepository,
   EnrichmentThreadSnapshot,
   FrozenHistoryEntry,
   GatewayClient,
   GatewayMediaPart,
+  MemoryToolClient,
 } from "./types";
 
 type PushHooks = {
@@ -203,7 +206,7 @@ async function runJob(
   blobStore: PrivateBlobStore,
   placeResolver: NearbyPlaceResolver,
   search: ResearchClient | undefined,
-  walkerProfile: string | null,
+  memoryRepository: WalkerMemoryRepository,
   push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
@@ -278,6 +281,53 @@ async function runJob(
       running.targetCaptureIds,
       placeResolver,
     );
+
+    // Reloaded per job so a patch applied by one Enrichment is visible to
+    // the next. A Memory outage degrades to an untailored report, never a
+    // failed job — the tool stays offered but answers memory_unavailable.
+    let walkerProfile: string | null = null;
+    try {
+      walkerProfile = renderWalkerProfile(
+        await memoryRepository.listMemories(userId),
+      );
+    } catch {
+      walkerProfile = null;
+    }
+    const appliedPatches: EnrichmentMemoryPatch[] = [];
+    const memoryTool: MemoryToolClient = {
+      async apply(patchInput) {
+        try {
+          const result = await applyMemoryPatch(
+            memoryRepository,
+            userId,
+            {
+              ...patchInput,
+              source: "enrichment",
+              sourceId: running.threadId,
+            },
+            {
+              now: () => new Date().toISOString(),
+              createId: () => crypto.randomUUID(),
+            },
+          );
+          if (!result.ok) return result;
+          appliedPatches.push({
+            patchId: result.patch.id,
+            op: result.patch.op,
+            category: result.patch.category,
+            content: result.patch.after ?? result.patch.before ?? "",
+          });
+          return {
+            ok: true,
+            patchId: result.patch.id,
+            memoryId: result.patch.memoryId,
+          };
+        } catch {
+          return { ok: false, error: "memory_unavailable" };
+        }
+      },
+    };
+
     const requestTitle = thread.enrichmentCount === 0;
     const prompt = buildEnrichmentPrompt({
       threadTitle: thread.title,
@@ -285,7 +335,7 @@ async function runJob(
       targetCaptureIds: running.targetCaptureIds,
       requestTitle,
       placesByCaptureId,
-      walkerProfile,
+      walkerProfile: walkerProfile ?? EMPTY_PROFILE_HINT,
     });
     const generation = await gateway.generate({
       model: running.model,
@@ -294,6 +344,7 @@ async function runJob(
       requestTitle,
       media,
       search,
+      memory: memoryTool,
     });
     const completed = await repository.completeJob(userId, running.id, {
       text: generation.text,
@@ -301,6 +352,7 @@ async function runJob(
       title: generation.title,
       sources: generation.sources,
       research: generation.research,
+      memoryPatches: appliedPatches,
     });
 
     if (completed.created) {
@@ -381,15 +433,6 @@ export async function processPendingEnrichments(
   const memoryRepository =
     options.memoryRepository ??
     getWalkerMemoryRepository(environment as NodeJS.ProcessEnv);
-  // A Memory outage degrades to an untailored report, never a failed job.
-  let walkerProfile: string | null = null;
-  try {
-    walkerProfile = renderWalkerProfile(
-      await memoryRepository.listMemories(userId),
-    );
-  } catch {
-    walkerProfile = null;
-  }
 
   if (options.retryFailed) {
     await repository.requeueFailed(userId);
@@ -416,7 +459,7 @@ export async function processPendingEnrichments(
       blobStore,
       placeResolver,
       search,
-      walkerProfile,
+      memoryRepository,
       push,
     );
     results.push(...jobResults);

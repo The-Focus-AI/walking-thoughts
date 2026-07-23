@@ -1,7 +1,12 @@
 import { enrichmentSystemAndModel, getGatewayClient } from "@/lib/enrichment/gateway";
 import type { GatewayClient } from "@/lib/enrichment/types";
+import { applyMemoryPatch } from "@/lib/memory/patches";
 import { getWalkerMemoryRepository } from "@/lib/memory/repository";
-import type { WalkerMemory, WalkerMemoryRepository } from "@/lib/memory/types";
+import type {
+  MemoryPatch,
+  WalkerMemory,
+  WalkerMemoryRepository,
+} from "@/lib/memory/types";
 import { extractMemoriesFromAnswer } from "./extract";
 import { nextInterviewQuestion } from "./questions";
 import { getInterviewRepository } from "./repository";
@@ -10,6 +15,8 @@ import type { InterviewRepository, InterviewTurn } from "./types";
 export type InterviewState = {
   turns: InterviewTurn[];
   memories: WalkerMemory[];
+  /** Full Memory Patch log, for the Changes timeline. */
+  patches: MemoryPatch[];
   /** No open question remains and nothing further will be asked. */
   complete: boolean;
 };
@@ -55,11 +62,12 @@ export async function readInterviewState(
   deps: InterviewDependencies = {},
 ): Promise<InterviewState> {
   const resolved = resolve(deps);
-  const [turns, memories] = await Promise.all([
+  const [turns, memories, patches] = await Promise.all([
     resolved.interviews.listTurns(userId),
     resolved.memories.listMemories(userId),
+    resolved.memories.listPatches(userId),
   ]);
-  return { turns, memories, complete: false };
+  return { turns, memories, patches, complete: false };
 }
 
 /**
@@ -99,15 +107,19 @@ export async function advanceInterview(
     });
     const memoryIds: string[] = [];
     for (const memory of extracted) {
-      const saved = await memories.saveMemory(userId, {
-        id: createId(),
-        category: memory.category,
-        content: memory.content,
-        source: "interview",
-        sourceId: open.id,
-        createdAt: now(),
-      });
-      memoryIds.push(saved.id);
+      const applied = await applyMemoryPatch(
+        memories,
+        userId,
+        {
+          op: "add",
+          category: memory.category,
+          content: memory.content,
+          source: "interview",
+          sourceId: open.id,
+        },
+        { now, createId },
+      );
+      if (applied.ok) memoryIds.push(applied.patch.memoryId);
     }
     await interviews.resolveTurn(userId, open.id, {
       answer,
@@ -119,6 +131,7 @@ export async function advanceInterview(
 
   turns = await interviews.listTurns(userId);
   const knownMemories = await memories.listMemories(userId);
+  const patches = await memories.listPatches(userId);
   let complete = false;
   if (!openTurn(turns)) {
     const next = await nextInterviewQuestion({
@@ -140,5 +153,5 @@ export async function advanceInterview(
     }
   }
 
-  return { turns, memories: knownMemories, complete };
+  return { turns, memories: knownMemories, patches, complete };
 }

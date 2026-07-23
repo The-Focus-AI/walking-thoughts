@@ -1,11 +1,9 @@
-import type {
-  WalkerMemory,
-  WalkerMemoryRepository,
-} from "./types";
+import { materializeMemories } from "./patches";
+import type { MemoryPatch, WalkerMemoryRepository } from "./types";
 
 type MemoryState = {
-  /** userId:memoryId -> memory */
-  memories: Map<string, WalkerMemory>;
+  /** userId -> append-only patch log */
+  patches: Map<string, MemoryPatch[]>;
 };
 
 const states = new Map<string, MemoryState>();
@@ -13,13 +11,13 @@ const states = new Map<string, MemoryState>();
 function stateFor(namespace: string): MemoryState {
   const existing = states.get(namespace);
   if (existing) return existing;
-  const created: MemoryState = { memories: new Map() };
+  const created: MemoryState = { patches: new Map() };
   states.set(namespace, created);
   return created;
 }
 
 export function resetMemoryWalkerMemoryRepository(namespace = "default"): void {
-  states.set(namespace, { memories: new Map() });
+  states.set(namespace, { patches: new Map() });
 }
 
 export function createMemoryWalkerMemoryRepository(
@@ -29,27 +27,18 @@ export function createMemoryWalkerMemoryRepository(
 
   return {
     async listMemories(userId) {
-      return [...state().memories.entries()]
-        .filter(([key]) => key.startsWith(`${userId}:`))
-        .map(([, memory]) => memory)
-        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+      return materializeMemories(state().patches.get(userId) ?? []);
     },
 
-    async saveMemory(userId, memory) {
-      const stored: WalkerMemory = {
-        id: memory.id,
-        category: memory.category,
-        content: memory.content,
-        source: memory.source,
-        sourceId: memory.sourceId ?? null,
-        createdAt: memory.createdAt,
-      };
-      state().memories.set(`${userId}:${memory.id}`, stored);
-      return stored;
+    async listPatches(userId) {
+      return [...(state().patches.get(userId) ?? [])];
     },
 
-    async forgetMemory(userId, memoryId) {
-      return state().memories.delete(`${userId}:${memoryId}`);
+    async appendPatch(userId, patch) {
+      const log = state().patches.get(userId) ?? [];
+      log.push(patch);
+      state().patches.set(userId, log);
+      return patch;
     },
   };
 }

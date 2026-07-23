@@ -1,8 +1,6 @@
 import { neon } from "@neondatabase/serverless";
-import type {
-  WalkerMemory,
-  WalkerMemoryRepository,
-} from "./types";
+import { materializeMemories } from "./patches";
+import type { MemoryPatch, WalkerMemoryRepository } from "./types";
 
 export function createNeonWalkerMemoryRepository(
   databaseUrl: string,
@@ -12,13 +10,17 @@ export function createNeonWalkerMemoryRepository(
   const ensure = () => {
     ready ??= (async () => {
       await sql`
-        CREATE TABLE IF NOT EXISTS walker_memories (
+        CREATE TABLE IF NOT EXISTS memory_patches (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
+          op TEXT NOT NULL,
+          memory_id TEXT NOT NULL,
           category TEXT NOT NULL,
-          content TEXT NOT NULL,
+          before_content TEXT,
+          after_content TEXT,
           source TEXT NOT NULL,
           source_id TEXT,
+          reverts_patch_id TEXT,
           created_at TIMESTAMPTZ NOT NULL
         )
       `;
@@ -26,80 +28,75 @@ export function createNeonWalkerMemoryRepository(
     return ready;
   };
 
-  function mapMemory(row: {
+  function mapPatch(row: {
     id: string;
-    category: WalkerMemory["category"];
-    content: string;
-    source: WalkerMemory["source"];
+    op: MemoryPatch["op"];
+    memory_id: string;
+    category: MemoryPatch["category"];
+    before_content: string | null;
+    after_content: string | null;
+    source: MemoryPatch["source"];
     source_id: string | null;
+    reverts_patch_id: string | null;
     created_at: string;
-  }): WalkerMemory {
+  }): MemoryPatch {
     return {
       id: row.id,
+      op: row.op,
+      memoryId: row.memory_id,
       category: row.category,
-      content: row.content,
+      before: row.before_content,
+      after: row.after_content,
       source: row.source,
       sourceId: row.source_id,
+      revertsPatchId: row.reverts_patch_id,
       createdAt: row.created_at,
     };
   }
 
+  async function fetchPatches(userId: string): Promise<MemoryPatch[]> {
+    await ensure();
+    const rows = (await sql`
+      SELECT id, op, memory_id, category, before_content, after_content,
+             source, source_id, reverts_patch_id, created_at
+      FROM memory_patches
+      WHERE user_id = ${userId}
+      ORDER BY created_at ASC, id ASC
+    `) as Array<Parameters<typeof mapPatch>[0]>;
+    return rows.map(mapPatch);
+  }
+
   return {
     async listMemories(userId) {
-      await ensure();
-      const rows = (await sql`
-        SELECT id, category, content, source, source_id, created_at
-        FROM walker_memories
-        WHERE user_id = ${userId}
-        ORDER BY created_at ASC
-      `) as Array<{
-        id: string;
-        category: WalkerMemory["category"];
-        content: string;
-        source: WalkerMemory["source"];
-        source_id: string | null;
-        created_at: string;
-      }>;
-      return rows.map(mapMemory);
+      return materializeMemories(await fetchPatches(userId));
     },
 
-    async saveMemory(userId, memory) {
+    async listPatches(userId) {
+      return fetchPatches(userId);
+    },
+
+    async appendPatch(userId, patch) {
       await ensure();
       await sql`
-        INSERT INTO walker_memories (
-          id, user_id, category, content, source, source_id, created_at
+        INSERT INTO memory_patches (
+          id, user_id, op, memory_id, category, before_content,
+          after_content, source, source_id, reverts_patch_id, created_at
         ) VALUES (
-          ${memory.id},
+          ${patch.id},
           ${userId},
-          ${memory.category},
-          ${memory.content},
-          ${memory.source},
-          ${memory.sourceId ?? null},
-          ${memory.createdAt}
+          ${patch.op},
+          ${patch.memoryId},
+          ${patch.category},
+          ${patch.before},
+          ${patch.after},
+          ${patch.source},
+          ${patch.sourceId},
+          ${patch.revertsPatchId},
+          ${patch.createdAt}
         )
-        ON CONFLICT (id) DO UPDATE
-        SET category = EXCLUDED.category,
-            content = EXCLUDED.content
-        WHERE walker_memories.user_id = ${userId}
+        ON CONFLICT (id) DO NOTHING
       `;
-      return {
-        id: memory.id,
-        category: memory.category,
-        content: memory.content,
-        source: memory.source,
-        sourceId: memory.sourceId ?? null,
-        createdAt: memory.createdAt,
-      };
-    },
-
-    async forgetMemory(userId, memoryId) {
-      await ensure();
-      const deleted = (await sql`
-        DELETE FROM walker_memories
-        WHERE user_id = ${userId} AND id = ${memoryId}
-        RETURNING id
-      `) as Array<{ id: string }>;
-      return deleted.length > 0;
+      return patch;
     },
   };
 }

@@ -9,6 +9,7 @@ export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
   "Distinguish sourced findings from your own interpretation, and state assumptions briefly rather than asking questions.",
   "When a walker profile of remembered facts is provided, tailor the report to it: skip basics the walker already knows, go deeper on their interests, and relate findings to their usual terrain — without restating the profile.",
+  "When the walker's own words reveal a durable fact about them, or contradict a remembered one, revise the profile with the memory_patch tool — sparingly, only facts useful months from now, never facts about the world.",
   "Ask only when the work genuinely cannot continue without an answer.",
   "Stay grounded in the provided history, media, place, and what you read.",
 ].join(" ");

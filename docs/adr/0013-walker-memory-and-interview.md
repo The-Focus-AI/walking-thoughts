@@ -1,36 +1,49 @@
-# Memories learned in an Interview tailor every Enrichment
+# An append-only Memory Patch log, written by Interview and Enrichment alike, tailors every Enrichment
 
 Enrichments were generic: the same report whether the walker is a field
-biologist or a first-time birder. We add a Memory system — durable facts
-about the walker (identity, place, interest, expertise, preference) stored
-per user — and inject them into every Enrichment prompt as a rendered
-walker-profile block, with a matching system-instruction line telling the
-model to skip known basics and go deeper on stated interests. Memories are
-learned in an Interview: Walking Thoughts asks seed questions first (who,
-where, what draws attention, what's already known, report taste), then
-gateway-generated follow-ups grounded in earlier answers, capped at twelve
-turns. Each answer is distilled into `MEMORY[category]: fact` lines by the
-same gateway model that writes Enrichments; when distillation yields
-nothing (including the fake dev gateway), the raw answer is kept whole
-under the question's category so nothing said is lost. We considered
-mining Memories silently from Capture history instead of asking, and
-rejected it for now: an explicit Interview keeps the walker in control of
-what the system believes about them, matches the app's visible-processing
-principle (ADR 0003), and produces facts the walker actually endorsed.
+biologist or a first-time birder. We add Memories — durable facts about
+the walker (identity, place, interest, expertise, preference) — injected
+into every Enrichment prompt as a walker-profile block, with matching
+system-instruction lines telling the model to skip known basics and go
+deeper on stated interests.
 
-Every Memory stays visible on the Interview screen and can be forgotten
-with one tap; forgetting deletes the row, and the next Enrichment simply
-renders a smaller profile. A Memory-store outage degrades to an untailored
-report, never a failed Enrichment job.
+The primary record is not the Memory but the **Memory Patch**: an
+append-only log of add/update/remove operations, from which the current
+Memory set is materialized. There is one write path
+(`applyMemoryPatch`), and three writers use it: the **Interview** (seed
+questions, then gateway follow-ups, capped at twelve turns, each answer
+distilled into facts), the **Enrichment research loop** — which gains a
+`memory_patch` tool beside `web_search`/`read_page` (ADR 0012) so the
+model can revise the profile while writing a report — and manual
+Forget/Revert.
+
+We considered gating enrichment-learned facts behind user approval and
+rejected it: patches **auto-apply**, and trust comes from visibility
+instead — a Changes timeline on the Interview screen shows every diff
+with its source, each patch has one-tap Revert (appending its inverse;
+the log is never rewritten, echoing ADR 0001's append-only Threads), and
+any Enrichment that patched the profile says so in a footer on the
+report itself. A Memory-store outage degrades to an untailored report —
+the tool answers `memory_unavailable`, the job never fails.
+
+Two directions are deliberately deferred, and shaped for: everything is
+keyed by `user_id` (multi-user is an allowlist change, not a migration),
+and `applyMemoryPatch`/`revertMemoryPatch` are plain domain operations so
+a future MCP/A2A surface — Walking Thoughts exposing Memories to other
+agents, or consuming external tools — can wrap them without rework. That
+choice of direction is intentionally unmade.
 
 ## Consequences
 
-- `buildEnrichmentPrompt` gains an optional walker-profile section; jobs
-  read the profile at run time, so a Memory learned between queueing and
-  running still applies (the frozen basis covers Thread history only).
-- Two new repositories (`walker_memories`, `interview_turns`) follow the
-  existing memory/Neon dual-implementation pattern keyed by
-  `DATABASE_URL`.
+- `buildEnrichmentPrompt` carries the profile (Memory ids included, so
+  the model can target update/remove) at run time — a patch applied by
+  one Enrichment is visible to the next, independent of the frozen
+  Thread basis.
+- Repositories store only `memory_patches` (plus `interview_turns`),
+  following the existing memory/Neon dual-implementation pattern; the
+  current Memory set is replayed from the log on read.
+- Enrichments persist the patches they made (`memory_patches` column) so
+  the report footer and export stay honest.
 - The Interview reuses the enrichment gateway seam, so dev/test stay
-  offline via `createFakeGatewayClient` and no new provider is added.
-- The profile block is capped (40 Memories) to bound prompt growth.
+  offline via `createFakeGatewayClient`; the profile block is capped
+  (40 Memories) to bound prompt growth.

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import type { InterviewTurn } from "@/lib/interview/types";
-import type { WalkerMemory } from "@/lib/memory/types";
+import { revertedPatchIds } from "@/lib/memory/patches";
+import type { MemoryPatch, WalkerMemory } from "@/lib/memory/types";
 
 type InterviewStatePayload = {
   turns: InterviewTurn[];
   memories: WalkerMemory[];
+  patches: MemoryPatch[];
   complete: boolean;
 };
 
@@ -64,6 +66,100 @@ function MemoryList({
   );
 }
 
+const OP_GLYPHS: Record<MemoryPatch["op"], string> = {
+  add: "+",
+  update: "~",
+  remove: "−",
+};
+
+function patchSourceLabel(patch: MemoryPatch): React.ReactNode {
+  if (patch.revertsPatchId) return "Reverted by you";
+  if (patch.source === "interview") return "Interview";
+  if (patch.source === "enrichment" && patch.sourceId) {
+    return <Link href={`/threads/${patch.sourceId}`}>Enrichment</Link>;
+  }
+  if (patch.source === "enrichment") return "Enrichment";
+  return "You";
+}
+
+/**
+ * The Changes timeline: the append-only Memory Patch log, newest first, with
+ * one-tap Revert. Every way the profile can change — Interview, Enrichment's
+ * memory_patch tool, manual Forget — lands here as a visible diff.
+ */
+function PatchTimeline({
+  patches,
+  onRevert,
+}: {
+  patches: MemoryPatch[];
+  onRevert: (patchId: string) => void;
+}) {
+  if (patches.length === 0) {
+    return (
+      <p className="interview-memories-empty">
+        No changes yet — the timeline shows every edit to what Walking
+        Thoughts remembers, and each one can be reverted.
+      </p>
+    );
+  }
+  const reverted = revertedPatchIds(patches);
+  const newestFirst = [...patches].reverse();
+  return (
+    <ol className="interview-patches" data-testid="interview-patches">
+      {newestFirst.map((patch) => (
+        <li
+          key={patch.id}
+          className={
+            reverted.has(patch.id)
+              ? "interview-patch interview-patch-reverted"
+              : "interview-patch"
+          }
+        >
+          <span
+            className={`interview-patch-op interview-patch-op-${patch.op}`}
+            aria-label={patch.op}
+          >
+            {OP_GLYPHS[patch.op]}
+          </span>
+          <span className="interview-patch-body">
+            <span className="interview-memory-category">
+              {CATEGORY_LABELS[patch.category]}
+            </span>
+            {patch.op === "update" ? (
+              <span className="interview-memory-content">
+                <s>{patch.before}</s> → {patch.after}
+              </span>
+            ) : (
+              <span className="interview-memory-content">
+                {patch.after ?? patch.before}
+              </span>
+            )}
+            <span className="interview-patch-meta">
+              {patchSourceLabel(patch)}
+              {" · "}
+              <time dateTime={patch.createdAt}>
+                {new Date(patch.createdAt).toLocaleString()}
+              </time>
+            </span>
+          </span>
+          {!reverted.has(patch.id) ? (
+            <button
+              type="button"
+              className="interview-memory-forget"
+              onClick={() => onRevert(patch.id)}
+              aria-label={`Revert this ${patch.op}`}
+            >
+              Revert
+            </button>
+          ) : (
+            <span className="interview-patch-reverted-note">reverted</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /**
  * The Interview: Walking Thoughts asks about the walker, each answer is
  * distilled into Memories, and every Memory stays visible and forgettable.
@@ -72,6 +168,7 @@ function MemoryList({
 export function InterviewPanel() {
   const [turns, setTurns] = useState<InterviewTurn[]>([]);
   const [memories, setMemories] = useState<WalkerMemory[]>([]);
+  const [patches, setPatches] = useState<MemoryPatch[]>([]);
   const [complete, setComplete] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,7 +178,21 @@ export function InterviewPanel() {
   const applyState = useCallback((state: InterviewStatePayload) => {
     setTurns(state.turns);
     setMemories(state.memories);
+    setPatches(state.patches ?? []);
     setComplete(state.complete);
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    const response = await fetch("/api/memories", {
+      headers: interviewHeaders(),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    const body = (await response.json()) as {
+      memories: WalkerMemory[];
+      patches: MemoryPatch[];
+    };
+    setMemories(body.memories);
+    setPatches(body.patches ?? []);
   }, []);
 
   useEffect(() => {
@@ -136,11 +247,24 @@ export function InterviewPanel() {
         headers: interviewHeaders(),
       });
       if (!response.ok) throw new Error(String(response.status));
-      setMemories((current) =>
-        current.filter((memory) => memory.id !== memoryId),
-      );
+      await refreshProfile();
     } catch {
       setError("Could not forget that Memory — check the connection");
+    }
+  }
+
+  async function revert(patchId: string) {
+    setError(null);
+    try {
+      const response = await fetch("/api/memories/patches", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...interviewHeaders() },
+        body: JSON.stringify({ revertPatchId: patchId }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      await refreshProfile();
+    } catch {
+      setError("Could not revert that change — check the connection");
     }
   }
 
@@ -157,8 +281,8 @@ export function InterviewPanel() {
           <h1>Interview</h1>
           <p className="thread-chat-sub">
             A short conversation so Enrichments know who they&apos;re
-            researching for. Everything learned is listed below and can be
-            forgotten.
+            researching for. Enrichments keep learning as you walk — every
+            change lands in the timeline below and can be reverted.
           </p>
         </div>
       </header>
@@ -222,6 +346,17 @@ export function InterviewPanel() {
         >
           <h2>What Walking Thoughts remembers</h2>
           <MemoryList memories={memories} onForget={(id) => void forget(id)} />
+        </section>
+
+        <section
+          className="interview-memories-section"
+          aria-label="Changes to what Walking Thoughts remembers"
+        >
+          <h2>Changes</h2>
+          <PatchTimeline
+            patches={patches}
+            onRevert={(id) => void revert(id)}
+          />
         </section>
       </div>
 

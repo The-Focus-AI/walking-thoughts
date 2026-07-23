@@ -2148,6 +2148,79 @@ footer {
   color: var(--ink);
 }
 
+.interview-patches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.interview-patch {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.interview-patch-reverted {
+  opacity: 0.55;
+}
+
+.interview-patch-op {
+  font-weight: 800;
+  font-size: 0.9rem;
+  width: 1.1rem;
+  text-align: center;
+}
+
+.interview-patch-op-add {
+  color: var(--sun);
+}
+
+.interview-patch-op-update {
+  color: rgba(120, 170, 210, 0.9);
+}
+
+.interview-patch-op-remove {
+  color: rgba(220, 140, 130, 0.9);
+}
+
+.interview-patch-body {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.interview-patch-meta {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.interview-patch-meta a {
+  color: inherit;
+}
+
+.interview-patch-reverted-note {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+.enrichment-memory-note {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.enrichment-memory-note a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* Shared navigation: bottom tab bar + glanceable sync pill */
 
 :root {
