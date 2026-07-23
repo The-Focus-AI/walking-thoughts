@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { getPrivateBlobStore } from "@/lib/media/blob-store";
 import type { HealthProbeResults } from "./health";
 
 /**
@@ -36,9 +37,27 @@ export async function probeIntegrationDependencies(
     reason: "token_missing",
   };
   if (blobToken) {
-    // Walking Thoughts always uses the private Blob adapter (`access: "private"`).
-    // Health reports that policy; it does not open a public URL to prove isolation.
-    blob = { ok: true, privateAccess: true };
+    // Exercise a real private round-trip. A token that belongs to a public
+    // store passes shallow checks but rejects `access: "private"` writes —
+    // exactly the misconfiguration that silently broke media upload once.
+    try {
+      const store = getPrivateBlobStore(environment);
+      const probeId = `probe-${crypto.randomUUID()}`;
+      await store.put({
+        userId: "health-probe",
+        attachmentId: probeId,
+        mimeType: "text/plain",
+        bytes: new TextEncoder().encode("walking-thoughts health probe"),
+        operationId: probeId,
+      });
+      const read = await store.get("health-probe", probeId);
+      await store.delete?.("health-probe", probeId);
+      blob = read
+        ? { ok: true, privateAccess: true }
+        : { ok: false, reason: "private_read_failed" };
+    } catch {
+      blob = { ok: false, reason: "private_write_failed" };
+    }
   }
 
   return { database, blob, queue };
