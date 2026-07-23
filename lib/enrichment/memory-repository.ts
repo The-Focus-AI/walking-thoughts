@@ -233,6 +233,10 @@ export function createMemoryEnrichmentRepository(
         if (!key.startsWith(`${userId}:`)) continue;
         if (job.status !== "failed") continue;
         if (jobId && job.id !== jobId) continue;
+        // Permanent failures (source media gone) must not retry forever.
+        if (job.error && job.error.startsWith("missing_original_media_")) {
+          continue;
+        }
         db.jobs.set(key, { ...job, status: "queued", error: undefined });
         count += 1;
       }

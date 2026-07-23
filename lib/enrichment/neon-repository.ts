@@ -515,14 +515,17 @@ export function createNeonEnrichmentRepository(
           UPDATE enrichment_jobs
           SET status = 'queued', error = NULL
           WHERE user_id = ${userId} AND id = ${jobId} AND status = 'failed'
+            AND (error IS NULL OR error NOT LIKE 'missing\_original\_media\_%')
           RETURNING id
         `) as Array<{ id: string }>;
         return updated.length;
       }
+      // Permanent failures (source media gone) must not retry forever.
       const updated = (await sql`
         UPDATE enrichment_jobs
         SET status = 'queued', error = NULL
         WHERE user_id = ${userId} AND status = 'failed'
+          AND (error IS NULL OR error NOT LIKE 'missing\_original\_media\_%')
         RETURNING id
       `) as Array<{ id: string }>;
       return updated.length;
