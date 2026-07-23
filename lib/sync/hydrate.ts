@@ -117,10 +117,22 @@ export function mergeRemoteThreads(input: {
           title: remote.title,
           revision: remote.revision,
           updatedAt: remote.updatedAt,
+          reviewedAt: remote.reviewedAt ?? null,
         },
         ...threads,
       ];
       continue;
+    }
+
+    // The server owns the review decision — adopt it even when nothing else
+    // about the Thread changed (marking reviewed does not bump revision).
+    const remoteReviewedAt = remote.reviewedAt ?? null;
+    if ((prior.reviewedAt ?? null) !== remoteReviewedAt) {
+      threads = threads.map((thread) =>
+        thread.id === remote.id
+          ? { ...thread, reviewedAt: remoteReviewedAt }
+          : thread,
+      );
     }
 
     if (importedIntoThread === 0 && remote.revision <= prior.revision) {

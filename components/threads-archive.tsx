@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { SyncStatusPill } from "@/components/sync-status-pill";
@@ -106,51 +107,87 @@ export function ThreadsArchive({
 }: {
   selectedThreadId?: string;
 } = {}) {
+  const router = useRouter();
   const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [queue, setQueue] = useState<"new" | "all">("new");
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const store = getCaptureStore();
+      const recent = await store.listRecentThreads();
+      const views = await Promise.all(
+        recent.map(async (thread) => {
+          const view = await store.listThread(thread.id);
+          const enrichments = await loadThreadEnrichments(thread.id);
+          return {
+            ...view,
+            enrichments,
+            dayKey: calendarDayKey(new Date(thread.updatedAt)),
+          };
+        }),
+      );
+      setThreads(views);
+    } catch {
+      setError("Could not load Threads");
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        const store = getCaptureStore();
-        const recent = await store.listRecentThreads();
-        const views = await Promise.all(
-          recent.map(async (thread) => {
-            const view = await store.listThread(thread.id);
-            const enrichments = await loadThreadEnrichments(thread.id);
-            return {
-              ...view,
-              enrichments,
-              dayKey: calendarDayKey(new Date(thread.updatedAt)),
-            };
-          }),
-        );
-        if (active) setThreads(views);
-      } catch {
-        if (active) setError("Could not load Threads");
-      }
-    }
-
     void load();
     const onCycle = () => void load();
     window.addEventListener(SYNC_CYCLE_EVENT, onCycle);
     return () => {
-      active = false;
       window.removeEventListener(SYNC_CYCLE_EVENT, onCycle);
     };
-  }, []);
+  }, [load]);
+
+  // The processing queue: New by default; search reaches everything.
+  const visibleThreads = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return threads.filter((view) => {
+      if (query) {
+        const haystack = [
+          view.thread.title,
+          ...view.captures.map((capture) => capture.text),
+        ]
+          .join("\n")
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
+        return true;
+      }
+      if (queue === "new" && view.thread.reviewedAt) {
+        // Keep the open Thread visible while it is being processed.
+        return view.thread.id === selectedThreadId;
+      }
+      return true;
+    });
+  }, [threads, queue, search, selectedThreadId]);
 
   const byDay = useMemo(() => {
     const groups = new Map<string, ThreadListView[]>();
-    for (const view of threads) {
+    for (const view of visibleThreads) {
       const list = groups.get(view.dayKey) ?? [];
       list.push(view);
       groups.set(view.dayKey, list);
     }
     return [...groups.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [threads]);
+  }, [visibleThreads]);
+
+  /** After marking reviewed, advance to the next new Thread — inbox zero. */
+  const onReviewedChange = useCallback(
+    (reviewed: boolean) => {
+      void load();
+      if (!reviewed) return;
+      const next = threads.find(
+        (view) =>
+          !view.thread.reviewedAt && view.thread.id !== selectedThreadId,
+      );
+      router.push(next ? `/threads/${next.thread.id}` : "/threads");
+    },
+    [load, router, threads, selectedThreadId],
+  );
 
   return (
     <main
@@ -174,6 +211,51 @@ export function ThreadsArchive({
         <SyncStatusPill />
       </header>
 
+      <div className="threads-queue-bar">
+        <div className="threads-queue-chips" role="tablist" aria-label="Queue">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={queue === "new" && !search}
+            className={
+              queue === "new" && !search
+                ? "threads-queue-chip active"
+                : "threads-queue-chip"
+            }
+            onClick={() => {
+              setQueue("new");
+              setSearch("");
+            }}
+          >
+            New
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={queue === "all" && !search}
+            className={
+              queue === "all" && !search
+                ? "threads-queue-chip active"
+                : "threads-queue-chip"
+            }
+            onClick={() => {
+              setQueue("all");
+              setSearch("");
+            }}
+          >
+            All
+          </button>
+        </div>
+        <input
+          type="search"
+          className="threads-search"
+          placeholder="Search all Threads…"
+          aria-label="Search all Threads"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </div>
+
       {error ? (
         <p className="capture-error" role="alert">
           {error}
@@ -182,8 +264,11 @@ export function ThreadsArchive({
 
       {byDay.length === 0 && !error ? (
         <p className="trail-thread-empty">
-          No Threads yet. Add a Capture from the Capture tab — it starts its
-          own Thread.
+          {search
+            ? "No Threads match that search."
+            : queue === "new" && threads.length > 0
+              ? "You're caught up — every Thread is reviewed."
+              : "No Threads yet. Add a Capture from the Capture tab — it starts its own Thread."}
         </p>
       ) : null}
 
@@ -253,12 +338,21 @@ export function ThreadsArchive({
                       </span>
                     </Link>
                     <div className="thread-row-side">
-                      <span
-                        className={`thread-chip thread-chip-${chip.tone}`}
-                        data-testid="thread-sync-chip"
-                      >
-                        {chip.label}
-                      </span>
+                      {view.thread.reviewedAt ? (
+                        <span
+                          className="thread-chip thread-chip-reviewed"
+                          data-testid="thread-reviewed-chip"
+                        >
+                          Reviewed
+                        </span>
+                      ) : (
+                        <span
+                          className={`thread-chip thread-chip-${chip.tone}`}
+                          data-testid="thread-sync-chip"
+                        >
+                          {chip.label}
+                        </span>
+                      )}
                     </div>
                   </li>
                 );
@@ -272,7 +366,11 @@ export function ThreadsArchive({
 
       <div className="threads-detail-pane">
         {selectedThreadId ? (
-          <ThreadChat key={selectedThreadId} threadId={selectedThreadId} />
+          <ThreadChat
+            key={selectedThreadId}
+            threadId={selectedThreadId}
+            onReviewedChange={onReviewedChange}
+          />
         ) : (
           <div className="threads-detail-empty" aria-hidden="true">
             <p>Select a Thread to read its report.</p>

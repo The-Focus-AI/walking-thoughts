@@ -16,6 +16,10 @@ _Avoid_: Chat, conversation, folder, inbox
 An AI-generated Thread entry based on that Thread's complete history at a recorded point, retaining which gateway model produced it. Examples include identification, explanation, transcription lookup, or research.
 _Avoid_: Sync, processing, response
 
+**Reviewed**:
+A Thread state set when the walker has processed it back at the desk. Threads start new and sit in the review queue until marked Reviewed.
+_Avoid_: Archived, done, read
+
 **Offline Region**:
 A user-selected geographic area whose trail-first topographic data is downloaded in advance and retained for use without connectivity. It prioritizes walkable trails and paths alongside contours, hillshade, water, roads, land cover, place names, and elevation labels.
 _Avoid_: Cache, viewed area, map session
