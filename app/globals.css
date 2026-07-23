@@ -988,7 +988,7 @@ h1 {
   margin-bottom: 0.25rem;
 }
 
-.threads-archive {
+.threads-queue {
   display: grid;
   gap: 1.5rem;
   width: min(100%, 48rem);
@@ -997,7 +997,7 @@ h1 {
     max(2rem, env(safe-area-inset-bottom));
 }
 
-.threads-archive-header {
+.threads-queue-header {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
@@ -1005,12 +1005,12 @@ h1 {
   align-items: flex-start;
 }
 
-.threads-archive-header h1 {
+.threads-queue-header h1 {
   margin: 0.15rem 0 0.4rem;
   font-size: clamp(1.8rem, 5vw, 2.6rem);
 }
 
-.threads-archive-header p {
+.threads-queue-header p {
   margin: 0;
   max-width: 36rem;
   color: var(--muted);
@@ -1047,10 +1047,12 @@ h1 {
   gap: 0.65rem 1rem;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--surface);
+  padding: 0.85rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.threads-day-list > li:first-child {
+  border-top: 1px solid var(--line);
 }
 
 .thread-row-main {
@@ -1085,35 +1087,29 @@ h1 {
   align-items: center;
 }
 
-.thread-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.6rem;
-  border-radius: 0;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+.thread-row-status {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  border: 1px solid var(--line);
   color: var(--muted);
 }
 
-.thread-chip-ready {
+.thread-status-ready {
   color: var(--moss);
-  border-color: rgba(169, 209, 143, 0.4);
-  background: rgba(169, 209, 143, 0.08);
 }
 
-.thread-chip-busy {
+.thread-status-busy {
   color: var(--sun);
-  border-color: rgba(244, 207, 114, 0.4);
-  background: rgba(244, 207, 114, 0.08);
 }
 
-.thread-chip-attention {
+.thread-status-attention {
   color: var(--attention);
-  border-color: rgba(240, 180, 160, 0.45);
-  background: rgba(240, 180, 160, 0.1);
+}
+
+.thread-row-attention {
+  background: rgba(240, 180, 160, 0.07);
 }
 
 .enrichment-model {
@@ -2084,7 +2080,7 @@ footer {
 
 /* Every routed surface clears the fixed tab bar. */
 .trail-shell,
-.threads-archive,
+.threads-queue,
 .offline-maps,
 .journal,
 .thread-chat-page {
@@ -2615,10 +2611,8 @@ footer {
   color: var(--muted);
 }
 
-.thread-chip-reviewed {
+.thread-status-reviewed {
   color: var(--muted);
-  border-color: var(--line);
-  background: var(--surface);
 }
 
 .thread-reviewed-toggle {

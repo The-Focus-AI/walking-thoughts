@@ -30,7 +30,7 @@ type ThreadListView = {
   dayKey: string;
 };
 
-function threadStatusChip(captures: LocalCapture[]): {
+function threadStatus(captures: LocalCapture[]): {
   label: string;
   tone: "ready" | "busy" | "attention";
 } {
@@ -38,13 +38,16 @@ function threadStatusChip(captures: LocalCapture[]): {
   if (rollup.needs_attention > 0) {
     return { label: "Needs attention", tone: "attention" };
   }
-  if (rollup.saved_locally > 0 || rollup.syncing > 0) {
-    return { label: "Waiting to sync", tone: "busy" };
+  if (rollup.syncing > 0) {
+    return { label: "Syncing", tone: "busy" };
+  }
+  if (rollup.saved_locally > 0) {
+    return { label: "Saved locally", tone: "busy" };
   }
   if (rollup.enriching > 0) {
-    return { label: "Researching", tone: "busy" };
+    return { label: "Enriching", tone: "busy" };
   }
-  return { label: "Report ready", tone: "ready" };
+  return { label: "Complete", tone: "ready" };
 }
 
 function DayPhoto({
@@ -102,7 +105,7 @@ function DayPhoto({
  * list on the left, the selected Thread's review page on the right. On
  * phones, selection swaps the panes (list ↔ Thread).
  */
-export function ThreadsArchive({
+export function ThreadsQueue({
   selectedThreadId,
 }: {
   selectedThreadId?: string;
@@ -193,19 +196,19 @@ export function ThreadsArchive({
     <main
       className={
         selectedThreadId
-          ? "threads-archive threads-workspace has-selection"
-          : "threads-archive threads-workspace"
+          ? "threads-queue threads-workspace has-selection"
+          : "threads-queue threads-workspace"
       }
     >
       <SyncRuntime />
       <div className="threads-list-pane">
-      <header className="threads-archive-header">
+      <header className="threads-queue-header">
         <div>
           <p className="eyebrow">By day</p>
           <h1>Threads</h1>
           <p>
-            Every Capture is its own Thread. Tap one to read its report, reply,
-            or copy it as markdown.
+            Every Capture is its own Thread. Open one to read its Enrichment,
+            reply, or copy it as markdown.
           </p>
         </div>
         <SyncStatusPill />
@@ -267,7 +270,7 @@ export function ThreadsArchive({
           {search
             ? "No Threads match that search."
             : queue === "new" && threads.length > 0
-              ? "You're caught up — every Thread is reviewed."
+              ? "Nothing waiting. Every Thread is marked Reviewed."
               : "No Threads yet. Add a Capture from the Capture tab — it starts its own Thread."}
         </p>
       ) : null}
@@ -303,7 +306,7 @@ export function ThreadsArchive({
             ) : null}
             <ul className="threads-day-list">
               {dayThreads.map((view) => {
-                const chip = threadStatusChip(view.captures);
+                const status = threadStatus(view.captures);
                 const words = view.captures[0]?.text ?? "";
                 const mediaCount = view.captures.reduce(
                   (count, capture) => count + capture.attachments.length,
@@ -312,11 +315,17 @@ export function ThreadsArchive({
                 return (
                   <li
                     key={view.thread.id}
-                    className={
+                    className={[
+                      "thread-row",
                       view.thread.id === selectedThreadId
-                        ? "thread-row thread-row-selected"
-                        : "thread-row"
-                    }
+                        ? "thread-row-selected"
+                        : "",
+                      status.tone === "attention" && !view.thread.reviewedAt
+                        ? "thread-row-attention"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     <Link
                       className="thread-row-main"
@@ -328,7 +337,9 @@ export function ThreadsArchive({
                       ) : null}
                       <span className="thread-row-meta">
                         {view.enrichments.length}{" "}
-                        {view.enrichments.length === 1 ? "report" : "reports"}
+                        {view.enrichments.length === 1
+                          ? "Enrichment"
+                          : "Enrichments"}
                         {view.captures.length > 1
                           ? ` · ${view.captures.length} Captures`
                           : ""}
@@ -340,17 +351,17 @@ export function ThreadsArchive({
                     <div className="thread-row-side">
                       {view.thread.reviewedAt ? (
                         <span
-                          className="thread-chip thread-chip-reviewed"
+                          className="thread-row-status thread-status-reviewed"
                           data-testid="thread-reviewed-chip"
                         >
                           Reviewed
                         </span>
                       ) : (
                         <span
-                          className={`thread-chip thread-chip-${chip.tone}`}
+                          className={`thread-row-status thread-status-${status.tone}`}
                           data-testid="thread-sync-chip"
                         >
-                          {chip.label}
+                          {status.label}
                         </span>
                       )}
                     </div>
@@ -373,7 +384,7 @@ export function ThreadsArchive({
           />
         ) : (
           <div className="threads-detail-empty" aria-hidden="true">
-            <p>Select a Thread to read its report.</p>
+            <p>Select a Thread to read its Enrichment.</p>
           </div>
         )}
       </div>
