@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
+import { ScaleBar } from "@/components/sheet";
 import { statusLabel } from "@/components/thread-entries";
 import { FOREGROUND_SYNC_IDLE } from "@/lib/disclosures/copy";
 import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
@@ -633,8 +634,12 @@ export function CaptureComposer() {
           role="status"
           data-testid="trail-sync-footer"
         >
-          <div>
-            <strong>{footerSummary}</strong>
+          <ScaleBar />
+          <div className="trail-sync-footer-lines">
+            <strong className="trail-sync-promise">
+              Committed locally first · Synced when in range
+            </strong>
+            <p className="trail-sync-tally">{footerSummary}</p>
             <p className="capture-persistence">
               {pendingSyncCount(rollup) > 0
                 ? `${rollup.saved_locally} local · ${rollup.syncing} syncing · ${rollup.enriching} enriching · ${rollup.needs_attention} need attention`
@@ -685,18 +690,29 @@ function CaptureEntry({
       aria-label={label}
     >
       {gutter ? (
-        <span className="gutter-label">{statusLabel(capture.status)}</span>
+        <div className="station-gutter">
+          <time className="station-time" dateTime={capture.createdAt}>
+            {new Date(capture.createdAt).toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
+          </time>
+          <span className="gutter-label">{statusLabel(capture.status)}</span>
+        </div>
       ) : null}
       <div className={gutter ? "capture-gutter-body" : undefined}>
       <div className="capture-entry-meta">
         {gutter ? null : (
-          <span className={`capture-status status-${capture.status}`}>
-            {statusLabel(capture.status)}
-          </span>
+          <>
+            <span className={`capture-status status-${capture.status}`}>
+              {statusLabel(capture.status)}
+            </span>
+            <time dateTime={capture.createdAt}>
+              {new Date(capture.createdAt).toLocaleString()}
+            </time>
+          </>
         )}
-        <time dateTime={capture.createdAt}>
-          {new Date(capture.createdAt).toLocaleString()}
-        </time>
         {capture.threadId ? (
           <Link className="topbar-link" href={`/threads/${capture.threadId}`}>
             {threadTitle ? `Thread: ${threadTitle}` : "Open Thread"}
