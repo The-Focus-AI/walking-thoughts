@@ -256,7 +256,6 @@ a {
   .trail-layout {
     grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 1fr);
     align-items: start;
-    min-height: calc(100svh - 8rem);
   }
 }
 
@@ -271,16 +270,15 @@ a {
 
 @media (min-width: 900px) {
   .trail-map-hero {
-    min-height: calc(100svh - 8rem);
+    min-height: min(calc(100svh - 24rem), 44rem);
     position: sticky;
     top: 0.75rem;
   }
 }
 
-.trail-map-hero-map {
+.trail-map-hero .trail-map-hero-map {
   position: absolute;
   inset: 0;
-  min-height: 100%;
 }
 
 .trail-map-hero-overlay {
@@ -304,7 +302,7 @@ a {
 
 @media (min-width: 900px) {
   .trail-map-hero-overlay {
-    min-height: 100%;
+    min-height: min(calc(100svh - 24rem), 44rem);
   }
 }
 
