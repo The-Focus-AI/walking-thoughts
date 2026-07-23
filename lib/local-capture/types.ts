@@ -17,6 +17,8 @@ export type LocalThread = {
   title: string;
   revision: number;
   updatedAt: string;
+  /** Set once processed at the desk; absent/null = new (in the review queue). */
+  reviewedAt?: string | null;
 };
 
 export type CaptureSyncStatus =
@@ -157,6 +159,11 @@ export type CaptureStore = {
     }>;
     trashedThreadId: string | null;
   }): Promise<void>;
+  /** Record the server's review decision on the local Thread row. */
+  setThreadReviewed(
+    threadId: string,
+    reviewedAt: string | null,
+  ): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
   applySyncBatch(batch: SyncBatchApplication): Promise<void>;

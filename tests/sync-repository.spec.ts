@@ -119,3 +119,39 @@ test("Thread follow-ups append independently per Thread", async () => {
     "Stream noise",
   ]);
 });
+
+test("setThreadReviewed round-trips through listThreads and clears back to new", async () => {
+  const repository = createMemoryThreadRepository("sync-tests");
+  await repository.upsertCaptures("user_a", [
+    {
+      id: "cap-review",
+      text: "Stone wall into the reservoir",
+      createdAt: "2026-07-23T12:00:00.000Z",
+      location: null,
+      threadId: null,
+      sequence: 1,
+      idempotencyKey: "cap-review",
+    },
+  ]);
+
+  const marked = await repository.setThreadReviewed(
+    "user_a",
+    "cap-review",
+    "2026-07-23T18:00:00.000Z",
+  );
+  expect(marked).toEqual({
+    threadId: "cap-review",
+    reviewedAt: "2026-07-23T18:00:00.000Z",
+  });
+
+  let listed = await repository.listThreads("user_a");
+  expect(listed[0].reviewedAt).toBe("2026-07-23T18:00:00.000Z");
+
+  await repository.setThreadReviewed("user_a", "cap-review", null);
+  listed = await repository.listThreads("user_a");
+  expect(listed[0].reviewedAt).toBeNull();
+
+  await expect(
+    repository.setThreadReviewed("user_a", "missing", "2026-07-23T18:00:00.000Z"),
+  ).rejects.toThrow("thread_not_found");
+});

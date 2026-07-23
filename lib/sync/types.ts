@@ -50,6 +50,8 @@ export type ServerThread = {
   title: string;
   revision: number;
   updatedAt: string;
+  /** Set when the walker processed this Thread at the desk; null = new. */
+  reviewedAt?: string | null;
   captures: Array<{
     id: string;
     text: string;
@@ -141,6 +143,12 @@ export type ThreadRepository = {
     threadId: string,
     now?: string,
   ): Promise<ThreadSplitResult>;
+  /** Mark a Thread processed at the desk (null clears back to new). */
+  setThreadReviewed(
+    userId: string,
+    threadId: string,
+    reviewedAt: string | null,
+  ): Promise<{ threadId: string; reviewedAt: string | null }>;
   updateThreadTitle?(
     userId: string,
     threadId: string,

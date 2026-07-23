@@ -26,8 +26,13 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           user_id TEXT NOT NULL,
           title TEXT NOT NULL,
           revision INTEGER NOT NULL,
-          updated_at TIMESTAMPTZ NOT NULL
+          updated_at TIMESTAMPTZ NOT NULL,
+          reviewed_at TIMESTAMPTZ
         )
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_captures (
@@ -300,7 +305,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     async listThreads(userId) {
       await ensure();
       const threads = (await sql`
-        SELECT id, title, revision, updated_at
+        SELECT id, title, revision, updated_at, reviewed_at
         FROM sync_threads
         WHERE user_id = ${userId}
           AND NOT EXISTS (
@@ -315,6 +320,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         title: string;
         revision: number;
         updated_at: string;
+        reviewed_at: string | null;
       }>;
 
       const result = [];
@@ -344,6 +350,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           title: thread.title,
           revision: thread.revision,
           updatedAt: thread.updated_at,
+          reviewedAt: thread.reviewed_at ?? null,
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -364,6 +371,18 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         SET title = ${title}
         WHERE user_id = ${userId} AND id = ${threadId}
       `;
+    },
+
+    async setThreadReviewed(userId, threadId, reviewedAt) {
+      await ensure();
+      const updated = (await sql`
+        UPDATE sync_threads
+        SET reviewed_at = ${reviewedAt}
+        WHERE user_id = ${userId} AND id = ${threadId}
+        RETURNING id
+      `) as Array<{ id: string }>;
+      if (!updated[0]) throw new Error("thread_not_found");
+      return { threadId, reviewedAt };
     },
 
     async splitThread(userId, threadId, now = new Date().toISOString()) {

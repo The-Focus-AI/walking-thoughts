@@ -286,6 +286,11 @@ export function createMemoryCaptureStore(
         );
       }
     },
+    async setThreadReviewed(threadId, reviewedAt) {
+      threads = threads.map((thread) =>
+        thread.id === threadId ? { ...thread, reviewedAt } : thread,
+      );
+    },
     async markSyncing(ids) {
       const idSet = new Set(ids);
       captures = captures.map((capture) =>
@@ -914,6 +919,21 @@ export function createIdbCaptureStore(): CaptureStore {
         if (split.trashedThreadId) {
           threadStore.delete(split.trashedThreadId);
         }
+        await transactionDone(transaction);
+      } finally {
+        db.close();
+      }
+    },
+
+    async setThreadReviewed(threadId, reviewedAt) {
+      const db = await openDatabase();
+      try {
+        const existing = (await requestToPromise(
+          db.transaction("threads", "readonly").objectStore("threads").get(threadId),
+        )) as LocalThread | undefined;
+        if (!existing) return;
+        const transaction = db.transaction("threads", "readwrite");
+        transaction.objectStore("threads").put({ ...existing, reviewedAt });
         await transactionDone(transaction);
       } finally {
         db.close();

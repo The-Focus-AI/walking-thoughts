@@ -20,6 +20,7 @@ import type {
   LocalThread,
 } from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
+import { getReviewTransport } from "@/lib/sync/review-client";
 import { getSplitTransport } from "@/lib/sync/split-client";
 import { threadToMarkdown } from "@/lib/thread-export/markdown";
 
@@ -28,6 +29,8 @@ type ThreadChatProps = {
   /** Compact embed (e.g. Map Journal panel) hides the full-page chrome. */
   embedded?: boolean;
   onClose?: () => void;
+  /** Called after the review state changes (true = marked reviewed). */
+  onReviewedChange?: (reviewed: boolean) => void;
 };
 
 function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
@@ -182,7 +185,12 @@ function ConversationCapture({ capture }: { capture: LocalCapture }) {
  * Thread one "Copy as markdown" away. Replying here is the explicit way to
  * add to this Thread — new Captures elsewhere start their own.
  */
-export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatProps) {
+export function ThreadChat({
+  threadId,
+  embedded = false,
+  onClose,
+  onReviewedChange,
+}: ThreadChatProps) {
   const [thread, setThread] = useState<LocalThread | null>(null);
   const [captures, setCaptures] = useState<LocalCapture[]>([]);
   const [enrichments, setEnrichments] = useState<ThreadEnrichment[]>([]);
@@ -190,6 +198,7 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
   const [media, setMedia] = useState<AttachmentInput[]>([]);
   const [busy, setBusy] = useState(false);
   const [splitting, setSplitting] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   const router = useRouter();
@@ -264,6 +273,29 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
       if (copyResetRef.current) window.clearTimeout(copyResetRef.current);
     };
   }, []);
+
+  /** The desk-processing action: reviewed Threads leave the New queue. */
+  async function toggleReviewed() {
+    if (reviewBusy || !thread) return;
+    setReviewBusy(true);
+    setError(null);
+    const next = !thread.reviewedAt;
+    try {
+      const result = await getReviewTransport().setReviewed(threadId, next);
+      if (!result) {
+        setError("Could not update the review state — check the connection");
+        return;
+      }
+      const store = getCaptureStore();
+      await store.setThreadReviewed(threadId, result.reviewedAt);
+      await refresh();
+      onReviewedChange?.(next);
+    } catch {
+      setError("Could not update the review state");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
 
   /** Local-first trash: hides immediately, syncs on the next cycle. */
   async function moveToTrash() {
@@ -381,6 +413,30 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
           </p>
         </div>
         <div className="thread-chat-tools">
+          {!embedded ? (
+            <button
+              type="button"
+              className={
+                thread?.reviewedAt
+                  ? "thread-copy-markdown thread-reviewed-toggle is-reviewed"
+                  : "thread-copy-markdown thread-reviewed-toggle"
+              }
+              data-testid="thread-reviewed-toggle"
+              onClick={() => void toggleReviewed()}
+              disabled={reviewBusy || !thread || !online}
+              title={
+                thread?.reviewedAt
+                  ? "Put this Thread back in the New queue"
+                  : "Done processing — remove from the New queue"
+              }
+            >
+              {reviewBusy
+                ? "Saving…"
+                : thread?.reviewedAt
+                  ? "Reviewed ✓"
+                  : "Mark reviewed"}
+            </button>
+          ) : null}
           {!embedded && captures.length > 1 ? (
             <button
               type="button"

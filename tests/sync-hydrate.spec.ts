@@ -349,3 +349,36 @@ test("applyRemoteThreads rehomes settled Captures to the server's Thread placeme
     "cap-outbox",
   ]);
 });
+
+test("applyRemoteThreads adopts the server's review decision without a revision bump", async () => {
+  const store = createMemoryCaptureStore({
+    threads: [
+      {
+        id: "thread-phone",
+        title: "Ridge line opens west",
+        revision: 1,
+        updatedAt: "2026-07-20T14:00:00.000Z",
+        reviewedAt: null,
+      },
+    ],
+    captures: [
+      {
+        id: "capture-phone",
+        text: "Ridge line opens west",
+        createdAt: "2026-07-20T14:00:00.000Z",
+        location: null,
+        status: "complete",
+        threadId: "thread-phone",
+        sequence: 1,
+        attachments: [],
+      },
+    ],
+  });
+
+  await store.applyRemoteThreads([
+    phoneThread({ reviewedAt: "2026-07-23T18:00:00.000Z" }),
+  ]);
+
+  const view = await store.listThread("thread-phone");
+  expect(view.thread.reviewedAt).toBe("2026-07-23T18:00:00.000Z");
+});
