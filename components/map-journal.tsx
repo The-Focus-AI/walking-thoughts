@@ -48,7 +48,7 @@ type GpsState =
 type JournalState =
   | { phase: "loading" }
   | { phase: "region-missing"; manifest: RegionManifest | null }
-  | { phase: "ready"; manifest: RegionManifest };
+  | { phase: "ready"; manifest: RegionManifest; source: "local" | "remote" };
 
 type ThreadContext = {
   capture: LocalCapture;
@@ -59,6 +59,8 @@ type ThreadContext = {
 
 export type MapJournalHook = {
   state: JournalState["phase"];
+  /** Which pack renders: installed ("local"), streamed ("remote"), or null. */
+  source: "local" | "remote" | null;
   markerCount: number;
   gps: GpsState;
   selectedCaptureId: string | null;
@@ -129,6 +131,7 @@ export function MapJournal() {
   );
   const hookRef = useRef({
     state: "loading" as JournalState["phase"],
+    source: null as "local" | "remote" | null,
     gps,
     markerCount,
     selected: null as string | null,
@@ -160,6 +163,7 @@ export function MapJournal() {
   useEffect(() => {
     hookRef.current = {
       state: state.phase,
+      source: state.phase === "ready" ? state.source : null,
       gps,
       markerCount,
       selected: context?.capture.id ?? null,
@@ -170,6 +174,9 @@ export function MapJournal() {
     window.__WT_MAP_JOURNAL__ = {
       get state() {
         return hookRef.current.state;
+      },
+      get source() {
+        return hookRef.current.source;
       },
       get markerCount() {
         return hookRef.current.markerCount;
@@ -196,7 +203,7 @@ export function MapJournal() {
       const installed = await store.installed();
       if (!active) return;
       if (installed) {
-        setState({ phase: "ready", manifest: installed });
+        setState({ phase: "ready", manifest: installed, source: "local" });
         return;
       }
 
@@ -207,7 +214,13 @@ export function MapJournal() {
         return;
       }
 
-      setState({ phase: "region-missing", manifest });
+      // First paint from the published pack while the install runs — a fresh
+      // origin or device opens on the map, not a download gate.
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        setState({ phase: "ready", manifest, source: "remote" });
+      } else {
+        setState({ phase: "region-missing", manifest });
+      }
       setDownloading(true);
       setProgress({
         downloadedBytes: 0,
@@ -218,7 +231,13 @@ export function MapJournal() {
         await store.install(manifest, (next) => {
           if (active) setProgress(next);
         });
-        if (active) setState({ phase: "ready", manifest });
+        if (active) {
+          setState((current) =>
+            current.phase === "ready"
+              ? { ...current, source: "local" }
+              : { phase: "ready", manifest, source: "local" },
+          );
+        }
       } catch {
         if (active) {
           setError(
@@ -238,19 +257,36 @@ export function MapJournal() {
     };
   }, [baseUrl, region]);
 
-  // The map mounts once the region is installed.
+  const readyManifest = state.phase === "ready" ? state.manifest : null;
+  const readySource = state.phase === "ready" ? state.source : null;
+
+  // The map mounts as soon as a pack can render — installed, or streamed
+  // from the published pack while the install finishes in the background.
   useEffect(() => {
-    if (state.phase !== "ready" || mapRef.current || !containerRef.current) {
+    if (!readyManifest || !readySource || mapRef.current || !containerRef.current) {
       return;
     }
-    const manifest = state.manifest;
+    const manifest = readyManifest;
     const container = containerRef.current;
     let disposed = false;
 
     void (async () => {
-      const { renderInstalledRegion } = await import("@/lib/offline-region/map");
-      const store = createRegionStore(baseUrl, region);
-      const { map } = await renderInstalledRegion(container, store, manifest);
+      const { renderInstalledRegion, renderRemoteRegion, withinRegionBounds } =
+        await import("@/lib/offline-region/map");
+      const fix = lastFixRef.current;
+      const options = { center: fix };
+      if (fix && withinRegionBounds(manifest, fix)) {
+        centeredOnGpsRef.current = true;
+      }
+      const { map } =
+        readySource === "local"
+          ? await renderInstalledRegion(
+              container,
+              createRegionStore(baseUrl, region),
+              manifest,
+              options,
+            )
+          : await renderRemoteRegion(container, baseUrl, manifest, options);
       if (disposed) {
         map.remove();
         return;
@@ -302,11 +338,14 @@ export function MapJournal() {
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [state, baseUrl, region, openCapture, placeGpsPin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- readySource flips remote→local without a remount
+  }, [readyManifest, baseUrl, region, openCapture, placeGpsPin]);
 
-  // Live GPS only while the map surface is active; honest about absence.
+  // Live GPS from the moment the surface opens — including while a pack
+  // downloads — so the permission prompt and first fix land before the map
+  // mounts and the sheet can open on the walker's position.
   useEffect(() => {
-    if (state.phase !== "ready") return;
+    if (state.phase === "loading") return;
     if (!("geolocation" in navigator)) {
       const timer = window.setTimeout(
         () => setGps({ status: "unavailable" }),
@@ -362,7 +401,7 @@ export function MapJournal() {
     try {
       const store = createRegionStore(baseUrl, region);
       await store.install(manifest, (next) => setProgress(next));
-      setState({ phase: "ready", manifest });
+      setState({ phase: "ready", manifest, source: "local" });
     } catch {
       setError(
         "The Offline Region download could not be verified. Stay online and try again.",
