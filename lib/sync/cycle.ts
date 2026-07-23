@@ -18,6 +18,11 @@ import {
   serverCaptureIdSet,
   type ThreadsTransport,
 } from "@/lib/sync/threads-client";
+import {
+  getTrashTransport,
+  synchronizeTrash,
+  type TrashTransport,
+} from "@/lib/sync/trash-client";
 
 export type SyncCycleResult = {
   skippedOffline: boolean;
@@ -37,6 +42,7 @@ export type SyncCycleInput = {
   captureTransport?: SyncTransport;
   enrichmentTransport?: EnrichmentTransport;
   threadsTransport?: ThreadsTransport;
+  trashTransport?: TrashTransport;
   retryFailed?: boolean;
 };
 
@@ -80,6 +86,17 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
     });
     requeuedForSync = recovered.requeuedForSync;
     requeuedForEnrichment = recovered.requeuedForEnrichment;
+  }
+
+  // Trash rides every cycle: local trash/restore mutations reach the server
+  // and other devices' trash decisions land here.
+  try {
+    await synchronizeTrash(
+      input.store,
+      input.trashTransport ?? getTrashTransport(),
+    );
+  } catch {
+    // Trash mutations stay in the local outbox for the next cycle.
   }
 
   await synchronizePendingMedia(

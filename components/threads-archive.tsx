@@ -53,9 +53,16 @@ function DayPhoto({
   threadId: string;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     const key = attachment.localObjectKey ?? attachment.thumbnailObjectKey;
-    if (!key) return;
+    if (!key) {
+      // Captured on another device: stream the private server copy.
+      if (attachment.remoteObjectKey) {
+        setUrl(`/api/media/${attachment.id}`);
+      }
+      return;
+    }
     let objectUrl: string | null = null;
     let active = true;
     void createIdbMediaStore()
@@ -70,13 +77,18 @@ function DayPhoto({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [attachment.localObjectKey, attachment.thumbnailObjectKey]);
+  }, [
+    attachment.id,
+    attachment.localObjectKey,
+    attachment.thumbnailObjectKey,
+    attachment.remoteObjectKey,
+  ]);
 
-  if (!url) return null;
+  if (!url || failed) return null;
   return (
     <Link href={`/threads/${threadId}`} className="threads-day-photo">
-      {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
-      <img src={url} alt={attachment.fileName} />
+      {/* eslint-disable-next-line @next/next/no-img-element -- local blob or private media URL */}
+      <img src={url} alt={attachment.fileName} onError={() => setFailed(true)} />
     </Link>
   );
 }

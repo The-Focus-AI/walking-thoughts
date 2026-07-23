@@ -190,3 +190,70 @@ test("remote Trash pull applies server records without rewriting Capture history
   expect(await store.list()).toHaveLength(1);
   expect((await store.list())[0]?.text).toBe("Keep history text");
 });
+
+test("runSyncCycle drains local Trash mutations to the server", async () => {
+  const { resetSyncCycleForTests, runSyncCycle } = await import(
+    "@/lib/sync/cycle"
+  );
+  const { createMemoryCaptureStore } = await import(
+    "@/lib/local-capture/store"
+  );
+  resetSyncCycleForTests();
+
+  const store = createMemoryCaptureStore();
+  const capture = await store.commit("Blurry test photo", null);
+  await store.trashThread(capture.threadId!);
+
+  const pushed: unknown[] = [];
+  const result = await runSyncCycle({
+    store,
+    online: true,
+    threadsTransport: { async listThreads() { return { unavailable: true as const }; } },
+    captureTransport: {
+      async pushCaptures() {
+        return { results: [], failures: [] };
+      },
+    },
+    mediaTransport: {
+      async upload() {
+        return { remoteObjectKey: "media/none" };
+      },
+    },
+    enrichmentTransport: {
+      async process() {
+        return { results: [], jobs: [] };
+      },
+    },
+    trashTransport: {
+      async pushTrashMutations(mutations) {
+        pushed.push(...mutations);
+        return {
+          results: mutations.map((mutation) => ({
+            idempotencyKey: mutation.idempotencyKey,
+            status: "complete" as const,
+            record:
+              mutation.action === "trash"
+                ? {
+                    kind: mutation.kind,
+                    targetId: mutation.targetId,
+                    trashedAt: mutation.trashedAt!,
+                    expiresAt: "2099-01-01T00:00:00.000Z",
+                    attachmentIds: mutation.attachmentIds ?? [],
+                  }
+                : null,
+          })),
+          failures: [],
+        };
+      },
+      async pullTrash() {
+        return { unavailable: true as const };
+      },
+    },
+  });
+
+  expect(result.skippedOffline).toBe(false);
+  expect(pushed).toHaveLength(1);
+  const settled = await store.listTrash();
+  expect(settled).toHaveLength(1);
+  expect(settled[0].syncStatus).toBe("complete");
+});

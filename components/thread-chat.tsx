@@ -32,9 +32,16 @@ type ThreadChatProps = {
 
 function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [remoteFailed, setRemoteFailed] = useState(false);
   useEffect(() => {
     const key = attachment.localObjectKey ?? attachment.thumbnailObjectKey;
-    if (!key) return;
+    if (!key) {
+      // Captured on another device: stream the private server copy.
+      if (attachment.remoteObjectKey) {
+        setUrl(`/api/media/${attachment.id}`);
+      }
+      return;
+    }
     let objectUrl: string | null = null;
     let active = true;
     void createIdbMediaStore()
@@ -49,19 +56,45 @@ function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [attachment.localObjectKey, attachment.thumbnailObjectKey]);
+  }, [
+    attachment.id,
+    attachment.localObjectKey,
+    attachment.thumbnailObjectKey,
+    attachment.remoteObjectKey,
+  ]);
 
-  if (url && attachment.kind === "image") {
+  const showUrl = remoteFailed ? null : url;
+  if (showUrl && attachment.kind === "image") {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- local blob URL
-      <img src={url} alt={attachment.fileName} className="chat-media" />
+      // eslint-disable-next-line @next/next/no-img-element -- local blob or private media URL
+      <img
+        src={showUrl}
+        alt={attachment.fileName}
+        className="chat-media"
+        onError={() => setRemoteFailed(true)}
+      />
     );
   }
-  if (url && attachment.kind === "video") {
-    return <video className="chat-media" src={url} controls playsInline />;
+  if (showUrl && attachment.kind === "video") {
+    return (
+      <video
+        className="chat-media"
+        src={showUrl}
+        controls
+        playsInline
+        onError={() => setRemoteFailed(true)}
+      />
+    );
   }
-  if (url && attachment.kind === "audio") {
-    return <audio className="chat-media" src={url} controls />;
+  if (showUrl && attachment.kind === "audio") {
+    return (
+      <audio
+        className="chat-media"
+        src={showUrl}
+        controls
+        onError={() => setRemoteFailed(true)}
+      />
+    );
   }
   return <span className="thread-media-name">{attachment.fileName}</span>;
 }
@@ -99,6 +132,13 @@ function CaptureHero({ capture }: { capture: LocalCapture }) {
           {statusLabel(capture.status)}
         </span>
       </div>
+      {capture.status === "needs_attention" ? (
+        <p className="thread-capture-reason">
+          {capture.syncReason?.startsWith("missing_original_media")
+            ? "The original media never reached the server, so there is nothing to research. Move this Thread to Trash if it is not worth keeping."
+            : (capture.syncReason ?? "Synchronization failed")}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -225,6 +265,26 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
     };
   }, []);
 
+  /** Local-first trash: hides immediately, syncs on the next cycle. */
+  async function moveToTrash() {
+    if (
+      !window.confirm(
+        "Move this Thread to Trash? It stays recoverable for 30 days.",
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      const store = getCaptureStore();
+      await store.trashThread(threadId);
+      void runSyncCycle({ store });
+      router.push("/threads");
+    } catch {
+      setError("Could not move this Thread to Trash");
+    }
+  }
+
   /** ADR 0011 repair: break a merged Thread into one Thread per Capture. */
   async function splitIntoThreads() {
     if (splitting) return;
@@ -346,6 +406,18 @@ export function ThreadChat({ threadId, embedded = false, onClose }: ThreadChatPr
                 ? "Copy failed"
                 : "Copy as markdown"}
           </button>
+          {!embedded ? (
+            <button
+              type="button"
+              className="thread-copy-markdown thread-trash"
+              data-testid="thread-trash"
+              onClick={() => void moveToTrash()}
+              disabled={!thread}
+              title="Move this Thread to Trash (recoverable for 30 days)"
+            >
+              Trash
+            </button>
+          ) : null}
           {onClose ? (
             <button
               type="button"
