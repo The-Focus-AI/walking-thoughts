@@ -67,11 +67,18 @@ the affected variants.
    work in progress, clay = needs attention, sky = the machine's voice
    (Enrichment), signal red only while recording. Off-limits: neon
    gradients, purple "AI glow", pure `#000`/`#fff`.
-5. **Typography** — serif display for Thread names and titles, system sans
-   for UI body, monospace for model IDs, coordinates, and counts. Headlines
-   loud only on signed-out/marketing surfaces; working surfaces stay quiet
-   (trail-cleanup verdict demoted the marketing hero). **System font stacks
-   only** — the offline shell must not depend on network fonts.
+5. **Typography & composition** — *(user-driven across three live rounds;
+   see design-lab.html)* — the user rejected font-swap variants ("looks
+   like shit") and asked for real art direction. Round 2 offered three
+   compositions (USGS Quadrangle, NPS Unigrid, memo-book Nightfield);
+   **Quadrangle won**. Round 3 instrumented it three ways (station strip,
+   route profile, collar diagrams); **V1 station strip won**, adding
+   elevation, GPS, ascent, and cached-forecast weather to the sheet.
+   Committed voices: Barlow Condensed 600 caps display (self-hosted
+   woff2), **Georgia italic reserved for the walker's words** (the USGS
+   natural-features convention), system sans body, mono for measured
+   facts. The old system-stacks-only rule relaxed to
+   self-hosted-webfonts-allowed.
 6. **Non-negotiables** — WCAG AA for every text/background pair; color never
    the only status signal (labels always); bottom tab bar + capture dock in
    the thumb zone with safe-area insets; reduced-motion respected; canonical

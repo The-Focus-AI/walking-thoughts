@@ -1,7 +1,11 @@
 # Verdict — design directions prototype
 
-**Picked: a — Forest Night**, with named steals from the losers. This is the
-direction distilled into the root `DESIGN.md`.
+Three rounds. Final language: **Quadrangle over Forest Night tokens, with
+the V1 station strip**, distilled into the root `DESIGN.md`.
+
+## Round 1 — color & atmosphere (unattended)
+
+**Picked: a — Forest Night**, with named steals from the losers.
 
 Judged unattended against the decision log in [README.md](README.md) (calm
 instrument, never urgency; honest status; dark-first; warm; system fonts;
@@ -32,8 +36,38 @@ measured for contrast (all pass AA, nearly all AAA — table in `DESIGN.md`).
   sun is reserved for the single primary act on screen; confident,
   full-width empty states rather than apologetic gray boxes.
 
+## Round 2 — composition (user-judged, live)
+
+The first typography pass (four font swaps on one layout: Georgia,
+Charter, Fraunces, Courier Prime — `?area=type`) was rejected by the user
+outright: personality doesn't come from the font menu. Round 2 offered
+three full compositions over Forest Night tokens (design-lab.html):
+
+| Direction | Outcome | Why |
+| --- | --- | --- |
+| **I · Quadrangle** (USGS survey sheet) | **Winner** | Neatlines, corner marginalia, condensed masthead — and the quads' convention that natural features run serif italic, which makes *the walker's words* typographically distinct from the machine's upright annotations. |
+| II · Unigrid (Vignelli NPS brochure) | Lost | Disciplined and confident, but anonymous — nothing of this product's world in it. |
+| III · Nightfield (memo book) | Lost | Charming cover block, but the graph-grid page texture reads as noise over daily use (now an explicit don't). |
+
+## Round 3 — instruments (user-judged, live)
+
+The user asked for elevation, GPS, and weather on the sheet. Three
+variations (design-lab.html, final state):
+
+| Variation | Outcome | Why |
+| --- | --- | --- |
+| **V1 · Station strip** | **Winner** ("i like V1") | Four ruled instrument cells (Elevation / Position / Ascent / Weather) under the masthead, cockpit-scan order; per-Capture elevation joins the station gutter; one sun line calls the next weather change. |
+| V2 · Route profile | Lost | Elevation profile with status-colored station rings + forecast strip — lovely, but heavier than the trail surface needs. Candidate to revisit for the desk walk-review header. |
+| V3 · Collar diagrams | Lost | Wind rose / sun arc / fix diagrams are charming but the least load-bearing. |
+
+Weather note: the forecast requires a new product capability (forecast
+cached into the Offline Region pack). `DESIGN.md` specifies the strip
+collapses gracefully when a cell has no data.
+
 ## Primary source
 
-Throwaway variants live under `/prototype/design-directions` on branch
+Throwaway variants live under `/prototype/design-directions` (Next.js
+rounds) and `design-lab.html` (static rounds 2–3, also published as a
+Claude artifact during review) on branch
 `claude/design-md-brand-system-mlwfw8` alongside the `DESIGN.md` this
 prototype settled. Winner is flagged on the `/prototype` hub.
