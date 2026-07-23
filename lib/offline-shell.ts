@@ -1,4 +1,4 @@
-export const SHELL_CACHE_NAME = "walking-thoughts-shell-v10";
+export const SHELL_CACHE_NAME = "walking-thoughts-shell-v11";
 
 /**
  * Register the service worker and cache the given shell pages plus every

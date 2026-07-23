@@ -1,11 +1,74 @@
 :root {
+  /* DESIGN.md color tokens — roles are strict; see the table in DESIGN.md. */
+  --background: #17231b;
+  --background-deep: #101712;
+  --surface: #1e2c22;
+  --surface-raised: #24352a;
   --ink: #f2f1e8;
   --muted: #b9bcae;
-  --forest: #17231b;
-  --forest-light: #223329;
-  --moss: #a9d18f;
-  --sun: #f4cf72;
   --line: rgba(242, 241, 232, 0.16);
+  --line-strong: rgba(242, 241, 232, 0.38);
+  --action: #f4cf72;
+  --action-text: var(--background);
+  --identity: #a9d18f;
+  --attention: #f0b4a0;
+  --machine: #8fb8d8;
+  --record: #b42318;
+  --record-text: #fff8f0;
+  --focus-ring: var(--identity);
+  /* Aliases predating the DESIGN.md names, kept while selectors migrate. */
+  --forest: var(--background);
+  --moss: var(--identity);
+  --sun: var(--action);
+  /* Type voices — each has one job (DESIGN.md Typography). */
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-capture: Georgia, "Times New Roman", serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/barlow-condensed-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/barlow-condensed-600.woff2") format("woff2");
+}
+
+/* The four voices as reusable classes. */
+.t-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+
+.t-capture {
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.t-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 * {
@@ -22,8 +85,8 @@ body {
   color: var(--ink);
   background:
     radial-gradient(circle at 70% 10%, rgba(169, 209, 143, 0.12), transparent 30%),
-    linear-gradient(160deg, #17231b 0%, #101712 100%);
-  font-family: Arial, Helvetica, sans-serif;
+    linear-gradient(160deg, var(--background) 0%, var(--background-deep) 100%);
+  font-family: var(--font-body);
 }
 
 button,
@@ -167,7 +230,7 @@ a {
 .trail-map-hero-progress-track {
   height: 0.45rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--line);
   overflow: hidden;
 }
 
@@ -326,7 +389,7 @@ a {
 }
 
 .gutter-needs_attention .gutter-label {
-  color: #f0b4a0;
+  color: var(--attention);
 }
 
 .trail-sync-footer {
@@ -504,7 +567,7 @@ h1 {
   padding: 1rem 1rem 1.1rem;
   border: 1px solid var(--line);
   border-radius: 1.1rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-raised);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(16px);
 }
@@ -544,7 +607,7 @@ h1 {
 }
 
 .capture-composer select:focus {
-  outline: 2px solid rgba(169, 209, 143, 0.55);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -562,7 +625,7 @@ h1 {
 }
 
 .capture-composer textarea:focus {
-  outline: 2px solid rgba(169, 209, 143, 0.55);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -594,7 +657,7 @@ h1 {
 }
 
 .capture-error {
-  color: #f0b4a0;
+  color: var(--attention);
 }
 
 .capture-persistence {
@@ -643,7 +706,7 @@ h1 {
   gap: 0.55rem;
   padding: 0.95rem 1rem;
   border-left: 3px solid rgba(169, 209, 143, 0.7);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface);
 }
 
 .capture-entry-meta {
@@ -671,13 +734,13 @@ h1 {
 }
 
 .capture-status.status-needs_attention {
-  color: #f0b4a0;
+  color: var(--attention);
 }
 
 .enrichment-entry,
 .enrichment-pending {
-  border-left-color: rgba(120, 170, 210, 0.75);
-  background: rgba(120, 170, 210, 0.08);
+  border-left-color: rgba(143, 184, 216, 0.75);
+  background: rgba(143, 184, 216, 0.08);
 }
 
 .thread-speaker-you {
@@ -771,7 +834,7 @@ h1 {
   padding: 0.85rem 1rem;
   border: 1px solid var(--line);
   border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
 }
 
 .thread-row-main {
@@ -830,7 +893,7 @@ h1 {
 }
 
 .thread-chip-attention {
-  color: #f0b4a0;
+  color: var(--attention);
   border-color: rgba(240, 180, 160, 0.45);
   background: rgba(240, 180, 160, 0.1);
 }
@@ -872,7 +935,7 @@ h1 {
 }
 
 .capture-attention {
-  color: #f0b4a0;
+  color: var(--attention);
   font-size: 0.82rem;
 }
 
@@ -882,7 +945,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 0.7rem;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface);
   font-weight: 700;
   cursor: pointer;
 }
@@ -991,8 +1054,8 @@ h1 {
   padding: 0 1rem;
   border: 0;
   border-radius: 0.6rem;
-  background: #b42318;
-  color: #fff8f0;
+  background: var(--record);
+  color: var(--record-text);
   font-weight: 800;
 }
 
@@ -1005,7 +1068,7 @@ h1 {
 }
 
 .availability-error {
-  color: #b42318;
+  color: var(--record);
 }
 
 .media-remove-local,
@@ -1024,7 +1087,7 @@ h1 {
   border-color: rgba(244, 207, 114, 0.35);
   background:
     linear-gradient(180deg, rgba(244, 207, 114, 0.08), transparent 40%),
-    rgba(255, 255, 255, 0.05);
+    var(--surface);
 }
 
 .capture-actions {
@@ -1052,8 +1115,8 @@ h1 {
 }
 
 .capture-card .capture-icon-btn[aria-pressed="true"] {
-  color: #fff8f0;
-  background: #b42318;
+  color: var(--record-text);
+  background: var(--record);
   border-color: transparent;
   animation: recording-pulse 1.2s ease-in-out infinite;
 }
@@ -1118,7 +1181,7 @@ h1 {
   padding: 1.1rem 1.2rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.5;
@@ -1304,7 +1367,7 @@ footer {
   padding: 1.25rem;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--forest-light);
+  background: var(--surface);
 }
 
 .journal-empty h1 {
@@ -1339,7 +1402,7 @@ footer {
 }
 
 .journal-panel {
-  background: var(--forest-light);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 1rem;
@@ -1506,7 +1569,7 @@ footer {
   padding: 1rem 1.25rem;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--forest-light);
+  background: var(--surface);
 }
 
 .region-tracer-error {
@@ -1565,7 +1628,7 @@ footer {
   margin: 0 auto;
   background:
     radial-gradient(circle at 70% 10%, rgba(169, 209, 143, 0.1), transparent 30%),
-    linear-gradient(160deg, #17231b 0%, #101712 100%);
+    linear-gradient(160deg, var(--background) 0%, var(--background-deep) 100%);
 }
 
 .thread-chat-embedded {
@@ -1639,8 +1702,8 @@ footer {
 }
 
 .chat-bubble-agent {
-  background: rgba(120, 170, 210, 0.14);
-  border: 1px solid rgba(120, 170, 210, 0.35);
+  background: rgba(143, 184, 216, 0.14);
+  border: 1px solid rgba(143, 184, 216, 0.35);
   border-bottom-left-radius: 0.3rem;
 }
 
@@ -1832,11 +1895,11 @@ footer {
 
 .sync-pill-attention {
   border-color: rgba(240, 180, 160, 0.5);
-  color: #f0b4a0;
+  color: var(--attention);
 }
 
 .sync-pill-attention .sync-pill-dot {
-  background: #f0b4a0;
+  background: var(--attention);
   box-shadow: 0 0 0 3px rgba(240, 180, 160, 0.14);
 }
 
@@ -1953,7 +2016,7 @@ footer {
   border-radius: 0.85rem;
   border: 1px solid var(--line);
   border-left: 3px solid rgba(244, 207, 114, 0.65);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
 }
 
 .enrichment-report-head {
@@ -2027,7 +2090,7 @@ footer {
 .enrichment-markdown code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.25);
   padding: 0.1rem 0.3rem;
   border-radius: 0.3rem;
 }
@@ -2143,16 +2206,16 @@ footer {
 }
 
 .thread-trash {
-  color: #f0b4a0;
+  color: var(--attention);
 }
 
 .thread-trash:hover {
-  border-color: #f0b4a0;
+  border-color: var(--attention);
 }
 
 .thread-capture-reason {
   margin: 0;
-  color: #f0b4a0;
+  color: var(--attention);
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -2287,7 +2350,7 @@ footer {
 
 .threads-queue-chip.active {
   background: var(--moss);
-  color: #17231b;
+  color: var(--background);
 }
 
 .threads-search {
@@ -2296,7 +2359,7 @@ footer {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.45rem 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
@@ -2309,7 +2372,7 @@ footer {
 .thread-chip-reviewed {
   color: var(--muted);
   border-color: var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
 }
 
 .thread-reviewed-toggle {
