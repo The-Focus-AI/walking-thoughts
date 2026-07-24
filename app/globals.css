@@ -2432,6 +2432,16 @@ footer {
   text-transform: uppercase;
 }
 
+.interview-error {
+  margin: 0;
+  color: var(--attention);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  line-height: 1.45;
+}
+
 .interview-empty {
   margin: 0;
   color: var(--muted);

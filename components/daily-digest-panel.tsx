@@ -4,7 +4,7 @@ import { useState } from "react";
 import Markdown from "react-markdown";
 import { collectDayCorpus } from "@/lib/digest/corpus";
 import type { DayCorpusEntry, DayDigestResult } from "@/lib/digest/types";
-import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
+import { readCachedThreadEnrichments } from "@/lib/enrichment/thread-view";
 import {
   calendarDayKey,
   formatDayHeading,
@@ -27,8 +27,10 @@ function digestHeaders(): Record<string, string> {
 }
 
 /**
- * Assemble Captures and Enrichments for one civil day from local store + cache.
- * Day membership follows Capture createdAt (local calendar day).
+ * Assemble Captures and Enrichments for one civil day from local store + the
+ * retained Enrichment cache only. Never awaits the network — Ask must not
+ * hang when Enrichment GETs stall (the Threads list already refreshes those
+ * in the background).
  */
 export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   const store = getCaptureStore();
@@ -64,7 +66,7 @@ export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   }
 
   for (const threadId of threadIds) {
-    const enrichments = await loadThreadEnrichments(threadId);
+    const enrichments = readCachedThreadEnrichments(threadId);
     for (const enrichment of enrichments) {
       const target = daysCaptures.find((capture) =>
         enrichment.targetCaptureIds.includes(capture.id),
