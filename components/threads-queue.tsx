@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { SyncStatusPill } from "@/components/sync-status-pill";
 import { ThreadChat } from "@/components/thread-chat";
-import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
+import {
+  loadThreadEnrichments,
+  readCachedThreadEnrichments,
+} from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
   calendarDayKey,
@@ -112,28 +115,46 @@ export function ThreadsQueue({
 } = {}) {
   const router = useRouter();
   const [threads, setThreads] = useState<ThreadListView[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queue, setQueue] = useState<"new" | "all">("new");
   const [search, setSearch] = useState("");
+  const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     try {
       const store = getCaptureStore();
       const recent = await store.listRecentThreads();
-      const views = await Promise.all(
+      // Local-first: paint from IndexedDB plus the retained Enrichment
+      // cache before touching the network, so the list is stable offline
+      // instead of flashing the zero-Thread state while per-Thread
+      // Enrichment fetches hang or fail.
+      const localViews = await Promise.all(
         recent.map(async (thread) => {
           const view = await store.listThread(thread.id);
-          const enrichments = await loadThreadEnrichments(thread.id);
           return {
             ...view,
-            enrichments,
+            enrichments: readCachedThreadEnrichments(thread.id),
             dayKey: calendarDayKey(new Date(thread.updatedAt)),
           };
         }),
       );
-      setThreads(views);
+      if (generation !== loadGeneration.current) return;
+      setThreads(localViews);
+      setLoaded(true);
+      const refreshed = await Promise.all(
+        localViews.map(async (view) => ({
+          ...view,
+          enrichments: await loadThreadEnrichments(view.thread.id),
+        })),
+      );
+      if (generation !== loadGeneration.current) return;
+      setThreads(refreshed);
     } catch {
+      if (generation !== loadGeneration.current) return;
       setError("Could not load Threads");
+      setLoaded(true);
     }
   }, []);
 
@@ -177,6 +198,49 @@ export function ThreadsQueue({
     }
     return [...groups.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   }, [visibleThreads]);
+
+  /** Threads in display order (day by day) for swipe stepping. */
+  const orderedThreadIds = useMemo(
+    () => byDay.flatMap(([, dayThreads]) => dayThreads.map((view) => view.thread.id)),
+    [byDay],
+  );
+
+  const openAdjacentThread = useCallback(
+    (step: 1 | -1) => {
+      if (!selectedThreadId) return;
+      const index = orderedThreadIds.indexOf(selectedThreadId);
+      if (index === -1) return;
+      const nextId = orderedThreadIds[index + step];
+      if (nextId) router.push(`/threads/${nextId}`);
+    },
+    [orderedThreadIds, router, selectedThreadId],
+  );
+
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+
+  const onDetailTouchStart = useCallback((event: React.TouchEvent) => {
+    swipeStart.current =
+      event.touches.length === 1
+        ? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+        : null;
+  }, []);
+
+  const onDetailTouchEnd = useCallback(
+    (event: React.TouchEvent) => {
+      const start = swipeStart.current;
+      swipeStart.current = null;
+      const touch = event.changedTouches[0];
+      if (!start || !touch) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      // Only a deliberate horizontal swipe — never a vertical scroll of
+      // the log that happens to drift sideways.
+      if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      // Swipe left → next (older) Thread; swipe right → previous (newer).
+      openAdjacentThread(dx < 0 ? 1 : -1);
+    },
+    [openAdjacentThread],
+  );
 
   /** After marking reviewed, advance to the next new Thread — inbox zero. */
   const onReviewedChange = useCallback(
@@ -270,7 +334,7 @@ export function ThreadsQueue({
         </p>
       ) : null}
 
-      {byDay.length === 0 && !error ? (
+      {loaded && byDay.length === 0 && !error ? (
         <p className="trail-thread-empty">
           {search
             ? "No Threads match that search."
@@ -380,7 +444,14 @@ export function ThreadsQueue({
 
       </div>
 
-      <div className="threads-detail-pane">
+      <div
+        className="threads-detail-pane"
+        onTouchStart={onDetailTouchStart}
+        onTouchEnd={onDetailTouchEnd}
+        onTouchCancel={() => {
+          swipeStart.current = null;
+        }}
+      >
         {selectedThreadId ? (
           <ThreadChat
             key={selectedThreadId}
