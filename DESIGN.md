@@ -292,7 +292,7 @@ from the losing Field Notebook variant); UI text sits at 1.45–1.5.
   in condensed 500), instrument strip, log, footer. Chrome that floats
   (tab bar, sync pill, capture dock) sits outside the sheet.
 - **Mobile first, thumb first.** Android-first PWA: fixed bottom tab bar
-  (Trail / Threads / Map), Capture dock sticky above it in the thumb
+  (Capture / Threads / Map / You), Capture dock sticky above it in the thumb
   zone. Respect `env(safe-area-inset-*)` everywhere.
 - **Dense on mobile, spacious on desktop.** The phone is the field
   instrument — notebook, topo map, kneeboard: tight 8–12px gaps, the
@@ -362,7 +362,10 @@ shadows:
   (condensed 600, tabular), labels and sublines in mono micro. The
   weather cell's value renders in `action`; the optional
   `conditions-note` line below the strip is the only sun-colored text
-  that isn't an act or in-flight status.
+  that isn't an act or in-flight status. Weather is resolved for the
+  walker's position (live forecast when online, retained briefly for
+  offline gaps); a future Offline Region pack may carry a longer cache.
+  Cells without data are omitted — never empty placeholders.
 - **Station gutter** — time / elevation / status stack. Status color
   follows the role table: moss Complete, sun Syncing/Enriching (time
   colors with it), muted Saved locally, clay Needs attention.

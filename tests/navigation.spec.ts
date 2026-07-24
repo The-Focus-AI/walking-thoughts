@@ -2,13 +2,14 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Public seams:
- * - A persistent bottom tab bar (Capture / Threads / Map) is the shared
+ * - A persistent bottom tab bar (Capture / Threads / Map / You) is the shared
  *   navigation on every product surface.
  * - Threads carries the glanceable sync pill.
+ * - You reaches the Interview / Memory desk surface.
  */
 
 test.describe("streamlined navigation", () => {
-  test("bottom tab bar reaches Capture, Threads, and Map from the shell", async ({
+  test("bottom tab bar reaches Capture, Threads, Map, and You from the shell", async ({
     page,
   }) => {
     await page.goto("/offline");
@@ -34,6 +35,19 @@ test.describe("streamlined navigation", () => {
     await expect(
       page.getByRole("navigation", { name: "Primary" }),
     ).toBeVisible();
+
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("link", { name: "You", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/interview/);
+    await expect(page.getByTestId("interview-panel")).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+        name: "You",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   test("Thread view keeps the tab bar so it is never a dead end", async ({
