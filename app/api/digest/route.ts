@@ -42,14 +42,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runDayDigest({
-      dayKey,
-      dayHeading,
-      question,
-      corpus,
-      walkerProfile:
-        typeof body.walkerProfile === "string" ? body.walkerProfile : null,
-    });
+    const result = await runDayDigest(
+      {
+        dayKey,
+        dayHeading,
+        question,
+        corpus,
+        walkerProfile:
+          typeof body.walkerProfile === "string" ? body.walkerProfile : null,
+      },
+      { userId: access.userId },
+    );
     return Response.json(result);
   } catch (error) {
     const message =

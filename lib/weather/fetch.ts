@@ -53,19 +53,19 @@ function writeCache(
 }
 
 /**
- * Fetch a short-range forecast for the walker's position. Returns a cached
- * snapshot when still fresh so the strip survives brief offline gaps.
+ * Fetch a short-range forecast for the walker's position. When offline,
+ * returns a still-fresh cached snapshot so the strip survives brief gaps.
+ * When online, always refreshes so the cell stays live.
  */
 export async function fetchWeatherSnapshot(
   latitude: number,
   longitude: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<WeatherSnapshot | null> {
-  const cached = readCache(latitude, longitude);
-  if (cached) return cached;
-
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return null;
+  const offline =
+    typeof navigator !== "undefined" && navigator.onLine === false;
+  if (offline) {
+    return readCache(latitude, longitude);
   }
 
   const url = new URL("https://api.open-meteo.com/v1/forecast");
@@ -83,12 +83,12 @@ export async function fetchWeatherSnapshot(
 
   try {
     const response = await fetchImpl(url.toString());
-    if (!response.ok) return null;
+    if (!response.ok) return readCache(latitude, longitude);
     const payload = (await response.json()) as OpenMeteoForecast;
     const snapshot = weatherFromOpenMeteo(payload);
     if (snapshot) writeCache(latitude, longitude, snapshot);
-    return snapshot;
+    return snapshot ?? readCache(latitude, longitude);
   } catch {
-    return null;
+    return readCache(latitude, longitude);
   }
 }

@@ -320,7 +320,7 @@ export function InterviewPanel() {
               </button>
               <button
                 type="button"
-                className="interview-send"
+                className="interview-secondary"
                 data-testid="interview-send"
                 onClick={() => void post({ answer: draft.trim() })}
                 disabled={busy || !draft.trim()}

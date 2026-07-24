@@ -86,7 +86,7 @@ test("weatherFromOpenMeteo builds a snapshot and rain note from hourly odds", ()
     },
   };
 
-  const snapshot = weatherFromOpenMeteo(payload, "2026-07-24T09:00:00.000Z");
+  const snapshot = weatherFromOpenMeteo(payload, "2026-07-24T09:00");
   expect(snapshot).toEqual({
     temperatureF: 54,
     windMph: 8,

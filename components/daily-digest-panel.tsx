@@ -51,12 +51,13 @@ async function loadTodayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   ];
 
   for (const capture of todays) {
-    if (!capture.threadId) continue;
     entries.push({
       kind: "capture",
       id: capture.id,
-      threadId: capture.threadId,
-      threadTitle: titleById.get(capture.threadId) ?? "Untitled Thread",
+      threadId: capture.threadId ?? "unthreaded",
+      threadTitle: capture.threadId
+        ? (titleById.get(capture.threadId) ?? "Untitled Thread")
+        : "Untitled Thread",
       text: capture.text,
       createdAt: capture.createdAt,
     });
@@ -157,7 +158,11 @@ export function DailyDigestPanel() {
       </p>
       {corpusCount != null ? (
         <p className="digest-count">
-          {corpusCount} {corpusCount === 1 ? "entry" : "entries"} ready
+          {corpusCount}{" "}
+          {corpusCount === 1
+            ? "Capture or Enrichment"
+            : "Captures and Enrichments"}{" "}
+          ready
         </p>
       ) : null}
 

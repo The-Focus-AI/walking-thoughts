@@ -3,6 +3,9 @@ import {
   getGatewayClient,
 } from "@/lib/enrichment/gateway";
 import type { GatewayClient } from "@/lib/enrichment/types";
+import { renderWalkerProfile } from "@/lib/memory/profile";
+import { getWalkerMemoryRepository } from "@/lib/memory/repository";
+import type { WalkerMemoryRepository } from "@/lib/memory/types";
 import {
   buildDayDigestPrompt,
   DAY_DIGEST_SYSTEM_INSTRUCTION,
@@ -12,6 +15,8 @@ import type { DayDigestRequest, DayDigestResult } from "./types";
 export type DayDigestDependencies = {
   gateway?: GatewayClient;
   model?: string;
+  memories?: WalkerMemoryRepository;
+  userId?: string;
   environment?: Record<string, string | undefined>;
 };
 
@@ -35,10 +40,20 @@ export async function runDayDigest(
   const gateway = deps.gateway ?? getGatewayClient(environment);
   const model = deps.model ?? enrichmentSystemAndModel(environment).model;
 
+  let walkerProfile = request.walkerProfile ?? null;
+  if (walkerProfile == null && deps.userId) {
+    const memories =
+      deps.memories ??
+      getWalkerMemoryRepository(environment as NodeJS.ProcessEnv);
+    walkerProfile = renderWalkerProfile(
+      await memories.listMemories(deps.userId),
+    );
+  }
+
   const generation = await gateway.generate({
     model,
     system: DAY_DIGEST_SYSTEM_INSTRUCTION,
-    prompt: buildDayDigestPrompt(request),
+    prompt: buildDayDigestPrompt({ ...request, walkerProfile }),
     requestTitle: false,
     media: [],
   });
