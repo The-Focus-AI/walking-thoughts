@@ -31,6 +31,17 @@ function writeCache(threadId: string, enrichments: ThreadEnrichment[]): void {
   }
 }
 
+/**
+ * The locally retained copy of a Thread's Enrichments, without touching the
+ * network. Lets review surfaces paint instantly (and offline) before a
+ * background refresh replaces it with the server's answer.
+ */
+export function readCachedThreadEnrichments(
+  threadId: string,
+): ThreadEnrichment[] {
+  return readCache(threadId);
+}
+
 function enrichmentHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   const testUser = process.env.NEXT_PUBLIC_SYNC_TEST_USER_ID;

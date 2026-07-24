@@ -829,6 +829,16 @@ h1 {
   gap: 1rem;
 }
 
+/* The Capture surface must never widen the page: grid and flex items
+   default to min-width auto, so one non-wrapping row (the action
+   toolbar, an unbroken filename) would pin the whole column wider than
+   a small phone and force horizontal scrolling. */
+.capture-workspace > *,
+.capture-card > *,
+.capture-composer > * {
+  min-width: 0;
+}
+
 .capture-card {
   display: grid;
   gap: 1rem;
@@ -1340,6 +1350,7 @@ h1 {
   gap: 0.5rem;
   align-items: center;
   justify-content: space-between;
+  overflow-wrap: anywhere;
 }
 
 .attachment-draft {
@@ -1363,6 +1374,7 @@ h1 {
 .attachment-draft-name {
   color: var(--ink);
   font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .attachment-draft .media-preview,
@@ -1445,6 +1457,7 @@ h1 {
 
 .capture-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.45rem;
   align-items: center;
 }

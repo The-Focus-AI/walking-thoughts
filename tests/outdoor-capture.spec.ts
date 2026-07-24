@@ -98,3 +98,23 @@ test("video record stages a preview draft instead of auto-committing", async ({
     page.getByRole("article").filter({ hasText: /video-/i }),
   ).toBeVisible({ timeout: 10_000 });
 });
+
+test("capture dock fits narrow phones without horizontal scrolling", async ({
+  page,
+}) => {
+  // Narrower than the Pixel default — the width class that used to make
+  // the action toolbar pin the page wider than the viewport.
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture actions")).toBeVisible();
+
+  const overflow = await page.evaluate(() => {
+    const doc = document.documentElement;
+    return doc.scrollWidth - doc.clientWidth;
+  });
+  expect(overflow).toBe(0);
+
+  // The wrapped toolbar keeps every control usable.
+  await expect(page.getByRole("button", { name: "Capture" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Record audio" })).toBeVisible();
+});
