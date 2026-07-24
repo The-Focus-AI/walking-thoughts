@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppNav } from "@/components/app-nav";
+import { ScaleBar } from "@/components/sheet";
 import type { InterviewTurn } from "@/lib/interview/types";
 import { revertedPatchIds } from "@/lib/memory/patches";
 import type { MemoryPatch, WalkerMemory } from "@/lib/memory/types";
@@ -21,73 +22,61 @@ function interviewHeaders(): Record<string, string> {
   return headers;
 }
 
-const CATEGORY_LABELS: Record<WalkerMemory["category"], string> = {
-  identity: "About you",
-  place: "Where you walk",
-  interest: "Interests",
-  expertise: "What you know",
-  preference: "Report style",
-};
-
-function MemoryList({
-  memories,
-  onForget,
-}: {
-  memories: WalkerMemory[];
-  onForget: (memoryId: string) => void;
-}) {
-  if (memories.length === 0) {
-    return (
-      <p className="interview-memories-empty">
-        Nothing remembered yet. Answers below become Memories that tailor
-        every future Enrichment.
-      </p>
-    );
-  }
-  return (
-    <ul className="interview-memories" data-testid="interview-memories">
-      {memories.map((memory) => (
-        <li key={memory.id} className="interview-memory">
-          <span className="interview-memory-category">
-            {CATEGORY_LABELS[memory.category]}
-          </span>
-          <span className="interview-memory-content">{memory.content}</span>
-          <button
-            type="button"
-            className="interview-memory-forget"
-            onClick={() => onForget(memory.id)}
-            aria-label={`Forget: ${memory.content}`}
-          >
-            Forget
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 const OP_GLYPHS: Record<MemoryPatch["op"], string> = {
   add: "+",
   update: "~",
   remove: "−",
 };
 
-function patchSourceLabel(patch: MemoryPatch): React.ReactNode {
-  if (patch.revertsPatchId) return "Reverted by you";
-  if (patch.source === "interview") return "Interview";
+function patchTime(patch: MemoryPatch): string {
+  return new Date(patch.createdAt).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function PatchSource({ patch }: { patch: MemoryPatch }) {
+  if (patch.revertsPatchId) return <span>Reverted by you</span>;
+  if (patch.source === "interview") return <span>Interview</span>;
   if (patch.source === "enrichment" && patch.sourceId) {
     return <Link href={`/threads/${patch.sourceId}`}>Enrichment</Link>;
   }
-  if (patch.source === "enrichment") return "Enrichment";
-  return "You";
+  if (patch.source === "enrichment") return <span>Enrichment</span>;
+  return <span>You</span>;
 }
 
 /**
- * The Changes timeline: the append-only Memory Patch log, newest first, with
- * one-tap Revert. Every way the profile can change — Interview, Enrichment's
- * memory_patch tool, manual Forget — lands here as a visible diff.
+ * One Interview question: the machine asks in its Annotation voice — sky
+ * rule, mono head — and the walker's answer prints in italic serif. The
+ * you-italic / machine-upright rule is absolute (DESIGN.md).
  */
-function PatchTimeline({
+function TurnQuestion({
+  turn,
+  index,
+}: {
+  turn: InterviewTurn;
+  index: number;
+}) {
+  return (
+    <div className="interview-question">
+      <header className="interview-question-head">
+        <span>Question {index + 1}</span>
+        <span>{turn.category}</span>
+      </header>
+      <p>{turn.question}</p>
+    </div>
+  );
+}
+
+/**
+ * The Changes ledger: the append-only Memory Patch log, newest first. Every
+ * way the profile can change — Interview, an Enrichment's memory_patch,
+ * manual Forget — prints here as a diff with one-tap Revert.
+ */
+function PatchLedger({
   patches,
   onRevert,
 }: {
@@ -96,63 +85,54 @@ function PatchTimeline({
 }) {
   if (patches.length === 0) {
     return (
-      <p className="interview-memories-empty">
-        No changes yet — the timeline shows every edit to what Walking
-        Thoughts remembers, and each one can be reverted.
+      <p className="interview-empty">
+        No changes yet. Answer a question above and the ledger begins.
       </p>
     );
   }
   const reverted = revertedPatchIds(patches);
   const newestFirst = [...patches].reverse();
   return (
-    <ol className="interview-patches" data-testid="interview-patches">
+    <ol className="interview-ledger" data-testid="interview-patches">
       {newestFirst.map((patch) => (
         <li
           key={patch.id}
           className={
             reverted.has(patch.id)
-              ? "interview-patch interview-patch-reverted"
-              : "interview-patch"
+              ? "interview-ledger-row interview-ledger-reverted"
+              : "interview-ledger-row"
           }
         >
-          <span
-            className={`interview-patch-op interview-patch-op-${patch.op}`}
-            aria-label={patch.op}
-          >
+          <span className="interview-ledger-op" aria-label={patch.op}>
             {OP_GLYPHS[patch.op]}
           </span>
-          <span className="interview-patch-body">
-            <span className="interview-memory-category">
-              {CATEGORY_LABELS[patch.category]}
-            </span>
+          <span className="interview-ledger-body">
             {patch.op === "update" ? (
-              <span className="interview-memory-content">
+              <span className="interview-ledger-content">
                 <s>{patch.before}</s> → {patch.after}
               </span>
             ) : (
-              <span className="interview-memory-content">
+              <span className="interview-ledger-content">
                 {patch.after ?? patch.before}
               </span>
             )}
-            <span className="interview-patch-meta">
-              {patchSourceLabel(patch)}
-              {" · "}
-              <time dateTime={patch.createdAt}>
-                {new Date(patch.createdAt).toLocaleString()}
-              </time>
+            <span className="interview-ledger-meta">
+              <span>{patch.category}</span>
+              <PatchSource patch={patch} />
+              <time dateTime={patch.createdAt}>{patchTime(patch)}</time>
             </span>
           </span>
           {!reverted.has(patch.id) ? (
             <button
               type="button"
-              className="interview-memory-forget"
+              className="interview-quiet"
               onClick={() => onRevert(patch.id)}
               aria-label={`Revert this ${patch.op}`}
             >
               Revert
             </button>
           ) : (
-            <span className="interview-patch-reverted-note">reverted</span>
+            <span className="interview-ledger-meta">Reverted</span>
           )}
         </li>
       ))}
@@ -161,9 +141,10 @@ function PatchTimeline({
 }
 
 /**
- * The Interview: Walking Thoughts asks about the walker, each answer is
- * distilled into Memories, and every Memory stays visible and forgettable.
- * Memories feed the walker profile that tailors future Enrichments.
+ * The Interview sheet — a desk surface (DESIGN.md): Walking Thoughts asks,
+ * the walker answers, and each answer distills into Memories that tailor
+ * every Enrichment. What the survey believes about its one reader stays
+ * printed on this page, line by revertible line.
  */
 export function InterviewPanel() {
   const [turns, setTurns] = useState<InterviewTurn[]>([]);
@@ -208,7 +189,11 @@ export function InterviewPanel() {
         applyState(state);
         setStarted(state.turns.length > 0);
       } catch {
-        if (active) setError("Could not load the Interview — check the connection");
+        if (active) {
+          setError(
+            "The Interview needs a connection. It will be here when you're back in range.",
+          );
+        }
       }
     })();
     return () => {
@@ -231,7 +216,9 @@ export function InterviewPanel() {
         setStarted(true);
         setDraft("");
       } catch {
-        setError("Could not reach the Interview — check the connection");
+        setError(
+          "That didn't reach the server. Your answer is still in the box — try again in range.",
+        );
       } finally {
         setBusy(false);
       }
@@ -249,7 +236,7 @@ export function InterviewPanel() {
       if (!response.ok) throw new Error(String(response.status));
       await refreshProfile();
     } catch {
-      setError("Could not forget that Memory — check the connection");
+      setError("Forgetting needs a connection. Try again in range.");
     }
   }
 
@@ -264,7 +251,7 @@ export function InterviewPanel() {
       if (!response.ok) throw new Error(String(response.status));
       await refreshProfile();
     } catch {
-      setError("Could not revert that change — check the connection");
+      setError("Reverting needs a connection. Try again in range.");
     }
   }
 
@@ -272,111 +259,43 @@ export function InterviewPanel() {
   const settledTurns = turns.filter((turn) => turn !== openTurn);
 
   return (
-    <div className="thread-chat interview-panel" data-testid="interview-panel">
-      <header className="thread-chat-header">
+    <main className="interview-sheet" data-testid="interview-panel">
+      <header className="threads-queue-header">
         <div>
-          <Link className="topbar-link" href="/">
-            ← Capture
-          </Link>
+          <p className="eyebrow">Provisional Survey</p>
           <h1>Interview</h1>
-          <p className="thread-chat-sub">
-            A short conversation so Enrichments know who they&apos;re
-            researching for. Enrichments keep learning as you walk — every
-            change lands in the timeline below and can be reverted.
+          <p>
+            Walking Thoughts asks; your answers become Memories that tailor
+            every Enrichment. Everything it believes about you is printed
+            below, and any line can be reverted.
           </p>
         </div>
       </header>
 
-      <div
-        className="thread-chat-log"
-        role="log"
-        aria-label="Interview"
-        aria-live="polite"
-      >
-        {settledTurns.map((turn) => (
-          <div key={turn.id}>
-            <article className="chat-turn chat-turn-agent">
-              <div className="chat-bubble chat-bubble-agent">
-                <p>{turn.question}</p>
-              </div>
-              <div className="chat-meta">
-                <span>Walking Thoughts</span>
-              </div>
-            </article>
-            <article className="chat-turn chat-turn-you">
-              <div className="chat-bubble chat-bubble-you">
-                <p>{turn.skipped ? "(skipped)" : turn.answer}</p>
-              </div>
-              <div className="chat-meta">
-                <span>You</span>
-              </div>
-            </article>
+      <section className="interview-section" aria-label="Interview">
+        {settledTurns.map((turn, index) => (
+          <div key={turn.id} className="interview-turn">
+            <TurnQuestion turn={turn} index={index} />
+            {turn.skipped ? (
+              <p className="interview-skipped">Skipped</p>
+            ) : (
+              <p className="interview-answer">{turn.answer}</p>
+            )}
           </div>
         ))}
 
         {openTurn ? (
-          <article className="chat-turn chat-turn-agent" data-testid="interview-question">
-            <div className="chat-bubble chat-bubble-agent">
-              <p>{openTurn.question}</p>
-            </div>
-            <div className="chat-meta">
-              <span>Walking Thoughts</span>
-            </div>
-          </article>
-        ) : null}
-
-        {!started && !openTurn ? (
-          <p className="interview-intro">
-            Answer a few questions about who you are, where you walk, and what
-            you care about. Future Enrichments use those Memories to skip what
-            you know and dig into what you don&apos;t.
-          </p>
-        ) : null}
-
-        {complete ? (
-          <p className="interview-complete" data-testid="interview-complete">
-            That&apos;s everything for now — the Interview picks back up when
-            there&apos;s something new worth asking.
-          </p>
-        ) : null}
-
-        <section
-          className="interview-memories-section"
-          aria-label="What Walking Thoughts remembers"
-        >
-          <h2>What Walking Thoughts remembers</h2>
-          <MemoryList memories={memories} onForget={(id) => void forget(id)} />
-        </section>
-
-        <section
-          className="interview-memories-section"
-          aria-label="Changes to what Walking Thoughts remembers"
-        >
-          <h2>Changes</h2>
-          <PatchTimeline
-            patches={patches}
-            onRevert={(id) => void revert(id)}
-          />
-        </section>
-      </div>
-
-      {error ? (
-        <p className="capture-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <footer className="thread-chat-composer">
-        {openTurn ? (
-          <>
-            <label className="capture-field-label" htmlFor="interview-answer">
+          <div className="interview-turn" data-testid="interview-question">
+            <TurnQuestion turn={openTurn} index={settledTurns.length} />
+            <label className="capture-label" htmlFor="interview-answer">
               Your answer
             </label>
             <textarea
               id="interview-answer"
-              rows={2}
+              className="interview-input"
+              rows={3}
               value={draft}
-              placeholder="Answer in your own words…"
+              placeholder="In your own words."
               onChange={(event) => setDraft(event.target.value)}
               disabled={busy}
               onKeyDown={(event) => {
@@ -386,46 +305,137 @@ export function InterviewPanel() {
                 }
               }}
             />
-            <div className="thread-chat-actions">
+            <div className="interview-actions">
               <button
                 type="button"
-                className="capture-add-media"
+                className="interview-secondary"
                 onClick={() => void post({ skip: true })}
                 disabled={busy}
               >
-                Skip this one
+                Skip
               </button>
               <button
                 type="button"
-                className="thread-chat-send"
+                className="interview-send"
                 data-testid="interview-send"
                 onClick={() => void post({ answer: draft.trim() })}
                 disabled={busy || !draft.trim()}
               >
-                {busy ? "Thinking…" : "Answer"}
+                Answer
               </button>
             </div>
-          </>
-        ) : (
-          <div className="thread-chat-actions">
+            {busy ? (
+              <p className="interview-status" role="status">
+                Distilling — turning your answer into Memories.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!started && !openTurn && !complete ? (
+          <div className="interview-turn">
+            <p className="interview-empty">
+              A few questions about who you are, where you walk, and what you
+              already know. Enrichments use the answers to skip your basics
+              and dig where you would dig.
+            </p>
+            <div className="interview-actions">
+              <button
+                type="button"
+                className="interview-send"
+                data-testid="interview-start"
+                onClick={() => void post({})}
+                disabled={busy}
+              >
+                Begin the Interview
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {started && !openTurn && !complete ? (
+          <div className="interview-actions">
             <button
               type="button"
-              className="thread-chat-send"
+              className="interview-secondary"
               data-testid="interview-start"
               onClick={() => void post({})}
-              disabled={busy || complete}
+              disabled={busy}
             >
-              {busy
-                ? "Thinking…"
-                : started
-                  ? "Ask another question"
-                  : "Start the Interview"}
+              Next question
             </button>
           </div>
+        ) : null}
+
+        {complete ? (
+          <p className="interview-empty" data-testid="interview-complete">
+            Nothing left to ask for now. The Interview resumes when there is
+            something new worth asking; Enrichments keep learning meanwhile.
+          </p>
+        ) : null}
+      </section>
+
+      {error ? (
+        <p className="capture-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <section
+        className="interview-section"
+        aria-label="What Walking Thoughts remembers"
+      >
+        <h2 className="interview-section-title">
+          What Walking Thoughts remembers
+        </h2>
+        {memories.length === 0 ? (
+          <p className="interview-empty">
+            Nothing on record yet. Answers above become Memories here.
+          </p>
+        ) : (
+          <ul className="interview-memories" data-testid="interview-memories">
+            {memories.map((memory) => (
+              <li key={memory.id} className="interview-memory">
+                <span className="interview-memory-category">
+                  {memory.category}
+                </span>
+                <span className="interview-memory-content">
+                  {memory.content}
+                </span>
+                <button
+                  type="button"
+                  className="interview-quiet"
+                  onClick={() => void forget(memory.id)}
+                  aria-label={`Forget: ${memory.content}`}
+                >
+                  Forget
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
+      </section>
+
+      <section
+        className="interview-section"
+        aria-label="Changes to what Walking Thoughts remembers"
+      >
+        <h2 className="interview-section-title">Changes</h2>
+        <PatchLedger patches={patches} onRevert={(id) => void revert(id)} />
+      </section>
+
+      <footer className="interview-footer">
+        <ScaleBar />
+        <p className="interview-footer-line">
+          Learned from your own words · revertible line by line
+        </p>
+        <p className="interview-footer-line">
+          {memories.length} {memories.length === 1 ? "Memory" : "Memories"} ·{" "}
+          {patches.length} {patches.length === 1 ? "change" : "changes"}
+        </p>
       </footer>
 
       <AppNav />
-    </div>
+    </main>
   );
 }

@@ -5,9 +5,5 @@ export const metadata = {
 };
 
 export default function InterviewPage() {
-  return (
-    <main className="thread-chat-page">
-      <InterviewPanel />
-    </main>
-  );
+  return <InterviewPanel />;
 }

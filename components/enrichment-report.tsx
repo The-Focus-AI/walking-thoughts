@@ -83,13 +83,17 @@ function memoryPatchSummary(patches: EnrichmentMemoryPatch[]): string {
   return parts.join(" ");
 }
 
-/** Visible processing: say so in the moment when a report patched the profile. */
+/**
+ * Visible processing: when this Annotation revised the walker profile, it
+ * says so in the machine's mono voice, in the moment — not only in the
+ * Interview ledger.
+ */
 function MemoryPatchFooter({ patches }: { patches: EnrichmentMemoryPatch[] }) {
   if (patches.length === 0) return null;
   return (
     <p className="enrichment-memory-note" data-testid="enrichment-memory-note">
-      Profile updated ({memoryPatchSummary(patches)}) ·{" "}
-      <Link href="/interview">review the change</Link>
+      <span>Profile revised · {memoryPatchSummary(patches)}</span>
+      <Link href="/interview">Review</Link>
     </p>
   );
 }
