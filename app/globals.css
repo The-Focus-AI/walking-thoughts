@@ -173,6 +173,28 @@
   color: var(--muted);
 }
 
+.instrument-block {
+  margin-top: 0.5rem;
+}
+
+.instrument-block .instrument-strip {
+  margin-top: 0;
+}
+
+.instrument-cell-weather .instrument-value {
+  color: var(--sun);
+}
+
+.conditions-note {
+  margin: 0.45rem 0 0;
+  padding: 0 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sun);
+}
+
 .scale-bar {
   display: inline-flex;
   height: 6px;
@@ -2113,6 +2135,72 @@ footer {
   color: var(--moss);
 }
 
+.digest-lede {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.digest-count {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.digest-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.digest-suggestion {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.digest-suggestion:hover:not(:disabled) {
+  border-color: var(--text);
+}
+
+.digest-suggestion:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.digest-result {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--machine);
+  background: var(--surface);
+}
+
+.digest-result-head {
+  margin: 0;
+  color: var(--machine);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .interview-turn {
   display: grid;
   gap: 0.6rem;
@@ -2416,7 +2504,7 @@ footer {
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.25rem;
   padding: 0.35rem 0.9rem calc(0.35rem + env(safe-area-inset-bottom));
   background: rgba(13, 19, 15, 0.96);

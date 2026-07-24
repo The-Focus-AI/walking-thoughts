@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { readAvailableLocation } from "@/lib/local-capture/location";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  prefetchLocation,
+  readAvailableLocation,
+} from "@/lib/local-capture/location";
+import type { CaptureLocation } from "@/lib/local-capture/types";
+import { fetchWeatherSnapshot } from "@/lib/weather/fetch";
+import {
+  formatConditionsNote,
+  formatWeatherCell,
+} from "@/lib/weather/format";
+import type { WeatherSnapshot } from "@/lib/weather/types";
 
 /**
  * Quadrangle sheet fixtures (DESIGN.md): the centered survey masthead, the
@@ -11,17 +21,18 @@ import { readAvailableLocation } from "@/lib/local-capture/location";
 
 const AGENCY_LINE = "Walking Thoughts · Provisional Survey";
 
-function useMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted;
+function subscribeNever() {
+  return () => undefined;
+}
+
+function useIsClient(): boolean {
+  return useSyncExternalStore(subscribeNever, () => true, () => false);
 }
 
 export function SheetMasthead({ title }: { title?: string }) {
-  const mounted = useMounted();
-  const now = new Date();
-  const dayLine = mounted
-    ? now.toLocaleDateString(undefined, {
+  const isClient = useIsClient();
+  const dayLine = isClient
+    ? new Date().toLocaleDateString(undefined, {
         weekday: "long",
         month: "long",
         day: "numeric",
@@ -43,19 +54,72 @@ export function SheetMasthead({ title }: { title?: string }) {
  * with no fix on hand the strip is absent, not empty (DESIGN.md).
  */
 export function InstrumentStrip() {
-  const mounted = useMounted();
-  if (!mounted) return null;
-  const location = readAvailableLocation();
-  if (!location) return null;
+  const [location, setLocation] = useState<CaptureLocation | null>(null);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
-  const position = `${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°`;
+  useEffect(() => {
+    prefetchLocation();
+
+    const apply = () => {
+      const next = readAvailableLocation();
+      if (next) {
+        setLocation(next);
+        return true;
+      }
+      return false;
+    };
+
+    if (apply()) return;
+
+    const timer = window.setInterval(() => {
+      if (apply()) window.clearInterval(timer);
+    }, 400);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 8_000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!location) return;
+    let cancelled = false;
+    void fetchWeatherSnapshot(location.latitude, location.longitude).then(
+      (snapshot) => {
+        if (!cancelled) setWeather(snapshot);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [location]);
+
+  if (!location && !weather) return null;
+
+  const weatherCell = weather ? formatWeatherCell(weather) : null;
+  const conditionsNote = formatConditionsNote(weather);
 
   return (
-    <div className="instrument-strip" role="group" aria-label="Instruments">
-      <div className="instrument-cell">
-        <span className="instrument-value">{position}</span>
-        <span className="instrument-sublabel">Position · GPS</span>
+    <div className="instrument-block">
+      <div className="instrument-strip" role="group" aria-label="Instruments">
+        {location ? (
+          <div className="instrument-cell">
+            <span className="instrument-value">
+              {`${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}°`}
+            </span>
+            <span className="instrument-sublabel">Position · GPS</span>
+          </div>
+        ) : null}
+        {weatherCell ? (
+          <div className="instrument-cell instrument-cell-weather">
+            <span className="instrument-value">{weatherCell.value}</span>
+            <span className="instrument-sublabel">{weatherCell.sublabel}</span>
+          </div>
+        ) : null}
       </div>
+      {conditionsNote ? (
+        <p className="conditions-note">{conditionsNote}</p>
+      ) : null}
     </div>
   );
 }
