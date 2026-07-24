@@ -211,7 +211,12 @@ export function ThreadsQueue({
             reply, or copy it as markdown.
           </p>
         </div>
-        <SyncStatusPill />
+        <div className="threads-queue-side">
+          <SyncStatusPill />
+          <Link className="interview-entry" href="/interview">
+            Interview
+          </Link>
+        </div>
       </header>
 
       <div className="threads-queue-bar">

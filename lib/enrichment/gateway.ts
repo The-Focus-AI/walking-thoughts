@@ -1,4 +1,4 @@
-import { generateText, stepCountIs, tool } from "ai";
+import { generateText, stepCountIs, tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { truncatePage, type ResearchStep } from "./research";
 import {
@@ -105,75 +105,103 @@ function createAiSdkGatewayClient(): GatewayClient {
       const searchHits = new Map<string, EnrichmentSource>();
       const client = input.search;
 
-      const tools = client
-        ? {
-            web_search: tool({
-              description:
-                "Search the web for candidate pages. Returns titles, URLs, and snippets.",
-              inputSchema: z.object({
-                query: z.string().describe("The search query"),
-              }),
-              execute: async ({ query }: { query: string }) => {
-                const hits = await client.search(query);
-                research.push({
-                  action: "search",
-                  provider: client.provider,
-                  query,
-                  resultCount: hits.length,
-                  at: new Date().toISOString(),
-                });
-                for (const hit of hits) {
-                  if (!searchHits.has(hit.url)) {
-                    searchHits.set(hit.url, {
-                      title: hit.title,
-                      url: hit.url,
-                      retrievedAt: hit.retrievedAt,
-                    });
-                  }
-                }
-                return hits.map((hit) => ({
+      const tools: ToolSet = {};
+      const memory = input.memory;
+      if (memory) {
+        tools.memory_patch = tool({
+          description:
+            "Revise the walker profile: add a new durable fact about the walker, or update/remove an existing one by the [id] shown in the profile. Use sparingly — only facts useful months from now.",
+          inputSchema: z.object({
+            op: z.enum(["add", "update", "remove"]),
+            memoryId: z
+              .string()
+              .optional()
+              .describe("Required for update/remove — the [id] from the walker profile"),
+            category: z
+              .enum(["identity", "place", "interest", "expertise", "preference"])
+              .optional()
+              .describe("Required for add"),
+            content: z
+              .string()
+              .optional()
+              .describe("The fact, as a self-contained third-person statement. Required for add/update"),
+          }),
+          execute: async (patchInput: {
+            op: "add" | "update" | "remove";
+            memoryId?: string;
+            category?: string;
+            content?: string;
+          }) => memory.apply(patchInput),
+        });
+      }
+
+      if (client) {
+        tools.web_search = tool({
+          description:
+            "Search the web for candidate pages. Returns titles, URLs, and snippets.",
+          inputSchema: z.object({
+            query: z.string().describe("The search query"),
+          }),
+          execute: async ({ query }: { query: string }) => {
+            const hits = await client.search(query);
+            research.push({
+              action: "search",
+              provider: client.provider,
+              query,
+              resultCount: hits.length,
+              at: new Date().toISOString(),
+            });
+            for (const hit of hits) {
+              if (!searchHits.has(hit.url)) {
+                searchHits.set(hit.url, {
                   title: hit.title,
                   url: hit.url,
-                  snippet: hit.snippet,
-                }));
-              },
+                  retrievedAt: hit.retrievedAt,
+                });
+              }
+            }
+            return hits.map((hit) => ({
+              title: hit.title,
+              url: hit.url,
+              snippet: hit.snippet,
+            }));
+          },
+        });
+        if (client.readPage) {
+          tools.read_page = tool({
+            description:
+              "Fetch one web page in full as markdown. Use after web_search to read the most promising result before citing it.",
+            inputSchema: z.object({
+              url: z.string().describe("URL of the page to read"),
             }),
-            ...(client.readPage
-              ? {
-                  read_page: tool({
-                    description:
-                      "Fetch one web page in full as markdown. Use after web_search to read the most promising result before citing it.",
-                    inputSchema: z.object({
-                      url: z.string().describe("URL of the page to read"),
-                    }),
-                    execute: async ({ url }: { url: string }) => {
-                      const page = await client.readPage!(url);
-                      if (!page) {
-                        return { url, error: "page_unavailable" };
-                      }
-                      research.push({
-                        action: "read",
-                        provider: client.provider,
-                        url: page.url,
-                        title: page.title,
-                        at: page.retrievedAt,
-                      });
-                      readSources.set(page.url, {
-                        title: page.title,
-                        url: page.url,
-                        retrievedAt: page.retrievedAt,
-                      });
-                      return {
-                        url: page.url,
-                        title: page.title,
-                        markdown: truncatePage(page.markdown),
-                      };
-                    },
-                  }),
-                }
-              : {}),
-          }
-        : undefined;
+            execute: async ({ url }: { url: string }) => {
+              const page = await client.readPage!(url);
+              if (!page) {
+                return { url, error: "page_unavailable" };
+              }
+              research.push({
+                action: "read",
+                provider: client.provider,
+                url: page.url,
+                title: page.title,
+                at: page.retrievedAt,
+              });
+              readSources.set(page.url, {
+                title: page.title,
+                url: page.url,
+                retrievedAt: page.retrievedAt,
+              });
+              return {
+                url: page.url,
+                title: page.title,
+                markdown: truncatePage(page.markdown),
+              };
+            },
+          });
+        }
+      }
+
+      const hasTools = Object.keys(tools).length > 0;
 
       const content: Array<
         | { type: "text"; text: string }
@@ -197,7 +225,7 @@ function createAiSdkGatewayClient(): GatewayClient {
         model: input.model,
         system: input.system,
         messages: [{ role: "user", content }],
-        ...(tools
+        ...(hasTools
           ? { tools, stopWhen: stepCountIs(RESEARCH_STEP_LIMIT) }
           : {}),
       });

@@ -1,8 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ResearchStep, ThreadEnrichment } from "@/lib/enrichment/types";
+import type {
+  EnrichmentMemoryPatch,
+  ResearchStep,
+  ThreadEnrichment,
+} from "@/lib/enrichment/types";
 
 /** Enrichment body as sanitized markdown (react-markdown escapes raw HTML). */
 export function EnrichmentMarkdown({ text }: { text: string }) {
@@ -64,6 +69,35 @@ function ResearchTrace({ steps }: { steps: ResearchStep[] }) {
   );
 }
 
+function memoryPatchSummary(patches: EnrichmentMemoryPatch[]): string {
+  const counts: Record<EnrichmentMemoryPatch["op"], number> = {
+    add: 0,
+    update: 0,
+    remove: 0,
+  };
+  for (const patch of patches) counts[patch.op] += 1;
+  const parts: string[] = [];
+  if (counts.add > 0) parts.push(`+${counts.add}`);
+  if (counts.update > 0) parts.push(`~${counts.update}`);
+  if (counts.remove > 0) parts.push(`−${counts.remove}`);
+  return parts.join(" ");
+}
+
+/**
+ * Visible processing: when this Annotation revised the walker profile, it
+ * says so in the machine's mono voice, in the moment — not only in the
+ * Interview ledger.
+ */
+function MemoryPatchFooter({ patches }: { patches: EnrichmentMemoryPatch[] }) {
+  if (patches.length === 0) return null;
+  return (
+    <p className="enrichment-memory-note" data-testid="enrichment-memory-note">
+      <span>Profile revised · {memoryPatchSummary(patches)}</span>
+      <Link href="/interview">Review</Link>
+    </p>
+  );
+}
+
 /**
  * An Enrichment rendered as the machine's Annotation (DESIGN.md): sky left
  * rule, mono sky header with the model ID, upright markdown body, numbered
@@ -105,6 +139,7 @@ export function EnrichmentReport({
         </ul>
       ) : null}
       <ResearchTrace steps={enrichment.research ?? []} />
+      <MemoryPatchFooter patches={enrichment.memoryPatches ?? []} />
     </article>
   );
 }

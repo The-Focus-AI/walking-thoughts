@@ -39,6 +39,14 @@ export type EnrichmentJob = {
   error?: string;
 };
 
+/** One walker-profile change the model made while writing this Enrichment. */
+export type EnrichmentMemoryPatch = {
+  patchId: string;
+  op: "add" | "update" | "remove";
+  category: string;
+  content: string;
+};
+
 export type ThreadEnrichment = {
   id: string;
   threadId: string;
@@ -52,6 +60,8 @@ export type ThreadEnrichment = {
   sources: EnrichmentSource[];
   /** Tool calls (searches, page reads) the model made while researching. */
   research?: ResearchStep[];
+  /** Walker-profile changes this Enrichment made via memory_patch. */
+  memoryPatches?: EnrichmentMemoryPatch[];
 };
 
 export type EnrichmentCaptureResult = {
@@ -85,6 +95,19 @@ export type GatewayGeneration = {
   research: ResearchStep[];
 };
 
+/** Seam the memory_patch tool calls through; apply lands in the patch log. */
+export type MemoryToolClient = {
+  apply(input: {
+    op: "add" | "update" | "remove";
+    memoryId?: string;
+    category?: string;
+    content?: string;
+  }): Promise<
+    | { ok: true; patchId: string; memoryId: string }
+    | { ok: false; error: string }
+  >;
+};
+
 export type GatewayGenerateInput = {
   model: string;
   system: string;
@@ -94,6 +117,8 @@ export type GatewayGenerateInput = {
   media: GatewayMediaPart[];
   /** Research tools (web_search, read_page) offered to the model. */
   search?: ResearchClient;
+  /** memory_patch tool offered to the model to revise the walker profile. */
+  memory?: MemoryToolClient;
 };
 
 export type GatewayClient = {
@@ -161,6 +186,7 @@ export type EnrichmentRepository = {
       title: string | null;
       sources: EnrichmentSource[];
       research?: ResearchStep[];
+      memoryPatches?: EnrichmentMemoryPatch[];
     },
   ): Promise<{ job: EnrichmentJob; enrichment: ThreadEnrichment; created: boolean }>;
   requeueFailed(userId: string, jobId?: string): Promise<number>;

@@ -2073,6 +2073,336 @@ footer {
   max-height: min(80svh, 40rem);
 }
 
+/* --- Interview: the desk sheet where the survey learns its walker -------- */
+
+.interview-sheet {
+  display: grid;
+  gap: 1.5rem;
+  width: min(100%, 48rem);
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem
+    calc(var(--tabbar-h) + 1.5rem);
+}
+
+.interview-section {
+  display: grid;
+  gap: 1rem;
+  border-top: 2px solid var(--line-strong);
+  padding-top: 1rem;
+  position: relative;
+}
+
+/* rule-major companion hairline under the 2px rule. */
+.interview-section::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  border-top: 1px solid var(--line);
+}
+
+.interview-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  font-size: 1.05rem;
+  color: var(--moss);
+}
+
+.interview-turn {
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* The machine asks in its Annotation voice: sky rule, mono head, upright body. */
+.interview-question {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--machine);
+  background: var(--surface);
+}
+
+.interview-question p {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.interview-question-head {
+  display: flex;
+  gap: 0.7rem;
+  color: var(--machine);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The walker's answer is the natural feature: italic serif, nothing else. */
+.interview-answer {
+  margin: 0;
+  padding: 0 0.9rem;
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.interview-skipped {
+  margin: 0;
+  padding: 0 0.9rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.interview-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.interview-input::placeholder {
+  color: var(--muted);
+}
+
+.interview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.interview-send {
+  min-height: 44px;
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--action);
+  color: var(--action-text);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.interview-send:hover {
+  filter: brightness(1.06);
+}
+
+.interview-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.interview-secondary {
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.interview-secondary:hover {
+  border-color: var(--ink);
+}
+
+.interview-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.interview-quiet {
+  border: 0;
+  background: transparent;
+  padding: 0.25rem 0.35rem;
+  color: var(--moss);
+  font-weight: 750;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.interview-quiet:hover {
+  text-decoration: underline;
+}
+
+/* In-flight work is stated factually, in sun, with its label. */
+.interview-status {
+  margin: 0;
+  color: var(--action);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.interview-empty {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.interview-memories,
+.interview-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.interview-memory,
+.interview-ledger-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.7rem;
+  align-items: baseline;
+  padding: 0.6rem 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.interview-memory:first-child,
+.interview-ledger-row:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.interview-memory-category {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.interview-memory-content,
+.interview-ledger-content {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.interview-ledger-op {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.9rem;
+  width: 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.interview-ledger-body {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.interview-ledger-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.interview-ledger-meta a {
+  color: var(--moss);
+}
+
+.interview-ledger-reverted .interview-ledger-content {
+  color: var(--muted);
+}
+
+.interview-footer {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  border-top: 2px solid var(--line-strong);
+  padding-top: 0.9rem;
+}
+
+.interview-footer-line {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Quiet Interview entry on the Threads desk header. */
+.threads-queue-side {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: end;
+}
+
+.interview-entry {
+  color: var(--moss);
+  font-weight: 750;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.interview-entry:hover {
+  text-decoration: underline;
+}
+
+/* The Annotation's profile-revision note: the machine's mono voice. */
+.enrichment-memory-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  margin: 0;
+  color: var(--machine);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enrichment-memory-note a {
+  color: var(--moss);
+  text-decoration: none;
+}
+
+.enrichment-memory-note a:hover {
+  text-decoration: underline;
+}
+
 /* Shared navigation: bottom tab bar + glanceable sync pill */
 
 :root {
