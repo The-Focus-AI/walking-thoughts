@@ -83,4 +83,23 @@ test.describe("trail Threads", () => {
     ).toBeVisible();
     await expect(page.getByTestId("thread-sync-chip").first()).toBeVisible();
   });
+
+  test("selecting a day opens the day digest pane", async ({ page }) => {
+    await openCaptureShell(page);
+    await page.getByLabel("Capture text").fill("Stone wall on the ridge");
+    await page.getByRole("button", { name: "Capture" }).click();
+    await expect(
+      page.getByRole("article", { name: /Stone wall on the ridge/ }),
+    ).toBeVisible();
+
+    await page.goto("/threads");
+    // New queue may hide reviewed Threads; ensure we see All if needed.
+    const dayButton = page.getByRole("button", { name: /Digest this day/i }).first();
+    await expect(dayButton).toBeVisible();
+    await dayButton.click();
+    await expect(page).toHaveURL(/\/threads\?day=\d{4}-\d{2}-\d{2}/);
+    await expect(page.getByTestId("daily-digest")).toBeVisible();
+    await expect(page.getByText("Day digest")).toBeVisible();
+    await expect(page.getByTestId("digest-send")).toBeVisible();
+  });
 });

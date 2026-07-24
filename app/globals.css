@@ -1102,6 +1102,76 @@ h1 {
   color: var(--moss);
 }
 
+.threads-day-select {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  padding: 0.35rem 0.25rem 0.55rem;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.threads-day-select:hover {
+  background: rgba(169, 209, 143, 0.06);
+}
+
+.threads-day-select[aria-pressed="true"],
+.threads-day-selected .threads-day-select {
+  background: rgba(169, 209, 143, 0.1);
+  border-bottom-color: rgba(169, 209, 143, 0.45);
+}
+
+.threads-day-select-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  font-size: 1.05rem;
+  color: var(--moss);
+}
+
+.threads-day-select-hint {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.day-digest-pane {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  height: calc(100svh - var(--tabbar-h));
+  overflow: auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem 1.5rem;
+}
+
+.day-digest-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.day-digest-header h1 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.day-digest-header p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .threads-day-list {
   display: grid;
   gap: 0.75rem;

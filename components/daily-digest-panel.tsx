@@ -27,30 +27,30 @@ function digestHeaders(): Record<string, string> {
 }
 
 /**
- * Assemble today's Captures and their Enrichments from local store + cache.
+ * Assemble Captures and Enrichments for one civil day from local store + cache.
  * Day membership follows Capture createdAt (local calendar day).
  */
-async function loadTodayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
+export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   const store = getCaptureStore();
   const [captures, threads] = await Promise.all([
     store.list(),
     store.listRecentThreads(),
   ]);
   const titleById = new Map(threads.map((thread) => [thread.id, thread.title]));
-  const todays = captures.filter(
+  const daysCaptures = captures.filter(
     (capture) => calendarDayKey(new Date(capture.createdAt)) === dayKey,
   );
 
   const entries: DayCorpusEntry[] = [];
   const threadIds = [
     ...new Set(
-      todays
+      daysCaptures
         .map((capture) => capture.threadId)
         .filter((id): id is string => Boolean(id)),
     ),
   ];
 
-  for (const capture of todays) {
+  for (const capture of daysCaptures) {
     entries.push({
       kind: "capture",
       id: capture.id,
@@ -66,7 +66,7 @@ async function loadTodayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   for (const threadId of threadIds) {
     const enrichments = await loadThreadEnrichments(threadId);
     for (const enrichment of enrichments) {
-      const target = todays.find((capture) =>
+      const target = daysCaptures.find((capture) =>
         enrichment.targetCaptureIds.includes(capture.id),
       );
       if (!target) continue;
@@ -85,13 +85,20 @@ async function loadTodayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   return collectDayCorpus(entries, dayKey);
 }
 
+type DailyDigestPanelProps = {
+  /** Local calendar day (YYYY-MM-DD) to digest. */
+  dayKey: string;
+  /** Mobile close — returns to the day list. */
+  onClose?: () => void;
+};
+
 /**
- * Desk surface for talking to the whole day — every Thread's Captures and
+ * Desk surface for talking to one whole day — every Thread's Captures and
  * Enrichments — not a single Thread follow-up.
  */
-export function DailyDigestPanel() {
-  const dayKey = calendarDayKey();
+export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
   const dayHeading = formatDayHeading(dayKey);
+  const isToday = dayKey === calendarDayKey();
   const [draft, setDraft] = useState("");
   const [corpusCount, setCorpusCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -105,10 +112,14 @@ export function DailyDigestPanel() {
     setError(null);
     setResult(null);
     try {
-      const corpus = await loadTodayCorpus(dayKey);
+      const corpus = await loadDayCorpus(dayKey);
       setCorpusCount(corpus.length);
       if (corpus.length === 0) {
-        setError("No Captures for today yet — commit something on the trail first.");
+        setError(
+          isToday
+            ? "No Captures for today yet — commit something on the trail first."
+            : `No Captures for ${dayHeading}.`,
+        );
         return;
       }
       const response = await fetch("/api/digest", {
@@ -147,15 +158,40 @@ export function DailyDigestPanel() {
 
   return (
     <section
-      className="interview-section digest-section"
-      aria-label="Today's digest"
+      className="day-digest-pane"
+      aria-label={`Digest for ${dayHeading}`}
       data-testid="daily-digest"
     >
-      <h2 className="interview-section-title">Today</h2>
-      <p className="digest-lede">
-        Ask across every Thread from {dayHeading} — checklists, summaries,
-        follow-ups. Not one Thread at a time.
-      </p>
+      <header className="day-digest-header">
+        <div>
+          <p className="eyebrow">Day digest</p>
+          <h1>{dayHeading}</h1>
+          <p>
+            Ask across every Thread from this day — checklists, summaries,
+            follow-ups. Not one Thread at a time.
+          </p>
+        </div>
+        {onClose ? (
+          <button
+            type="button"
+            className="journal-close"
+            aria-label="Close day digest"
+            onClick={onClose}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        ) : null}
+      </header>
+
       {corpusCount != null ? (
         <p className="digest-count">
           {corpusCount}{" "}
@@ -181,7 +217,7 @@ export function DailyDigestPanel() {
       </div>
 
       <label className="capture-label" htmlFor="digest-ask">
-        Ask about today
+        Ask about this day
       </label>
       <textarea
         id="digest-ask"
@@ -212,7 +248,7 @@ export function DailyDigestPanel() {
 
       {busy ? (
         <p className="interview-status" role="status">
-          Digesting — reading every Thread from today.
+          Digesting — reading every Thread from this day.
         </p>
       ) : null}
       {error ? (
@@ -222,9 +258,7 @@ export function DailyDigestPanel() {
       ) : null}
       {result ? (
         <article className="digest-result" data-testid="digest-result">
-          <p className="digest-result-head">
-            Digest · {result.model}
-          </p>
+          <p className="digest-result-head">Digest · {result.model}</p>
           <div className="enrichment-markdown">
             <Markdown>{result.text}</Markdown>
           </div>
