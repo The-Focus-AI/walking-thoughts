@@ -288,10 +288,11 @@ a {
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
   align-items: flex-end;
+  align-content: flex-end;
   justify-content: space-between;
   min-height: 42svh;
-  padding: 1rem 1.1rem;
-  background: linear-gradient(transparent 35%, rgba(16, 23, 18, 0.9) 78%);
+  padding: 1rem 1.1rem 1.2rem;
+  background: linear-gradient(transparent 28%, rgba(16, 23, 18, 0.94) 74%);
   pointer-events: none;
 }
 
@@ -304,6 +305,54 @@ a {
   .trail-map-hero-overlay {
     min-height: min(calc(100svh - 24rem), 44rem);
   }
+}
+
+@media (max-width: 899px) {
+  .trail-map-hero .maplibregl-ctrl-top-right {
+    display: none;
+  }
+
+  .trail-map-hero-overlay .trail-map-hero-cta,
+  .trail-map-hero-overlay .offline-maps-secondary {
+    min-height: 2.4rem;
+    padding: 0 0.8rem;
+    font-size: 0.7rem;
+  }
+
+  .trail-map-hero-name {
+    font-size: clamp(1.2rem, 4.5vw, 2.2rem);
+  }
+}
+
+/* Map credits in the sheet's own voice: mono micro on the dusk ground.
+   The extra .maplibregl-ctrl class outranks maplibre's own background. */
+.trail-map-hero .maplibregl-ctrl.maplibregl-ctrl-attrib,
+.journal-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
+.region-tracer-map .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background-color: rgba(16, 23, 18, 0.85);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
+}
+
+.trail-map-hero .maplibregl-ctrl-attrib a,
+.journal-map .maplibregl-ctrl-attrib a,
+.region-tracer-map .maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}
+
+.trail-map-hero .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button,
+.journal-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button,
+.region-tracer-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+  filter: invert(1) opacity(0.75);
+}
+
+.trail-map-hero .maplibregl-ctrl-attrib.maplibregl-compact,
+.journal-map .maplibregl-ctrl-attrib.maplibregl-compact,
+.region-tracer-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  background-color: rgba(16, 23, 18, 0.85);
 }
 
 .trail-map-hero-name {
@@ -616,8 +665,8 @@ a {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  padding-top: 0.35rem;
-  background: linear-gradient(transparent, rgba(16, 23, 18, 0.94) 28%);
+  padding-top: 0.85rem;
+  background: linear-gradient(transparent, rgba(16, 23, 18, 0.96) 38%);
 }
 
 @media (min-width: 900px) {

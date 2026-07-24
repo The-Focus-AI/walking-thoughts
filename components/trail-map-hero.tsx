@@ -141,7 +141,10 @@ export function TrailMapHero() {
       const { renderInstalledRegion, renderRemoteRegion } = await import(
         "@/lib/offline-region/map"
       );
-      const options = { center: readAvailableLocation() };
+      const options = {
+        center: readAvailableLocation(),
+        compactAttribution: true,
+      };
       const { map } =
         source === "local"
           ? await renderInstalledRegion(
