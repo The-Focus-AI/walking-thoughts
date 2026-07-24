@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppNav } from "@/components/app-nav";
-import { DailyDigestPanel } from "@/components/daily-digest-panel";
 import { ScaleBar } from "@/components/sheet";
 import type { InterviewTurn } from "@/lib/interview/types";
 import { revertedPatchIds } from "@/lib/memory/patches";
@@ -266,14 +265,12 @@ export function InterviewPanel() {
           <p className="eyebrow">Provisional Survey</p>
           <h1>You</h1>
           <p>
-            Digest the day across every Thread, then teach Walking Thoughts
-            who you are. Memories tailor every Enrichment; any line can be
-            reverted.
+            Walking Thoughts asks; your answers become Memories that tailor
+            every Enrichment. Everything it believes about you is printed
+            below, and any line can be reverted.
           </p>
         </div>
       </header>
-
-      <DailyDigestPanel />
 
       <section className="interview-section" aria-label="Interview">
         <h2 className="interview-section-title">Interview</h2>
@@ -320,7 +317,7 @@ export function InterviewPanel() {
               </button>
               <button
                 type="button"
-                className="interview-secondary"
+                className="interview-send"
                 data-testid="interview-send"
                 onClick={() => void post({ answer: draft.trim() })}
                 disabled={busy || !draft.trim()}

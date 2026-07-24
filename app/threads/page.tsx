@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ThreadsQueue } from "@/components/threads-queue";
 
 export const metadata = {
@@ -5,5 +6,9 @@ export const metadata = {
 };
 
 export default function ThreadsPage() {
-  return <ThreadsQueue />;
+  return (
+    <Suspense fallback={<p className="proto-pad">Opening Threads…</p>}>
+      <ThreadsQueue />
+    </Suspense>
+  );
 }
