@@ -30,6 +30,32 @@ export const THREAD_KINDS = [
 export type ThreadKind = (typeof THREAD_KINDS)[number];
 
 /**
+ * Desk order, not the declaration order: what the walker acts on comes
+ * before what they read, and noise sits last. Shared by every surface that
+ * lists kinds so they never disagree.
+ */
+export const KIND_DESK_ORDER: ThreadKind[] = [
+  "task",
+  "idea",
+  "question",
+  "observation",
+  "place",
+  "media",
+  "noise",
+];
+
+/** Kind names the walker reads, not the slugs the model writes. */
+export const KIND_LABELS: Record<ThreadKind, string> = {
+  task: "To do",
+  idea: "Idea",
+  question: "Question",
+  observation: "Observation",
+  place: "Place",
+  media: "Media",
+  noise: "Noise",
+};
+
+/**
  * Narrow a stored or transmitted value to a kind. Anything the current
  * vocabulary does not name reads as unclassified rather than reaching the UI.
  */
@@ -51,6 +77,11 @@ export type LocalThread = {
   kind?: ThreadKind | null;
   /** Topic slugs that group this Thread with others on the same subject. */
   topics?: string[];
+  /**
+   * The open question from the newest Enrichment — the model met a name or
+   * intent it could not place and asked rather than guessing.
+   */
+  ask?: string | null;
 };
 
 export type CaptureSyncStatus =
@@ -234,6 +265,10 @@ export type CaptureStore = {
       title: string;
       revision: number;
       updatedAt: string;
+      reviewedAt?: string | null;
+      kind?: ThreadKind | null;
+      topics?: string[];
+      ask?: string | null;
       captures: Array<{
         id: string;
         text: string;

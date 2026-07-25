@@ -63,6 +63,8 @@ export type ServerThread = {
   kind?: ThreadKind | null;
   /** Topic slugs that group this Thread with others on the same subject. */
   topics?: string[];
+  /** The open question from the newest Enrichment; null when it had none. */
+  ask?: string | null;
   captures: Array<{
     id: string;
     text: string;
@@ -169,7 +171,11 @@ export type ThreadRepository = {
   updateThreadClassification?(
     userId: string,
     threadId: string,
-    classification: { kind: string | null; topics: string[] },
+    classification: {
+      kind: string | null;
+      topics: string[];
+      ask: string | null;
+    },
   ): Promise<void>;
   applyTrashMutations(
     userId: string,

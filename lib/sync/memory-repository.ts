@@ -26,6 +26,7 @@ type StoredThread = {
   reviewedAt?: string | null;
   kind?: string | null;
   topics?: string[];
+  ask?: string | null;
 };
 
 type MemoryState = {
@@ -336,6 +337,7 @@ export function createMemoryThreadRepository(
             reviewedAt: thread.reviewedAt ?? null,
             kind: asThreadKind(thread.kind),
             topics: thread.topics ?? [],
+            ask: thread.ask ?? null,
             captures,
           } satisfies ServerThread;
         })
@@ -466,8 +468,13 @@ export function createMemoryThreadRepository(
       if (!existing) return;
       db.threads.set(key, {
         ...existing,
-        kind: classification.kind,
-        topics: classification.topics,
+        // An Enrichment that could not tell leaves the prior verdict standing.
+        kind: classification.kind ?? existing.kind ?? null,
+        topics:
+          classification.topics.length > 0
+            ? classification.topics
+            : (existing.topics ?? []),
+        ask: classification.ask,
       });
     },
 

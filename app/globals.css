@@ -3298,6 +3298,67 @@ footer {
   opacity: 0.75;
 }
 
+/* Clay is stuck work that needs the walker — an unanswered question is
+   exactly that, and never an alarm. */
+.threads-kind-chip-ask.active {
+  border-color: rgba(240, 180, 160, 0.55);
+  background: rgba(240, 180, 160, 0.12);
+  color: var(--attention);
+}
+
+.thread-row-ask {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--attention);
+}
+
+.thread-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(240, 180, 160, 0.45);
+  border-left-width: 2px;
+  border-radius: 4px;
+  background: rgba(240, 180, 160, 0.09);
+}
+
+.thread-ask-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--attention);
+}
+
+.thread-ask-question {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--ink);
+  max-width: 60ch;
+}
+
+.thread-ask-answer {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .thread-row-kind {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -3359,4 +3420,103 @@ footer {
 
 .thread-reviewed-toggle.is-reviewed {
   background: rgba(169, 209, 143, 0.14);
+}
+
+
+/* --- Day sheet: what a day amounts to, before any question ---------------- */
+
+.day-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 0 1rem;
+  border-bottom: 1px solid var(--line-strong);
+  margin-bottom: 0.9rem;
+}
+
+.day-sheet-instruments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin: 0;
+  border-top: 2px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0;
+}
+
+.day-sheet-instruments div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.day-sheet-instruments dt {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.day-sheet-instruments dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-sheet-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.day-sheet-kind b {
+  color: var(--machine);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-sheet-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.day-sheet-block-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.day-sheet-block ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.day-sheet-block a {
+  color: var(--ink);
+}
+
+.day-sheet-asks .day-sheet-block-label {
+  color: var(--attention);
+}
+
+.day-sheet-asks li::marker {
+  color: var(--attention);
 }

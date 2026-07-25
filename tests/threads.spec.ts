@@ -440,4 +440,69 @@ test.describe("trail Threads", () => {
       page.getByRole("link", { name: /We should build a token pool/ }),
     ).toBeVisible();
   });
+
+  test("a Thread the model could not place asks for a word instead of guessing", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await page.getByLabel("Capture text").fill("Goldin scope");
+    await page.getByRole("button", { name: "Capture" }).click();
+    await expect(page.getByRole("article", { name: /Goldin scope/ })).toBeVisible();
+
+    // The Enrichment met a name it could not place and asked rather than
+    // researching a public subject that merely sounds similar.
+    await page.evaluate(async () => {
+      type SeedStore = {
+        listRecentThreads(): Promise<
+          Array<{ id: string; title: string; revision: number; updatedAt: string }>
+        >;
+        listThread(id: string): Promise<{
+          captures: Array<{
+            id: string;
+            text: string;
+            createdAt: string;
+            sequence: number;
+          }>;
+        }>;
+        applyRemoteThreads(threads: unknown[]): Promise<unknown>;
+      };
+      const store = (
+        globalThis as typeof globalThis & { __WT_CAPTURE_STORE__?: SeedStore }
+      ).__WT_CAPTURE_STORE__!;
+      const threads = await store.listRecentThreads();
+      const thread = threads[0]!;
+      const view = await store.listThread(thread.id);
+      await store.applyRemoteThreads([
+        {
+          id: thread.id,
+          title: thread.title,
+          revision: thread.revision,
+          updatedAt: thread.updatedAt,
+          kind: null,
+          topics: [],
+          ask: "Who is Goldin — a client, a project, or a person?",
+          captures: view.captures.map((capture) => ({
+            id: capture.id,
+            text: capture.text,
+            createdAt: capture.createdAt,
+            location: null,
+            sequence: capture.sequence,
+            attachments: [],
+          })),
+        },
+      ]);
+    });
+
+    await page.goto("/threads");
+    await expect(page.getByTestId("thread-ask-chip")).toBeVisible();
+    await expect(page.getByTestId("kind-chip-ask")).toContainText("1");
+
+    await page.getByRole("link", { name: /Goldin scope/ }).click();
+    const ask = page.getByTestId("thread-ask");
+    await expect(ask).toContainText("Who is Goldin");
+
+    // Answering is an ordinary reply in the Thread — no separate interview.
+    await ask.getByRole("button", { name: "Answer in this Thread" }).click();
+    await expect(page.locator("#thread-chat-followup")).toBeFocused();
+  });
 });

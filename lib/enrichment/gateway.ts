@@ -57,6 +57,7 @@ export function createFakeGatewayClient(
     title?: string | null;
     kind?: ThreadKind | null;
     topics?: string[];
+    ask?: string | null;
     sources?: EnrichmentSource[];
     research?: ResearchStep[];
   }>,
@@ -71,6 +72,7 @@ export function createFakeGatewayClient(
           title: result.title ?? null,
           kind: result.kind ?? null,
           topics: result.topics ?? [],
+          ask: result.ask ?? null,
           sources: result.sources ?? [],
           research: result.research ?? [],
         };
@@ -109,6 +111,7 @@ export function createFakeGatewayClient(
         title,
         kind: "question",
         topics: [],
+        ask: null,
         sources,
         research,
       } satisfies GatewayGeneration;
@@ -271,6 +274,7 @@ function createAiSdkGatewayClient(): GatewayClient {
         title: parsed.title,
         kind: parsed.kind,
         topics: parsed.topics,
+        ask: parsed.ask,
         sources,
         research,
       };

@@ -204,9 +204,27 @@ Steps 1 and 2 of the order below are implemented:
   never the walker's italic. Desk order puts *To do* first, and tapping the
   active kind clears the filter.
 
-Still open: per-kind tool sets and step budgets, the kind-aware digest, the
-per-kind destinations (checklist, idea board, map), topic linking, and Memory
-dedup.
+- **It asks instead of guessing.** "Goldin scope" was not a garbled
+  observatory — it was a reminder to write a scope of work for a client named
+  Goldin, and nothing in the walker profile could have told the model that.
+  The instruction now forbids substituting a public subject that merely sounds
+  similar: an unrecognized name produces an `ASK` header with one specific
+  question, an omitted or `unclear` kind, and a report limited to what can
+  honestly be said. The question rides on the Thread, shows as **Needs a word**
+  in the queue and its own filter chip, and appears above the reply composer —
+  answering is an ordinary reply Capture, which re-enriches the Thread and
+  clears the question. An Enrichment that still cannot tell leaves the prior
+  kind standing rather than erasing it.
+- **The day has a sheet.** Selecting a day opens with what the day *is* before
+  any question is asked: Threads, Captures, media, reviewed, the kind
+  breakdown, everything needing a word, and the day's to-dos — computed from
+  local state, so it paints instantly and works out of range.
+
+Still open: per-kind tool sets and step budgets, the per-kind destinations
+(checklist, idea board, map), topic linking, and Memory dedup. The Interview
+now overlaps the in-Thread question: both exist to teach the system about the
+walker, and the Thread version arrives in context, at the moment the gap
+actually bites.
 
 ## What the backfill produced
 

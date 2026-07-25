@@ -547,6 +547,22 @@ export function ThreadChat({
         </p>
       ) : null}
 
+      {thread?.ask ? (
+        <aside className="thread-ask" data-testid="thread-ask">
+          <p className="thread-ask-label">Walking Thoughts needs a word</p>
+          <p className="thread-ask-question">{thread.ask}</p>
+          <button
+            type="button"
+            className="thread-ask-answer"
+            onClick={() => {
+              document.getElementById("thread-chat-followup")?.focus();
+            }}
+          >
+            Answer in this Thread
+          </button>
+        </aside>
+      ) : null}
+
       <footer className="thread-chat-composer">
         <label className="capture-field-label" htmlFor="thread-chat-followup">
           Reply in this Thread

@@ -197,6 +197,7 @@ export function createMemoryEnrichmentRepository(
           title: enrichment.title,
           kind: enrichment.kind ?? null,
           topics: enrichment.topics ?? [],
+          ask: enrichment.ask ?? null,
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
@@ -209,11 +210,15 @@ export function createMemoryEnrichmentRepository(
             enrichment.title,
           );
         }
-        if (enrichment.kind && threadRepository.updateThreadClassification) {
+        if (threadRepository.updateThreadClassification) {
           await threadRepository.updateThreadClassification(
             userId,
             job.threadId,
-            { kind: enrichment.kind, topics: enrichment.topics ?? [] },
+            {
+              kind: enrichment.kind ?? null,
+              topics: enrichment.topics ?? [],
+              ask: enrichment.ask ?? null,
+            },
           );
         }
       }

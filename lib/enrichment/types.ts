@@ -72,6 +72,8 @@ export type ThreadEnrichment = {
   kind?: ThreadKind | null;
   /** Topic slugs that group this Thread with others on the same subject. */
   topics?: string[];
+  /** One question the walker must answer before this Thread can go further. */
+  ask?: string | null;
   sources: EnrichmentSource[];
   /** Tool calls (searches, page reads) the model made while researching. */
   research?: ResearchStep[];
@@ -108,6 +110,7 @@ export type GatewayGeneration = {
   title: string | null;
   kind: ThreadKind | null;
   topics: string[];
+  ask: string | null;
   sources: EnrichmentSource[];
   research: ResearchStep[];
 };
@@ -203,6 +206,7 @@ export type EnrichmentRepository = {
       title: string | null;
       kind?: ThreadKind | null;
       topics?: string[];
+      ask?: string | null;
       sources: EnrichmentSource[];
       research?: ResearchStep[];
       memoryPatches?: EnrichmentMemoryPatch[];

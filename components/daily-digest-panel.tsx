@@ -9,6 +9,7 @@ import {
   type DayChatMessage,
 } from "@/lib/digest/chat-store";
 import { collectDayCorpus } from "@/lib/digest/corpus";
+import { summarizeDay, type DaySheet } from "@/lib/digest/day-sheet";
 import type { DayCorpusEntry, DayDigestResult } from "@/lib/digest/types";
 import { readCachedThreadEnrichments } from "@/lib/enrichment/thread-view";
 import {
@@ -21,6 +22,7 @@ import {
   formatDayHeading,
 } from "@/lib/local-capture/calendar-day";
 import { getCaptureStore } from "@/lib/local-capture/store";
+import { KIND_LABELS } from "@/lib/local-capture/types";
 
 const SUGGESTIONS = [
   "Create a task checklist of the day",
@@ -109,6 +111,83 @@ type DailyDigestPanelProps = {
 };
 
 /**
+ * The day at a glance, before any question is asked: what it holds, what it
+ * left to do, and what Walking Thoughts could not place. Read from local
+ * state, so it paints offline and instantly.
+ */
+function DaySheetPanel({ sheet }: { sheet: DaySheet }) {
+  if (sheet.threadCount === 0) return null;
+  return (
+    <aside className="day-sheet" data-testid="day-sheet">
+      <dl className="day-sheet-instruments">
+        <div>
+          <dt>Threads</dt>
+          <dd>{sheet.threadCount}</dd>
+        </div>
+        <div>
+          <dt>Captures</dt>
+          <dd>{sheet.captureCount}</dd>
+        </div>
+        {sheet.photoCount > 0 ? (
+          <div>
+            <dt>Media</dt>
+            <dd>{sheet.photoCount}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>Reviewed</dt>
+          <dd>
+            {sheet.reviewed} of {sheet.threadCount}
+          </dd>
+        </div>
+      </dl>
+
+      {sheet.kinds.length > 0 ? (
+        <p className="day-sheet-kinds">
+          {sheet.kinds.map(({ kind, count }) => (
+            <span key={kind} className="day-sheet-kind">
+              <b>{count}</b> {KIND_LABELS[kind]}
+            </span>
+          ))}
+          {sheet.unclassified > 0 ? (
+            <span className="day-sheet-kind">
+              <b>{sheet.unclassified}</b> still enriching
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+
+      {sheet.needsWord.length > 0 ? (
+        <div className="day-sheet-block day-sheet-asks">
+          <p className="day-sheet-block-label">Needs a word from you</p>
+          <ul>
+            {sheet.needsWord.map((thread) => (
+              <li key={thread.threadId}>
+                <a href={`/threads/${thread.threadId}`}>{thread.title}</a>
+                {thread.ask ? <span> — {thread.ask}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {sheet.toDo.length > 0 ? (
+        <div className="day-sheet-block">
+          <p className="day-sheet-block-label">To do from this day</p>
+          <ul>
+            {sheet.toDo.map((thread) => (
+              <li key={thread.threadId}>
+                <a href={`/threads/${thread.threadId}`}>{thread.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </aside>
+  );
+}
+
+/**
  * An ongoing chat with one whole day — every Thread's Captures and
  * Enrichments. The transcript is retained on this phone per day, and each
  * ask carries the conversation so far, so the walker can go back and
@@ -121,6 +200,7 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
   const [messages, setMessages] = useState<DayChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<DaySheet | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
 
   // Restore the retained transcript after mount (never during hydration —
@@ -128,6 +208,23 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only storage restore after hydration
     setMessages(readDayChat(dayKey));
+  }, [dayKey]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const store = getCaptureStore();
+      const [captures, threads] = await Promise.all([
+        store.list(),
+        store.listRecentThreads(),
+      ]);
+      if (!active) return;
+      setSheet(summarizeDay({ threads, captures, dayKey }));
+    };
+    void load().catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [dayKey]);
 
   useEffect(() => {
@@ -265,6 +362,7 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
       </header>
 
       <div className="day-chat-log" ref={logRef}>
+        {sheet ? <DaySheetPanel sheet={sheet} /> : null}
         {messages.length === 0 && !busy ? (
           <div
             className="digest-suggestions"

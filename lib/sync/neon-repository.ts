@@ -44,6 +44,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ADD COLUMN IF NOT EXISTS topics JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS ask TEXT
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS sync_captures (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
@@ -314,7 +318,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     async listThreads(userId) {
       await ensure();
       const threads = (await sql`
-        SELECT id, title, revision, updated_at, reviewed_at, kind, topics
+        SELECT id, title, revision, updated_at, reviewed_at, kind, topics, ask
         FROM sync_threads
         WHERE user_id = ${userId}
           AND NOT EXISTS (
@@ -332,6 +336,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         reviewed_at: string | null;
         kind: string | null;
         topics: string[] | null;
+        ask: string | null;
       }>;
 
       const result = [];
@@ -364,6 +369,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           reviewedAt: thread.reviewed_at ?? null,
           kind: asThreadKind(thread.kind),
           topics: thread.topics ?? [],
+          ask: thread.ask ?? null,
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -388,10 +394,18 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
 
     async updateThreadClassification(userId, threadId, classification) {
       await ensure();
+      // An Enrichment that could not tell leaves the prior verdict standing;
+      // the question it asked always replaces the previous one, so answering
+      // a Thread clears it.
       await sql`
         UPDATE sync_threads
-        SET kind = ${classification.kind},
-            topics = ${JSON.stringify(classification.topics)}
+        SET kind = COALESCE(${classification.kind}, kind),
+            topics = CASE
+              WHEN ${classification.topics.length} > 0
+                THEN ${JSON.stringify(classification.topics)}::jsonb
+              ELSE topics
+            END,
+            ask = ${classification.ask}
         WHERE user_id = ${userId} AND id = ${threadId}
       `;
     },
