@@ -63,8 +63,8 @@ function formatRecordingClock(ms: number): string {
 
 /**
  * Capture-first home surface. Every Capture starts its own Thread
- * (ADR 0011) — no destination picking, no Inbox. Today's Captures list
- * below the composer links through to each Capture's Thread.
+ * (ADR 0011) — no destination picking, no Inbox. The composer sits in
+ * line under the Today stream; each Capture links through to its Thread.
  */
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
@@ -411,7 +411,7 @@ export function CaptureComposer() {
     (draft.trim().length > 0 || pendingAttachments.length > 0);
 
   const composer = (
-    <div className="capture-card outdoor-card trail-dock-card" aria-label="New Capture">
+    <div className="capture-card outdoor-card" aria-label="New Capture">
       {recordingKind ? (
         <div
           className="recording-banner"
@@ -629,6 +629,8 @@ export function CaptureComposer() {
           </p>
         )}
 
+        {composer}
+
         <footer
           className="trail-sync-footer"
           role="status"
@@ -655,8 +657,6 @@ export function CaptureComposer() {
             Retry
           </button>
         </footer>
-
-        <div className="trail-sticky-dock">{composer}</div>
       </section>
     </div>
   );

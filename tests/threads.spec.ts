@@ -51,8 +51,7 @@ test.describe("trail Threads", () => {
       today.getByRole("article", { name: /Same ridge, clearer view/ }),
     ).toBeVisible();
 
-    // Composer lives under the Today stream (its sticky dock may overlap
-    // the tail of the stream, so compare bottom edges).
+    // Composer sits in line under the Today stream.
     const composer = today.getByLabel("New Capture");
     await expect(composer).toBeVisible();
     const streamBox = await today
