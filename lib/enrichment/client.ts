@@ -1,5 +1,6 @@
 import type { CaptureStore } from "@/lib/local-capture/types";
-import { fetchWithTimeout, MODEL_TIMEOUT_MS } from "@/lib/net/timeout";
+import { MODEL_TIMEOUT_MS } from "@/lib/net/timeout";
+import { trackedFetch } from "@/lib/sync/session-state";
 import type { EnrichmentBatchResponse } from "./types";
 
 export type EnrichmentTransport = {
@@ -26,7 +27,7 @@ function defaultTransport(): EnrichmentTransport {
 
   return {
     async process(options) {
-      const response = await fetchWithTimeout(
+      const response = await trackedFetch(
         "/api/enrichment/process",
         {
           method: "POST",

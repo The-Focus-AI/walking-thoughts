@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
+import { isSyncAuthBlocked, SYNC_AUTH_EVENT } from "@/lib/sync/session-state";
 import {
   emptySyncRollup,
   pendingSyncCount,
@@ -18,8 +19,14 @@ type PillTone = "ready" | "busy" | "attention" | "offline";
 function pillView(
   rollup: SyncRollup,
   online: boolean,
+  authBlocked: boolean,
 ): { label: string; tone: PillTone } {
   const pending = pendingSyncCount(rollup);
+  // A refused session outranks the queue depth: nothing will move until the
+  // walker signs in again, and "Syncing 1…" would be a lie about that.
+  if (authBlocked && online) {
+    return { label: "Sign in to sync", tone: "attention" };
+  }
   if (rollup.needs_attention > 0) {
     return {
       label: `${rollup.needs_attention} need attention`,
@@ -47,6 +54,9 @@ export function SyncStatusPill() {
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
+  // Read at mount rather than in an effect: the flag is already set by the
+  // time a screen re-mounts mid-session.
+  const [authBlocked, setAuthBlocked] = useState(isSyncAuthBlocked);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +79,11 @@ export function SyncStatusPill() {
     };
     const onOffline = () => setOnline(false);
     const onCycle = () => void refresh();
+    const onAuth = (event: Event) => {
+      const detail = (event as CustomEvent<{ blocked: boolean }>).detail;
+      setAuthBlocked(detail?.blocked ?? isSyncAuthBlocked());
+    };
+    window.addEventListener(SYNC_AUTH_EVENT, onAuth);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     window.addEventListener(SYNC_CYCLE_EVENT, onCycle);
@@ -78,17 +93,22 @@ export function SyncStatusPill() {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       window.removeEventListener(SYNC_CYCLE_EVENT, onCycle);
+      window.removeEventListener(SYNC_AUTH_EVENT, onAuth);
     };
   }, []);
 
-  const { label, tone } = pillView(rollup, online);
+  const { label, tone } = pillView(rollup, online, authBlocked);
 
   return (
     <Link
-      href="/threads"
+      href={authBlocked && online ? "/sign-in" : "/threads"}
       className={`sync-pill sync-pill-${tone}`}
       data-testid="sync-pill"
-      title="Capture sync status — open Threads for per-Thread detail"
+      title={
+        authBlocked && online
+          ? "The server refused this device's session — sign in again to sync"
+          : "Capture sync status — open Threads for per-Thread detail"
+      }
     >
       <span className="sync-pill-dot" aria-hidden="true" />
       {label}

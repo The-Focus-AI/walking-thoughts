@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "@/lib/net/timeout";
+import { trackedFetch } from "@/lib/sync/session-state";
 import type { Project } from "./types";
 
 /** What the walker settled about a Thread while filing it. */
@@ -48,7 +48,7 @@ function defaultTransport(): ReviewTransport {
   return {
     async setReviewed(threadId, reviewed) {
       try {
-        const response = await fetchWithTimeout("/api/sync/review", {
+        const response = await trackedFetch("/api/sync/review", {
           method: "POST",
           headers: headers(),
           body: JSON.stringify({ threadId, reviewed }),
@@ -65,7 +65,7 @@ function defaultTransport(): ReviewTransport {
 
     async fileThread(threadId, filing) {
       try {
-        const response = await fetchWithTimeout("/api/sync/review", {
+        const response = await trackedFetch("/api/sync/review", {
           method: "POST",
           headers: headers(),
           body: JSON.stringify({ threadId, ...filing }),
@@ -79,7 +79,7 @@ function defaultTransport(): ReviewTransport {
 
     async listProjects() {
       try {
-        const response = await fetchWithTimeout("/api/sync/projects", {
+        const response = await trackedFetch("/api/sync/projects", {
           headers: headers(),
         });
         if (!response.ok) return null;
@@ -92,7 +92,7 @@ function defaultTransport(): ReviewTransport {
 
     async createProject(name) {
       try {
-        const response = await fetchWithTimeout("/api/sync/projects", {
+        const response = await trackedFetch("/api/sync/projects", {
           method: "POST",
           headers: headers(),
           body: JSON.stringify({ name }),
