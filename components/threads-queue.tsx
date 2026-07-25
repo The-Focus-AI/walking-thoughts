@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
@@ -130,13 +130,17 @@ function dayKeyForThread(
  * digest that day's Captures and Enrichments. On desktop this is a
  * master-detail workspace; on phones, selection swaps the panes. Horizontal
  * swipes step between Threads when one is open.
+ *
+ * Lives in the /threads layout so it stays mounted while the walker moves
+ * between the list, a Thread, and the day chat — the queue pick, day pick,
+ * search, and scroll all keep their state instead of resetting on every
+ * navigation. The selected Thread comes from the route, not a prop.
  */
-export function ThreadsQueue({
-  selectedThreadId,
-}: {
-  selectedThreadId?: string;
-} = {}) {
+export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
+  const params = useParams<{ threadId?: string }>();
+  const selectedThreadId =
+    typeof params.threadId === "string" ? params.threadId : undefined;
   const searchParams = useSearchParams();
   const dayParam = searchParams.get("day");
   const selectedDayKey =
@@ -397,6 +401,26 @@ export function ThreadsQueue({
   }
 
   const hasSelection = Boolean(selectedThreadId || selectedDayKey);
+
+  // Phone panes share the window scroll: remember where the walker was in
+  // the day list and put them back there after closing a Thread or day
+  // chat (the list is display:none while a selection is open).
+  const listScrollY = useRef(0);
+  useEffect(() => {
+    if (hasSelection) return;
+    const onScroll = () => {
+      listScrollY.current = window.scrollY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [hasSelection]);
+  useEffect(() => {
+    if (hasSelection) return;
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo(0, listScrollY.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [hasSelection]);
 
   return (
     <main
@@ -795,6 +819,8 @@ export function ThreadsQueue({
           swipeStart.current = null;
         }}
       >
+        {/* Route pages render null; the workspace owns the detail pane. */}
+        {children}
         {selectedThreadId ? (
           <ThreadChat
             key={selectedThreadId}
