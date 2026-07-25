@@ -133,6 +133,69 @@ test.describe("trail Threads", () => {
     await expect(page.getByText("No Threads yet")).toBeHidden();
   });
 
+  test("long attachment filenames never widen Thread surfaces", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    const longName =
+      "PXL_20260725_121110998.PORTRAIT.ORIGINAL.EDITED.cornwall-bridge-market-loop-north-side.jpg";
+    // Photo-only Capture: the filename becomes the Thread title too.
+    const threadId = await page.evaluate(async (fileName) => {
+      const store = (
+        globalThis as typeof globalThis & {
+          __WT_CAPTURE_STORE__?: {
+            commit(
+              text: string,
+              location: null,
+              options: object,
+            ): Promise<unknown>;
+            listRecentThreads(): Promise<Array<{ id: string }>>;
+          };
+        }
+      ).__WT_CAPTURE_STORE__;
+      await store!.commit("", null, {
+        destination: { type: "new_thread" },
+        attachments: [
+          {
+            kind: "image",
+            mimeType: "image/jpeg",
+            fileName,
+            bytes: new Blob([new Uint8Array([9])], { type: "image/jpeg" }),
+          },
+        ],
+      });
+      const threads = await store!.listRecentThreads();
+      return threads[0]!.id;
+    }, longName);
+
+    // No element may poke past the viewport — including inside internal
+    // scroll containers like the Thread log, which document.scrollWidth
+    // alone would miss.
+    const expectNoSidewaysOverflow = async () => {
+      const overflow = await page.evaluate(() => {
+        const doc = document.documentElement;
+        let widest = doc.scrollWidth;
+        for (const el of document.querySelectorAll("*")) {
+          widest = Math.max(widest, Math.ceil(el.getBoundingClientRect().right));
+        }
+        return widest - doc.clientWidth;
+      });
+      expect(overflow).toBeLessThanOrEqual(0);
+    };
+
+    await page.reload();
+    await expect(page.getByLabel("Capture text")).toBeVisible();
+    await expectNoSidewaysOverflow();
+
+    await page.goto("/threads");
+    await expect(page.locator(".thread-row")).toHaveCount(1);
+    await expectNoSidewaysOverflow();
+
+    await page.goto(`/threads/${threadId}`);
+    await expect(page.getByTestId("thread-chat")).toBeVisible();
+    await expectNoSidewaysOverflow();
+  });
+
   test("horizontal swipes step forward and back through Threads", async ({
     page,
   }) => {

@@ -603,7 +603,9 @@ a {
 
 .trail-gutter-list .capture-gutter {
   display: grid;
-  grid-template-columns: 4.9rem 1fr;
+  /* minmax(0, …): the body column shrinks under long tokens instead of
+     widening the stream into a sideways scroller. */
+  grid-template-columns: 4.9rem minmax(0, 1fr);
   gap: 0.65rem;
   align-items: start;
 }
@@ -982,6 +984,14 @@ h1 {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 0.68rem;
+  min-width: 0;
+}
+
+/* Meta cells (the Thread link may carry a filename title) wrap instead
+   of stretching the row. */
+.capture-entry-meta > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .capture-status {
@@ -1200,6 +1210,7 @@ h1 {
 .thread-row-title {
   font-weight: 700;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .thread-row-meta {
@@ -1331,6 +1342,13 @@ h1 {
   align-items: center;
   justify-content: space-between;
   overflow-wrap: anywhere;
+}
+
+/* Flex items keep min-width auto, which defeats overflow-wrap on the
+   filename span — let the cells shrink so the wrap can happen. */
+.capture-attachment-drafts li > *,
+.capture-attachments li > * {
+  min-width: 0;
 }
 
 .attachment-draft {
@@ -2040,6 +2058,17 @@ footer {
   border-bottom: 1px solid var(--line);
 }
 
+/* A photo-only Capture titles its Thread with the filename — the header
+   must wrap it, not widen the page. (First div only: the tools column
+   keeps its min-content floor.) */
+.thread-chat-header > div:first-child {
+  min-width: 0;
+}
+
+.thread-chat-header h1 {
+  overflow-wrap: anywhere;
+}
+
 .thread-chat-header h1 {
   margin: 0.35rem 0 0;
   font-size: clamp(1.35rem, 4vw, 1.85rem);
@@ -2063,6 +2092,13 @@ footer {
   display: grid;
   gap: 0.85rem;
   align-content: start;
+}
+
+/* Log entries must never widen the log into a sideways scroller: grid
+   items default to min-width auto, so one unbroken token (a camera
+   filename, a long URL) would push the whole Thread past the phone. */
+.thread-chat-log > * {
+  min-width: 0;
 }
 
 /* Thread log entries: station gutter left, the walker's words right. The
@@ -2716,6 +2752,9 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  /* Never squeeze below the widest control: a shrunken flex-end row
+     spills its buttons leftward over the Thread title. */
+  min-width: min-content;
 }
 
 .thread-copy-markdown {
@@ -2751,6 +2790,7 @@ footer {
   font-size: 1.06rem;
   line-height: 1.45;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .thread-capture-media {
@@ -2760,6 +2800,11 @@ footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.thread-capture-media li {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .thread-capture-media .chat-media {
@@ -2782,6 +2827,7 @@ footer {
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  overflow-wrap: anywhere;
 }
 
 /* --- Enrichment report: markdown + sources + research trace --------------- */
