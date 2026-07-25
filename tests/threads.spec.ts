@@ -256,6 +256,71 @@ test.describe("trail Threads", () => {
     await expect(page).toHaveURL(new RegExp(firstId));
   });
 
+  test("list state survives opening a Thread and coming back", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await page.getByLabel("Capture text").fill("State keeper today");
+    await page.getByRole("button", { name: "Capture" }).click();
+    await expect(
+      page.getByRole("article", { name: /State keeper today/ }),
+    ).toBeVisible();
+
+    // An older day so the strip has something non-default to remember.
+    await page.evaluate(async () => {
+      const store = (
+        globalThis as typeof globalThis & {
+          __WT_CAPTURE_STORE__?: {
+            applyRemoteThreads(threads: Array<object>): Promise<unknown>;
+          };
+        }
+      ).__WT_CAPTURE_STORE__;
+      const old = new Date();
+      old.setDate(old.getDate() - 4);
+      old.setHours(12, 0, 0, 0);
+      await store!.applyRemoteThreads([
+        {
+          id: "state-keeper-old",
+          title: "State keeper older",
+          revision: 1,
+          updatedAt: old.toISOString(),
+          captures: [
+            {
+              id: "state-keeper-old-capture",
+              text: "State keeper older",
+              createdAt: old.toISOString(),
+              location: null,
+              sequence: 1,
+              attachments: [],
+            },
+          ],
+        },
+      ]);
+    });
+
+    await page.goto("/threads");
+    const chips = page.locator(".threads-day-chip");
+    await expect(chips).toHaveCount(3);
+
+    // Pick the older day, then walk into its Thread and back out.
+    await chips.nth(1).click();
+    const olderRow = page.getByRole("link", { name: /State keeper older/ });
+    await expect(olderRow).toBeVisible();
+    await olderRow.click();
+    await expect(page).toHaveURL(/\/threads\/state-keeper-old/);
+    await page.getByRole("link", { name: "← Threads" }).click();
+    await expect(page).toHaveURL(/\/threads$/);
+
+    // The day pick held: still the older day, not reset to Today.
+    await expect(chips.nth(1)).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("link", { name: /State keeper older/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /State keeper today/ }),
+    ).toBeHidden();
+  });
+
   test("selecting a day opens the day chat pane", async ({ page }) => {
     await openCaptureShell(page);
     await page.getByLabel("Capture text").fill("Stone wall on the ridge");
