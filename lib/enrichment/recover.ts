@@ -1,4 +1,5 @@
 import type { CaptureStore, LocalCapture } from "@/lib/local-capture/types";
+import { readCachedThreadEnrichments } from "./thread-view";
 import type { ThreadEnrichment } from "./types";
 
 /** True when an Enrichment batch already covered this Capture. */
@@ -63,6 +64,11 @@ export async function recoverStaleLocalCaptures(
     loadEnrichments: (
       threadId: string,
     ) => Promise<ThreadEnrichment[] | null>;
+    /**
+     * Locally retained Enrichments, consulted before the network. Defaults to
+     * the browser cache; tests pass their own.
+     */
+    cachedEnrichments?: (threadId: string) => ThreadEnrichment[];
   },
 ): Promise<RecoverStaleResult> {
   const captures = await store.list();
@@ -80,8 +86,33 @@ export async function recoverStaleLocalCaptures(
     ),
   ];
   const enrichmentsByThread = new Map<string, ThreadEnrichment[]>();
+
+  // Only a Thread the retained copy does not already account for is worth a
+  // request. This sweep runs on every sync cycle from every open screen, so
+  // asking about all of them cost ~70 requests every few seconds — enough to
+  // starve the Capture and media pushes it exists to protect.
+  const readCached =
+    options.cachedEnrichments ??
+    (typeof window === "undefined"
+      ? () => []
+      : (threadId: string) => readCachedThreadEnrichments(threadId));
+
+  const unresolved = threadIds.filter((threadId) => {
+    const known = readCached(threadId);
+    if (known.length === 0) return true;
+    enrichmentsByThread.set(threadId, known);
+    const stillUncovered = afterSyncRequeue.some(
+      (capture) =>
+        capture.threadId === threadId &&
+        capture.status === "complete" &&
+        !captureCoveredByEnrichment(capture.id, known),
+    );
+    if (stillUncovered) enrichmentsByThread.delete(threadId);
+    return stillUncovered;
+  });
+
   await Promise.all(
-    threadIds.map(async (threadId) => {
+    unresolved.map(async (threadId) => {
       const loaded = await options.loadEnrichments(threadId);
       // null → skip orphan detection for this Thread (network unavailable)
       if (loaded !== null) enrichmentsByThread.set(threadId, loaded);

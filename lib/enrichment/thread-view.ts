@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "@/lib/net/timeout";
+import { trackedFetch } from "@/lib/sync/session-state";
 import type { ThreadEnrichment } from "./types";
 
 const CACHE_PREFIX = "wt-thread-enrichments:";
@@ -59,13 +59,18 @@ export async function fetchThreadEnrichmentsFromNetwork(
   threadId: string,
 ): Promise<ThreadEnrichment[] | null> {
   try {
-    const response = await fetchWithTimeout(
+    const response = await trackedFetch(
       `/api/enrichment/threads/${threadId}`,
       { headers: enrichmentHeaders() },
     );
     if (!response.ok) return null;
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
-    return normalize(body.enrichments ?? []);
+    const enrichments = normalize(body.enrichments ?? []);
+    // Retain what the sweep already paid for. Without this the recovery pass
+    // re-asked the server about every Thread on every cycle, because nothing
+    // it learned was ever written down.
+    if (enrichments.length > 0) writeCache(threadId, enrichments);
+    return enrichments;
   } catch {
     return null;
   }
@@ -80,7 +85,7 @@ export async function loadThreadEnrichments(
   threadId: string,
 ): Promise<ThreadEnrichment[]> {
   try {
-    const response = await fetchWithTimeout(
+    const response = await trackedFetch(
       `/api/enrichment/threads/${threadId}`,
       { headers: enrichmentHeaders() },
     );
