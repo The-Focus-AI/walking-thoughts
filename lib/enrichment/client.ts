@@ -1,4 +1,5 @@
 import type { CaptureStore } from "@/lib/local-capture/types";
+import { fetchWithTimeout, MODEL_TIMEOUT_MS } from "@/lib/net/timeout";
 import type { EnrichmentBatchResponse } from "./types";
 
 export type EnrichmentTransport = {
@@ -25,11 +26,15 @@ function defaultTransport(): EnrichmentTransport {
 
   return {
     async process(options) {
-      const response = await fetch("/api/enrichment/process", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ retryFailed: options?.retryFailed ?? false }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/enrichment/process",
+        {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ retryFailed: options?.retryFailed ?? false }),
+        },
+        MODEL_TIMEOUT_MS,
+      );
       if (
         response.status === 401 ||
         response.status === 403 ||

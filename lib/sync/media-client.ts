@@ -1,5 +1,6 @@
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import type { CaptureStore, LocalCapture } from "@/lib/local-capture/types";
+import { fetchWithTimeout, MEDIA_TIMEOUT_MS } from "@/lib/net/timeout";
 
 export type MediaTransport = {
   upload(input: {
@@ -33,11 +34,15 @@ function defaultMediaTransport(): MediaTransport {
       body.set("operationId", operationId);
       body.set("mimeType", mimeType);
       body.set("file", bytes, attachmentId);
-      const response = await fetch("/api/sync/media", {
-        method: "POST",
-        headers: authHeaders(),
-        body,
-      });
+      const response = await fetchWithTimeout(
+        "/api/sync/media",
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body,
+        },
+        MEDIA_TIMEOUT_MS,
+      );
       if (
         response.status === 401 ||
         response.status === 403 ||
@@ -54,17 +59,21 @@ function defaultMediaTransport(): MediaTransport {
       };
     },
     async verify(attachmentId) {
-      const response = await fetch(`/api/media/${attachmentId}`, {
+      const response = await fetchWithTimeout(`/api/media/${attachmentId}`, {
         method: "GET",
         headers: authHeaders(),
       });
       return response.ok;
     },
     async download(attachmentId) {
-      const response = await fetch(`/api/media/${attachmentId}`, {
-        method: "GET",
-        headers: authHeaders(),
-      });
+      const response = await fetchWithTimeout(
+        `/api/media/${attachmentId}`,
+        {
+          method: "GET",
+          headers: authHeaders(),
+        },
+        MEDIA_TIMEOUT_MS,
+      );
       if (!response.ok) {
         throw new Error(`media_download_${response.status}`);
       }

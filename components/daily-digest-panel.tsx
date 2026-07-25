@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
+import {
+  clearDayChat,
+  readDayChat,
+  writeDayChat,
+  type DayChatMessage,
+} from "@/lib/digest/chat-store";
 import { collectDayCorpus } from "@/lib/digest/corpus";
 import type { DayCorpusEntry, DayDigestResult } from "@/lib/digest/types";
 import { readCachedThreadEnrichments } from "@/lib/enrichment/thread-view";
+import {
+  fetchWithTimeout,
+  isTimeoutError,
+  MODEL_TIMEOUT_MS,
+} from "@/lib/net/timeout";
 import {
   calendarDayKey,
   formatDayHeading,
@@ -16,6 +27,9 @@ const SUGGESTIONS = [
   "Summarize what I noticed on the trail",
   "List open questions still worth following up",
 ] as const;
+
+/** Most recent chat turns sent back to the digest for context. */
+const HISTORY_TURN_LIMIT = 24;
 
 function digestHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
@@ -88,52 +102,78 @@ export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
 }
 
 type DailyDigestPanelProps = {
-  /** Local calendar day (YYYY-MM-DD) to digest. */
+  /** Local calendar day (YYYY-MM-DD) to chat about. */
   dayKey: string;
   /** Mobile close — returns to the day list. */
   onClose?: () => void;
 };
 
 /**
- * Desk surface for talking to one whole day — every Thread's Captures and
- * Enrichments — not a single Thread follow-up.
+ * An ongoing chat with one whole day — every Thread's Captures and
+ * Enrichments. The transcript is retained on this phone per day, and each
+ * ask carries the conversation so far, so the walker can go back and
+ * forth instead of firing one-off digests.
  */
 export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
   const dayHeading = formatDayHeading(dayKey);
   const isToday = dayKey === calendarDayKey();
   const [draft, setDraft] = useState("");
-  const [corpusCount, setCorpusCount] = useState<number | null>(null);
+  const [messages, setMessages] = useState<DayChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<DayDigestResult | null>(null);
+  const logRef = useRef<HTMLDivElement | null>(null);
+
+  // Restore the retained transcript after mount (never during hydration —
+  // localStorage only exists on the client, so the server render is empty).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only storage restore after hydration
+    setMessages(readDayChat(dayKey));
+  }, [dayKey]);
+
+  useEffect(() => {
+    const log = logRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [messages, busy]);
 
   async function ask(question: string) {
     const trimmed = question.trim();
     if (!trimmed || busy) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    const before = messages;
+    const walkerTurn: DayChatMessage = {
+      role: "walker",
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages([...before, walkerTurn]);
+    setDraft("");
     try {
       const corpus = await loadDayCorpus(dayKey);
-      setCorpusCount(corpus.length);
       if (corpus.length === 0) {
-        setError(
+        throw new Error(
           isToday
             ? "No Captures for today yet — commit something on the trail first."
             : `No Captures for ${dayHeading}.`,
         );
-        return;
       }
-      const response = await fetch("/api/digest", {
-        method: "POST",
-        headers: digestHeaders(),
-        body: JSON.stringify({
-          dayKey,
-          dayHeading,
-          question: trimmed,
-          corpus,
-        }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/digest",
+        {
+          method: "POST",
+          headers: digestHeaders(),
+          body: JSON.stringify({
+            dayKey,
+            dayHeading,
+            question: trimmed,
+            corpus,
+            history: before
+              .slice(-HISTORY_TURN_LIMIT)
+              .map(({ role, text }) => ({ role, text })),
+          }),
+        },
+        MODEL_TIMEOUT_MS,
+      );
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
           error?: string;
@@ -141,131 +181,178 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
         throw new Error(body?.error ?? `Digest failed (${response.status})`);
       }
       const body = (await response.json()) as DayDigestResult;
-      setResult(body);
-      setDraft("");
+      const digestTurn: DayChatMessage = {
+        role: "digest",
+        text: body.text,
+        model: body.model,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...before, walkerTurn, digestTurn];
+      setMessages(next);
+      writeDayChat(dayKey, next);
     } catch (cause) {
+      // Nothing was answered: put the question back in the composer.
+      setMessages(before);
+      setDraft(trimmed);
       const offline =
         typeof navigator !== "undefined" && navigator.onLine === false;
       setError(
         offline
-          ? "Day digests need a connection. They will be here when you're back in range."
-          : cause instanceof Error
-            ? cause.message
-            : "Digest could not run.",
+          ? "Day chat needs a connection. It will be here when you're back in range."
+          : isTimeoutError(cause)
+            ? "The signal is too weak right now — your question is back in the box, try again in better range."
+            : cause instanceof Error
+              ? cause.message
+              : "Digest could not run.",
       );
     } finally {
       setBusy(false);
     }
   }
 
+  function clearChat() {
+    clearDayChat(dayKey);
+    setMessages([]);
+    setError(null);
+  }
+
   return (
     <section
       className="day-digest-pane"
-      aria-label={`Digest for ${dayHeading}`}
+      aria-label={`Day chat for ${dayHeading}`}
       data-testid="daily-digest"
     >
       <header className="day-digest-header">
         <div>
-          <p className="eyebrow">Day digest</p>
+          <p className="eyebrow">Day chat</p>
           <h1>{dayHeading}</h1>
           <p>
-            Ask across every Thread from this day — checklists, summaries,
-            follow-ups. Not one Thread at a time.
+            Talk with every Thread from this day — the conversation keeps its
+            history on this phone.
           </p>
         </div>
-        {onClose ? (
-          <button
-            type="button"
-            className="journal-close"
-            aria-label="Close day digest"
-            onClick={onClose}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.9}
-              strokeLinecap="round"
-              aria-hidden="true"
+        <div className="day-digest-header-tools">
+          {messages.length > 0 ? (
+            <button
+              type="button"
+              className="digest-clear"
+              onClick={clearChat}
+              disabled={busy}
             >
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
-        ) : null}
+              Clear chat
+            </button>
+          ) : null}
+          {onClose ? (
+            <button
+              type="button"
+              className="journal-close"
+              aria-label="Close day chat"
+              onClick={onClose}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.9}
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       </header>
 
-      {corpusCount != null ? (
-        <p className="digest-count">
-          {corpusCount}{" "}
-          {corpusCount === 1
-            ? "Capture or Enrichment"
-            : "Captures and Enrichments"}{" "}
-          ready
-        </p>
-      ) : null}
-
-      <div className="digest-suggestions" role="group" aria-label="Suggestions">
-        {SUGGESTIONS.map((suggestion) => (
-          <button
-            key={suggestion}
-            type="button"
-            className="digest-suggestion"
-            disabled={busy}
-            onClick={() => void ask(suggestion)}
+      <div className="day-chat-log" ref={logRef}>
+        {messages.length === 0 && !busy ? (
+          <div
+            className="digest-suggestions"
+            role="group"
+            aria-label="Suggestions"
           >
-            {suggestion}
-          </button>
-        ))}
-      </div>
-
-      <label className="capture-label" htmlFor="digest-ask">
-        Ask about this day
-      </label>
-      <textarea
-        id="digest-ask"
-        className="interview-input"
-        rows={3}
-        value={draft}
-        placeholder="Create a task checklist of the day"
-        onChange={(event) => setDraft(event.target.value)}
-        disabled={busy}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            if (draft.trim()) void ask(draft);
-          }
-        }}
-      />
-      <div className="interview-actions">
-        <button
-          type="button"
-          className="interview-send"
-          data-testid="digest-send"
-          onClick={() => void ask(draft)}
-          disabled={busy || !draft.trim()}
-        >
-          Ask
-        </button>
-      </div>
-
-      {busy ? (
-        <p className="interview-status" role="status">
-          Digesting — reading every Thread from this day.
-        </p>
-      ) : null}
-      {error ? (
-        <p className="interview-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {result ? (
-        <article className="digest-result" data-testid="digest-result">
-          <p className="digest-result-head">Digest · {result.model}</p>
-          <div className="enrichment-markdown">
-            <Markdown>{result.text}</Markdown>
+            {SUGGESTIONS.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                className="digest-suggestion"
+                disabled={busy}
+                onClick={() => void ask(suggestion)}
+              >
+                {suggestion}
+              </button>
+            ))}
           </div>
-        </article>
-      ) : null}
+        ) : null}
+
+        {messages.map((message, index) =>
+          message.role === "walker" ? (
+            <p
+              key={`${message.createdAt}-${index}`}
+              className="day-chat-walker"
+              data-testid="digest-walker"
+            >
+              {message.text}
+            </p>
+          ) : (
+            <article
+              key={`${message.createdAt}-${index}`}
+              className="digest-result"
+              data-testid="digest-result"
+            >
+              <p className="digest-result-head">
+                Digest{message.model ? ` · ${message.model}` : ""}
+              </p>
+              <div className="enrichment-markdown">
+                <Markdown>{message.text}</Markdown>
+              </div>
+            </article>
+          ),
+        )}
+
+        {busy ? (
+          <p className="interview-status" role="status">
+            Digesting — reading every Thread from this day.
+          </p>
+        ) : null}
+        {error ? (
+          <p className="interview-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="day-chat-composer">
+        <label className="capture-label" htmlFor="digest-ask">
+          Ask about this day
+        </label>
+        <textarea
+          id="digest-ask"
+          className="interview-input"
+          rows={2}
+          value={draft}
+          placeholder="Ask a follow-up about this day…"
+          onChange={(event) => setDraft(event.target.value)}
+          disabled={busy}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (draft.trim()) void ask(draft);
+            }
+          }}
+        />
+        <div className="interview-actions">
+          <button
+            type="button"
+            className="interview-send"
+            data-testid="digest-send"
+            onClick={() => void ask(draft)}
+            disabled={busy || !draft.trim()}
+          >
+            Ask
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

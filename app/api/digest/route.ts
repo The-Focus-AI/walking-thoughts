@@ -1,5 +1,5 @@
 import { runDayDigest } from "@/lib/digest/run";
-import type { DayCorpusEntry } from "@/lib/digest/types";
+import type { DayChatTurn, DayCorpusEntry } from "@/lib/digest/types";
 import { requireSyncAccess } from "@/lib/sync/access";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,31 @@ type DigestBody = {
   question?: string;
   corpus?: DayCorpusEntry[];
   walkerProfile?: string | null;
+  history?: DayChatTurn[];
 };
+
+/** Most recent turns of the ongoing chat sent back for context. */
+const HISTORY_TURN_LIMIT = 24;
+const HISTORY_TURN_CHARS = 4000;
+
+function sanitizeHistory(history: unknown): DayChatTurn[] {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter(
+      (turn): turn is DayChatTurn =>
+        typeof turn === "object" &&
+        turn !== null &&
+        ((turn as DayChatTurn).role === "walker" ||
+          (turn as DayChatTurn).role === "digest") &&
+        typeof (turn as DayChatTurn).text === "string" &&
+        (turn as DayChatTurn).text.trim().length > 0,
+    )
+    .slice(-HISTORY_TURN_LIMIT)
+    .map((turn) => ({
+      role: turn.role,
+      text: turn.text.slice(0, HISTORY_TURN_CHARS),
+    }));
+}
 
 /**
  * Cross-Thread day digest: the client assembles today's local Captures and
@@ -50,6 +74,7 @@ export async function POST(request: Request) {
         corpus,
         walkerProfile:
           typeof body.walkerProfile === "string" ? body.walkerProfile : null,
+        history: sanitizeHistory(body.history),
       },
       { userId: access.userId },
     );

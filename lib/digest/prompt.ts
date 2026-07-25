@@ -19,10 +19,19 @@ function formatEntry(entry: DayCorpusEntry): string {
 
 export function buildDayDigestPrompt(input: DayDigestRequest): string {
   const historyBlock = input.corpus.map(formatEntry).join("\n");
-  const sections = [
-    `Day: ${input.dayHeading} (${input.dayKey})`,
-    `Walker's ask: ${input.question}`,
-  ];
+  const sections = [`Day: ${input.dayHeading} (${input.dayKey})`];
+  if (input.history?.length) {
+    sections.push(
+      "Conversation so far (oldest first) — continue it, don't restart:",
+      input.history
+        .map(
+          (turn) =>
+            `${turn.role === "walker" ? "Walker" : "Digest"}: ${turn.text}`,
+        )
+        .join("\n"),
+    );
+  }
+  sections.push(`Walker's ask: ${input.question}`);
   if (input.walkerProfile) {
     sections.push(input.walkerProfile);
   }

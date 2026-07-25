@@ -83,6 +83,28 @@ test("buildDayDigestPrompt lists every Thread's material and the ask", () => {
   expect(prompt).not.toContain("Should not appear");
 });
 
+test("buildDayDigestPrompt carries the conversation so far before the ask", () => {
+  const corpus = collectDayCorpus(ENTRIES, DAY_KEY);
+  const prompt = buildDayDigestPrompt({
+    dayKey: DAY_KEY,
+    dayHeading: DAY_HEADING,
+    question: "Now turn that into tasks",
+    corpus,
+    history: [
+      { role: "walker", text: "What did I notice on the ridge?" },
+      { role: "digest", text: "A stone wall and chanterelles." },
+    ],
+  });
+
+  expect(prompt).toContain("Conversation so far");
+  expect(prompt).toContain("Walker: What did I notice on the ridge?");
+  expect(prompt).toContain("Digest: A stone wall and chanterelles.");
+  // History precedes the current ask so the model continues, not restarts.
+  expect(prompt.indexOf("Conversation so far")).toBeLessThan(
+    prompt.indexOf("Walker's ask: Now turn that into tasks"),
+  );
+});
+
 test("runDayDigest asks the gateway with the day system instruction", async () => {
   let seenSystem = "";
   let seenPrompt = "";

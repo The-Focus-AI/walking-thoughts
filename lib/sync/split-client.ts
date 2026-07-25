@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/net/timeout";
 import type { ThreadSplitResult } from "./types";
 
 export type SplitTransport = {
@@ -23,7 +24,7 @@ function defaultTransport(): SplitTransport {
   return {
     async splitThread(threadId) {
       try {
-        const response = await fetch("/api/sync/split", {
+        const response = await fetchWithTimeout("/api/sync/split", {
           method: "POST",
           headers: headers(),
           body: JSON.stringify({ threadId }),

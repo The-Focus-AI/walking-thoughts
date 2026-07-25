@@ -82,7 +82,10 @@ export async function fetchWeatherSnapshot(
   url.searchParams.set("forecast_days", "1");
 
   try {
-    const response = await fetchImpl(url.toString());
+    // One bar of signal must fall back to the cache, not stall the strip.
+    const response = await fetchImpl(url.toString(), {
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!response.ok) return readCache(latitude, longitude);
     const payload = (await response.json()) as OpenMeteoForecast;
     const snapshot = weatherFromOpenMeteo(payload);

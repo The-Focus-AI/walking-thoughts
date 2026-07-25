@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/net/timeout";
 import type { ThreadEnrichment } from "./types";
 
 const CACHE_PREFIX = "wt-thread-enrichments:";
@@ -58,9 +59,10 @@ export async function fetchThreadEnrichmentsFromNetwork(
   threadId: string,
 ): Promise<ThreadEnrichment[] | null> {
   try {
-    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
-      headers: enrichmentHeaders(),
-    });
+    const response = await fetchWithTimeout(
+      `/api/enrichment/threads/${threadId}`,
+      { headers: enrichmentHeaders() },
+    );
     if (!response.ok) return null;
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
     return normalize(body.enrichments ?? []);
@@ -78,9 +80,10 @@ export async function loadThreadEnrichments(
   threadId: string,
 ): Promise<ThreadEnrichment[]> {
   try {
-    const response = await fetch(`/api/enrichment/threads/${threadId}`, {
-      headers: enrichmentHeaders(),
-    });
+    const response = await fetchWithTimeout(
+      `/api/enrichment/threads/${threadId}`,
+      { headers: enrichmentHeaders() },
+    );
     if (!response.ok) return readCache(threadId);
     const body = (await response.json()) as { enrichments?: ThreadEnrichment[] };
     const enrichments = normalize(body.enrichments ?? []);

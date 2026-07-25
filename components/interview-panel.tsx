@@ -6,6 +6,7 @@ import { AppNav } from "@/components/app-nav";
 import { ScaleBar } from "@/components/sheet";
 import type { InterviewTurn } from "@/lib/interview/types";
 import { revertedPatchIds } from "@/lib/memory/patches";
+import { fetchWithTimeout, MODEL_TIMEOUT_MS } from "@/lib/net/timeout";
 import type { MemoryPatch, WalkerMemory } from "@/lib/memory/types";
 
 type InterviewStatePayload = {
@@ -164,7 +165,7 @@ export function InterviewPanel() {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    const response = await fetch("/api/memories", {
+    const response = await fetchWithTimeout("/api/memories", {
       headers: interviewHeaders(),
     });
     if (!response.ok) throw new Error(String(response.status));
@@ -180,7 +181,7 @@ export function InterviewPanel() {
     let active = true;
     void (async () => {
       try {
-        const response = await fetch("/api/interview", {
+        const response = await fetchWithTimeout("/api/interview", {
           headers: interviewHeaders(),
         });
         if (!response.ok) throw new Error(String(response.status));
@@ -206,11 +207,18 @@ export function InterviewPanel() {
       setBusy(true);
       setError(null);
       try {
-        const response = await fetch("/api/interview", {
-          method: "POST",
-          headers: { "content-type": "application/json", ...interviewHeaders() },
-          body: JSON.stringify(body),
-        });
+        const response = await fetchWithTimeout(
+          "/api/interview",
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...interviewHeaders(),
+            },
+            body: JSON.stringify(body),
+          },
+          MODEL_TIMEOUT_MS,
+        );
         if (!response.ok) throw new Error(String(response.status));
         applyState((await response.json()) as InterviewStatePayload);
         setStarted(true);
@@ -229,7 +237,7 @@ export function InterviewPanel() {
   async function forget(memoryId: string) {
     setError(null);
     try {
-      const response = await fetch(`/api/memories/${memoryId}`, {
+      const response = await fetchWithTimeout(`/api/memories/${memoryId}`, {
         method: "DELETE",
         headers: interviewHeaders(),
       });
@@ -243,7 +251,7 @@ export function InterviewPanel() {
   async function revert(patchId: string) {
     setError(null);
     try {
-      const response = await fetch("/api/memories/patches", {
+      const response = await fetchWithTimeout("/api/memories/patches", {
         method: "POST",
         headers: { "content-type": "application/json", ...interviewHeaders() },
         body: JSON.stringify({ revertPatchId: patchId }),

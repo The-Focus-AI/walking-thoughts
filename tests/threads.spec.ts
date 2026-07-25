@@ -256,7 +256,7 @@ test.describe("trail Threads", () => {
     await expect(page).toHaveURL(new RegExp(firstId));
   });
 
-  test("selecting a day opens the day digest pane", async ({ page }) => {
+  test("selecting a day opens the day chat pane", async ({ page }) => {
     await openCaptureShell(page);
     await page.getByLabel("Capture text").fill("Stone wall on the ridge");
     await page.getByRole("button", { name: "Capture" }).click();
@@ -266,13 +266,88 @@ test.describe("trail Threads", () => {
 
     await page.goto("/threads");
     const dayButton = page
-      .getByRole("button", { name: /Digest this day/i })
+      .getByRole("button", { name: /Chat about this day/i })
       .first();
     await expect(dayButton).toBeVisible();
     await dayButton.click();
     await expect(page).toHaveURL(/\/threads\?day=\d{4}-\d{2}-\d{2}/);
     await expect(page.getByTestId("daily-digest")).toBeVisible();
-    await expect(page.getByText("Day digest")).toBeVisible();
+    await expect(page.getByText("Day chat")).toBeVisible();
     await expect(page.getByTestId("digest-send")).toBeVisible();
+  });
+
+  test("day strip shows one day at a time; All days opens the archive", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await page.getByLabel("Capture text").fill("Chip strip today capture");
+    await page.getByRole("button", { name: "Capture" }).click();
+    await expect(
+      page.getByRole("article", { name: /Chip strip today capture/ }),
+    ).toBeVisible();
+
+    // Import an older day's Thread the way sync hydration would.
+    await page.evaluate(async () => {
+      const store = (
+        globalThis as typeof globalThis & {
+          __WT_CAPTURE_STORE__?: {
+            applyRemoteThreads(
+              threads: Array<object>,
+            ): Promise<unknown>;
+          };
+        }
+      ).__WT_CAPTURE_STORE__;
+      const old = new Date();
+      old.setDate(old.getDate() - 3);
+      old.setHours(12, 0, 0, 0);
+      await store!.applyRemoteThreads([
+        {
+          id: "older-day-thread",
+          title: "Older ridge notes",
+          revision: 1,
+          updatedAt: old.toISOString(),
+          captures: [
+            {
+              id: "older-day-capture",
+              text: "Older ridge notes",
+              createdAt: old.toISOString(),
+              location: null,
+              sequence: 1,
+              attachments: [],
+            },
+          ],
+        },
+      ]);
+    });
+
+    await page.goto("/threads");
+    // Default: only the newest day's section renders.
+    await expect(
+      page.getByRole("link", { name: /Chip strip today capture/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Older ridge notes/ }),
+    ).toBeHidden();
+
+    // The older day is one chip away.
+    await expect(page.getByTestId("day-chip-all")).toBeVisible();
+    const chips = page.locator(".threads-day-chip");
+    await expect(chips).toHaveCount(3); // today, older day, All days
+    await chips.nth(1).click();
+    await expect(
+      page.getByRole("link", { name: /Older ridge notes/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Chip strip today capture/ }),
+    ).toBeHidden();
+
+    // All days shows the whole archive again.
+    await page.getByTestId("day-chip-all").click();
+    await expect(
+      page.getByRole("link", { name: /Chip strip today capture/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Older ridge notes/ }),
+    ).toBeVisible();
   });
 });
