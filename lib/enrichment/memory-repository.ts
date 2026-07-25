@@ -1,5 +1,9 @@
 import { createMemoryThreadRepository } from "@/lib/sync/memory-repository";
 import type { ThreadRepository } from "@/lib/sync/types";
+import {
+  isPermanentEnrichmentError,
+  MAX_ENRICHMENT_ATTEMPTS,
+} from "./failures";
 import type {
   EnrichmentHistoryEntry,
   EnrichmentJob,
@@ -191,6 +195,8 @@ export function createMemoryEnrichmentRepository(
           targetCaptureIds: [...job.targetCaptureIds],
           createdAt: new Date().toISOString(),
           title: enrichment.title,
+          kind: enrichment.kind ?? null,
+          topics: enrichment.topics ?? [],
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
@@ -234,10 +240,8 @@ export function createMemoryEnrichmentRepository(
         if (!key.startsWith(`${userId}:`)) continue;
         if (job.status !== "failed") continue;
         if (jobId && job.id !== jobId) continue;
-        // Permanent failures (source media gone) must not retry forever.
-        if (job.error && job.error.startsWith("missing_original_media_")) {
-          continue;
-        }
+        if (job.error && isPermanentEnrichmentError(job.error)) continue;
+        if (job.attempts >= MAX_ENRICHMENT_ATTEMPTS) continue;
         db.jobs.set(key, { ...job, status: "queued", error: undefined });
         count += 1;
       }

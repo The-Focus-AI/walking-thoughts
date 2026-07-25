@@ -6,6 +6,7 @@ import {
   parseGatewayText,
 } from "./system-instruction";
 import type {
+  ThreadKind,
   EnrichmentSource,
   GatewayClient,
   GatewayGenerateInput,
@@ -20,6 +21,23 @@ export const RESEARCH_STEP_LIMIT = 8;
 type GatewayGlobals = typeof globalThis & {
   __WT_GATEWAY__?: GatewayClient;
 };
+
+/**
+ * `result.text` is only the *last* step's text. When the model writes the
+ * report and then calls a tool — memory_patch, typically — the report lives
+ * in an earlier step and the last step holds a closing line. Production lost
+ * five Enrichment bodies that way, each reduced to a sentence referring to
+ * "the report above". Keep the text of every step.
+ */
+export function collectGeneratedText(
+  steps: ReadonlyArray<{ text?: string }>,
+  lastStepText: string,
+): string {
+  const parts = steps
+    .map((step) => step.text?.trim() ?? "")
+    .filter((text) => text.length > 0);
+  return parts.length > 0 ? parts.join("\n\n") : lastStepText.trim();
+}
 
 export function getSelectedGatewayModel(
   environment: Record<string, string | undefined> = process.env,
@@ -37,6 +55,8 @@ export function createFakeGatewayClient(
     text: string;
     model?: string;
     title?: string | null;
+    kind?: ThreadKind | null;
+    topics?: string[];
     sources?: EnrichmentSource[];
     research?: ResearchStep[];
   }>,
@@ -49,6 +69,8 @@ export function createFakeGatewayClient(
           text: result.text,
           model: result.model ?? input.model,
           title: result.title ?? null,
+          kind: result.kind ?? null,
+          topics: result.topics ?? [],
           sources: result.sources ?? [],
           research: result.research ?? [],
         };
@@ -85,6 +107,8 @@ export function createFakeGatewayClient(
         text: input.requestTitle ? `TITLE: ${title}\n${body}` : body,
         model: input.model,
         title,
+        kind: "question",
+        topics: [],
         sources,
         research,
       } satisfies GatewayGeneration;
@@ -237,11 +261,16 @@ function createAiSdkGatewayClient(): GatewayClient {
           ? [...readSources.values()]
           : [...searchHits.values()].slice(0, 5);
 
-      const parsed = parseGatewayText(result.text, input.requestTitle);
+      const parsed = parseGatewayText(
+        collectGeneratedText(result.steps, result.text),
+        input.requestTitle,
+      );
       return {
         text: parsed.text,
         model: input.model,
         title: parsed.title,
+        kind: parsed.kind,
+        topics: parsed.topics,
         sources,
         research,
       };
