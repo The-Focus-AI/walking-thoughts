@@ -229,11 +229,25 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       if (generation !== loadGeneration.current) return;
       setThreads(localViews);
       setLoaded(true);
+
+      // Only ask the server about Threads whose answer can still change: the
+      // one being read, and any still working. A settled Thread's Enrichments
+      // are immutable, so refetching the whole corpus every sync cycle bought
+      // nothing and cost a request per Thread every few seconds.
+      const changeable = (view: ThreadListView): boolean => {
+        if (view.thread.id === selectedThreadId) return true;
+        if (view.enrichments.length === 0) return true;
+        return view.captures.some((capture) => capture.status !== "complete");
+      };
       const refreshed = await Promise.all(
-        localViews.map(async (view) => ({
-          ...view,
-          enrichments: await loadThreadEnrichments(view.thread.id),
-        })),
+        localViews.map(async (view) =>
+          changeable(view)
+            ? {
+                ...view,
+                enrichments: await loadThreadEnrichments(view.thread.id),
+              }
+            : view,
+        ),
       );
       if (generation !== loadGeneration.current) return;
       setThreads(refreshed);
@@ -242,7 +256,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       setError("Could not load Threads");
       setLoaded(true);
     }
-  }, []);
+  }, [selectedThreadId]);
 
   useEffect(() => {
     let active = true;

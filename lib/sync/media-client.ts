@@ -1,6 +1,7 @@
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import type { CaptureStore, LocalCapture } from "@/lib/local-capture/types";
-import { fetchWithTimeout, MEDIA_TIMEOUT_MS } from "@/lib/net/timeout";
+import { MEDIA_TIMEOUT_MS } from "@/lib/net/timeout";
+import { trackedFetch } from "@/lib/sync/session-state";
 
 export type MediaTransport = {
   upload(input: {
@@ -34,7 +35,7 @@ function defaultMediaTransport(): MediaTransport {
       body.set("operationId", operationId);
       body.set("mimeType", mimeType);
       body.set("file", bytes, attachmentId);
-      const response = await fetchWithTimeout(
+      const response = await trackedFetch(
         "/api/sync/media",
         {
           method: "POST",
@@ -59,14 +60,14 @@ function defaultMediaTransport(): MediaTransport {
       };
     },
     async verify(attachmentId) {
-      const response = await fetchWithTimeout(`/api/media/${attachmentId}`, {
+      const response = await trackedFetch(`/api/media/${attachmentId}`, {
         method: "GET",
         headers: authHeaders(),
       });
       return response.ok;
     },
     async download(attachmentId) {
-      const response = await fetchWithTimeout(
+      const response = await trackedFetch(
         `/api/media/${attachmentId}`,
         {
           method: "GET",

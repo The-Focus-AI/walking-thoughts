@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "@/lib/net/timeout";
+import { trackedFetch } from "@/lib/sync/session-state";
 import type { ServerThread } from "./types";
 
 export type ThreadsTransport = {
@@ -22,7 +22,7 @@ function defaultTransport(): ThreadsTransport {
   return {
     async listThreads() {
       try {
-        const response = await fetchWithTimeout("/api/sync/threads", {
+        const response = await trackedFetch("/api/sync/threads", {
           headers: headers(),
         });
         if (
