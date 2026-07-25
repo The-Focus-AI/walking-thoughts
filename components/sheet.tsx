@@ -43,7 +43,9 @@ export function SheetMasthead({ title }: { title?: string }) {
   return (
     <header className="masthead">
       <p className="masthead-agency">{AGENCY_LINE}</p>
-      <p className="masthead-title">{title ?? "Trail Log"}</p>
+      {/* The sheet's own name is the page heading — there is no other h1
+          on the trail surface. */}
+      <h1 className="masthead-title">{title ?? "Trail Log"}</h1>
       {dayLine ? <p className="masthead-date">{dayLine}</p> : null}
     </header>
   );

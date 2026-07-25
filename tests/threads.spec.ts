@@ -1,18 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
-
-async function openCaptureShell(page: Page) {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Shell ready")).toBeVisible();
-  await expect(
-    page.getByText("Each Capture starts its own Thread").first(),
-  ).toBeVisible();
-}
+import {
+  captureCount,
+  commitCapture,
+  newestThreadId,
+  openCaptureShell,
+} from "./helpers/capture-shell";
 
 /** Fire a horizontal swipe gesture across the Thread detail pane. */
 async function swipeDetailPane(page: Page, dx: number) {
   await page.evaluate((delta) => {
-    const pane = document.querySelector(".threads-detail-pane");
+    const pane = document.querySelector(".desk-detail-pane");
     if (!pane) throw new Error("Thread detail pane is missing");
     const makeTouch = (x: number, y: number) =>
       new Touch({ identifier: 1, target: pane, clientX: x, clientY: y });
@@ -38,99 +35,107 @@ async function swipeDetailPane(page: Page, dx: number) {
 }
 
 test.describe("trail Threads", () => {
-  test("each Capture starts its own Thread and Today lists them", async ({
+  test("the trail surface counts the day instead of listing it", async ({
     page,
   }) => {
     await openCaptureShell(page);
-
-    await page.getByLabel("Capture text").fill("Same ridge, clearer view");
-    await page.getByRole("button", { name: "Capture" }).click();
-
-    const today = page.getByRole("region", { name: "Today" });
-    await expect(
-      today.getByRole("article", { name: /Same ridge, clearer view/ }),
-    ).toBeVisible();
-
-    // Composer sits in line under the Today stream.
-    const composer = today.getByLabel("New Capture");
-    await expect(composer).toBeVisible();
-    const streamBox = await today
-      .getByRole("article", { name: /Same ridge, clearer view/ })
-      .boundingBox();
-    const composerBox = await composer.boundingBox();
-    expect(streamBox && composerBox).toBeTruthy();
-    expect(composerBox!.y + composerBox!.height).toBeGreaterThan(
-      streamBox!.y + streamBox!.height,
+    await expect(page.getByTestId("capture-tally")).toHaveText(
+      "No Captures today",
     );
 
-    await page.getByLabel("Capture text").fill("Correction: marker leans right");
-    await page.getByRole("button", { name: "Capture" }).click();
+    await commitCapture(page, "Same ridge, clearer view");
 
+    // The day's state is a tally in the canonical status labels — the
+    // Captures themselves live on Days.
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "1 Capture today",
+    );
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      /Saved locally|Syncing|Enriching|Complete/,
+    );
     await expect(
-      today.getByRole("article", { name: /Correction: marker leans right/ }),
-    ).toBeVisible();
+      page.getByRole("article", { name: /Same ridge, clearer view/ }),
+    ).toHaveCount(0);
+
+    await commitCapture(page, "Correction: marker leans right");
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "2 Captures today",
+    );
 
     // ADR 0011: consecutive Captures land in separate Threads.
-    const firstLink = today
-      .getByRole("article", { name: /Same ridge, clearer view/ })
-      .getByRole("link", { name: /Thread/ });
-    const secondLink = today
-      .getByRole("article", { name: /Correction: marker leans right/ })
-      .getByRole("link", { name: /Thread/ });
-    const firstHref = await firstLink.getAttribute("href");
-    const secondHref = await secondLink.getAttribute("href");
-    expect(firstHref).toMatch(/^\/threads\//);
-    expect(secondHref).toMatch(/^\/threads\//);
-    expect(secondHref).not.toBe(firstHref);
+    const threadIds = await page.evaluate(async () => {
+      const store = (
+        globalThis as typeof globalThis & {
+          __WT_CAPTURE_STORE__?: {
+            list(): Promise<Array<{ threadId: string | null }>>;
+          };
+        }
+      ).__WT_CAPTURE_STORE__;
+      return (await store!.list()).map((capture) => capture.threadId);
+    });
+    expect(new Set(threadIds).size).toBe(2);
 
     await page.reload();
-    await expect(
-      page
-        .getByRole("region", { name: "Today" })
-        .getByRole("article", { name: /Correction: marker leans right/ }),
-    ).toBeVisible();
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "2 Captures today",
+    );
   });
 
-  test("Threads archive groups by day with one row per Thread", async ({
+  test("Days lists one row per walk, and the day opens its Threads", async ({
     page,
   }) => {
     await openCaptureShell(page);
-    await page.getByLabel("Capture text").fill("Overlook fungi");
-    await page.getByRole("button", { name: "Capture" }).click();
+    await commitCapture(page, "Overlook fungi");
+
+    await page.goto("/days");
     await expect(
-      page.getByRole("article", { name: /Overlook fungi/ }),
+      page.getByRole("heading", { name: "Days", exact: true }),
     ).toBeVisible();
 
-    await page.goto("/threads");
-    await expect(
-      page.getByRole("heading", { name: "Threads", exact: true }),
-    ).toBeVisible();
+    const dayRow = page.locator(".desk-day-open").first();
+    await expect(dayRow).toContainText("Today");
+    await expect(dayRow).toContainText("1 Thread");
+    await expect(dayRow).toContainText("1 waiting");
+
+    await dayRow.click();
+    await expect(page.getByTestId("daily-digest")).toBeVisible();
     await expect(
       page.getByRole("link", { name: /Overlook fungi/ }),
     ).toBeVisible();
     await expect(page.getByTestId("thread-sync-chip").first()).toBeVisible();
   });
 
-  test("Threads list paints from local data while Enrichment fetches stall", async ({
+  test("the day paints from local data while Enrichment fetches stall", async ({
     page,
   }) => {
     await openCaptureShell(page);
-    await page.getByLabel("Capture text").fill("Cached ridge line");
-    await page.getByRole("button", { name: "Capture" }).click();
-    await expect(
-      page.getByRole("article", { name: /Cached ridge line/ }),
-    ).toBeVisible();
+    await commitCapture(page, "Cached ridge line");
 
     // Airplane-mode shape: per-Thread Enrichment reads never answer. The
-    // list must still render from IndexedDB and the local Enrichment cache
+    // day must still render from IndexedDB and the local Enrichment cache
     // instead of flashing the zero-Thread state.
     await page.route("**/api/enrichment/threads/**", () => {});
 
-    await page.goto("/threads");
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
     await expect(
       page.getByRole("link", { name: /Cached ridge line/ }),
     ).toBeVisible();
-    await expect(page.getByText("No Threads yet")).toBeHidden();
+    await expect(page.getByText("No walks yet")).toBeHidden();
+  });
+
+  test("search reaches every Thread across days", async ({ page }) => {
+    await openCaptureShell(page);
+    await commitCapture(page, "Beaver dam below the culvert");
+
+    await page.goto("/days");
+    await page.getByLabel("Search all Threads").fill("beaver");
+    await expect(
+      page.getByRole("link", { name: /Beaver dam below the culvert/ }),
+    ).toBeVisible();
+
+    await page.getByLabel("Search all Threads").fill("nothing here");
+    await expect(page.getByText("No Threads match that search.")).toBeVisible();
   });
 
   test("long attachment filenames never widen Thread surfaces", async ({
@@ -187,7 +192,8 @@ test.describe("trail Threads", () => {
     await expect(page.getByLabel("Capture text")).toBeVisible();
     await expectNoSidewaysOverflow();
 
-    await page.goto("/threads");
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
     await expect(page.locator(".thread-row")).toHaveCount(1);
     await expectNoSidewaysOverflow();
 
@@ -200,165 +206,50 @@ test.describe("trail Threads", () => {
     page,
   }) => {
     await openCaptureShell(page);
-    for (const text of ["Swipe stop one", "Swipe stop two"]) {
-      await page.getByLabel("Capture text").fill(text);
-      await page.getByRole("button", { name: "Capture" }).click();
-      await expect(
-        page.getByRole("article", { name: new RegExp(text) }),
-      ).toBeVisible();
-    }
+    await commitCapture(page, "Older Thread on the col");
+    const olderId = await newestThreadId(page);
+    await commitCapture(page, "Newer Thread at the outlet");
+    expect(await captureCount(page)).toBe(2);
+    const newerId = await newestThreadId(page);
+    expect(newerId).not.toBe(olderId);
 
-    await page.goto("/threads");
-    await expect(page.locator(".thread-row")).toHaveCount(2);
-    const hrefs = await page
-      .locator(".thread-row-main")
-      .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
-    const [firstId, secondId] = hrefs.map((href) => href!.split("/").pop()!);
-    const rowTitles = await page.locator(".thread-row-title").allTextContents();
-
-    await page.goto(`/threads/${firstId}`);
-    await expect(page.getByTestId("thread-chat")).toBeVisible();
-    // The (hidden) day list must be loaded before swiping has an order.
-    await expect(page.locator(".thread-row")).toHaveCount(2);
-
-    // Swipe left → forward to the next Thread in the day list.
-    await swipeDetailPane(page, -160);
-    await expect(page).toHaveURL(new RegExp(secondId));
+    await page.goto(`/threads/${newerId}`);
     await expect(page.getByTestId("thread-capture-hero")).toContainText(
-      rowTitles[1],
+      "Newer Thread at the outlet",
     );
 
-    // Swipe right → back to the previous Thread.
-    await expect(page.locator(".thread-row")).toHaveCount(2);
+    // Swipe left → the next (older) Thread.
+    await swipeDetailPane(page, -160);
+    await expect(page).toHaveURL(new RegExp(`/threads/${olderId}`));
+    await expect(page.getByTestId("thread-capture-hero")).toContainText(
+      "Older Thread on the col",
+    );
+
+    // Swipe right → back to the newer one.
     await swipeDetailPane(page, 160);
-    await expect(page).toHaveURL(new RegExp(firstId));
-
-    // A mostly vertical drag is a scroll, never navigation.
-    await page.evaluate(() => {
-      const pane = document.querySelector(".threads-detail-pane")!;
-      const makeTouch = (x: number, y: number) =>
-        new Touch({ identifier: 1, target: pane, clientX: x, clientY: y });
-      pane.dispatchEvent(
-        new TouchEvent("touchstart", {
-          bubbles: true,
-          touches: [makeTouch(200, 200)],
-          changedTouches: [makeTouch(200, 200)],
-        }),
-      );
-      pane.dispatchEvent(
-        new TouchEvent("touchend", {
-          bubbles: true,
-          touches: [],
-          changedTouches: [makeTouch(120, 500)],
-        }),
-      );
-    });
-    await expect(page).toHaveURL(new RegExp(firstId));
+    await expect(page).toHaveURL(new RegExp(`/threads/${newerId}`));
   });
 
-  test("list state survives opening a Thread and coming back", async ({
+  test("/threads without an id sends the walker to Days", async ({ page }) => {
+    await page.goto("/threads");
+    await expect(page).toHaveURL(/\/days$/);
+    await expect(
+      page.getByRole("heading", { name: "Days", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("each day is its own row, and opening one shows only that day", async ({
     page,
   }) => {
     await openCaptureShell(page);
-    await page.getByLabel("Capture text").fill("State keeper today");
-    await page.getByRole("button", { name: "Capture" }).click();
-    await expect(
-      page.getByRole("article", { name: /State keeper today/ }),
-    ).toBeVisible();
-
-    // An older day so the strip has something non-default to remember.
-    await page.evaluate(async () => {
-      const store = (
-        globalThis as typeof globalThis & {
-          __WT_CAPTURE_STORE__?: {
-            applyRemoteThreads(threads: Array<object>): Promise<unknown>;
-          };
-        }
-      ).__WT_CAPTURE_STORE__;
-      const old = new Date();
-      old.setDate(old.getDate() - 4);
-      old.setHours(12, 0, 0, 0);
-      await store!.applyRemoteThreads([
-        {
-          id: "state-keeper-old",
-          title: "State keeper older",
-          revision: 1,
-          updatedAt: old.toISOString(),
-          captures: [
-            {
-              id: "state-keeper-old-capture",
-              text: "State keeper older",
-              createdAt: old.toISOString(),
-              location: null,
-              sequence: 1,
-              attachments: [],
-            },
-          ],
-        },
-      ]);
-    });
-
-    await page.goto("/threads");
-    const chips = page.locator(".threads-day-chip");
-    await expect(chips).toHaveCount(3);
-
-    // Pick the older day, then walk into its Thread and back out.
-    await chips.nth(1).click();
-    const olderRow = page.getByRole("link", { name: /State keeper older/ });
-    await expect(olderRow).toBeVisible();
-    await olderRow.click();
-    await expect(page).toHaveURL(/\/threads\/state-keeper-old/);
-    await page.getByRole("link", { name: "← Threads" }).click();
-    await expect(page).toHaveURL(/\/threads$/);
-
-    // The day pick held: still the older day, not reset to Today.
-    await expect(chips.nth(1)).toHaveAttribute("aria-selected", "true");
-    await expect(
-      page.getByRole("link", { name: /State keeper older/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /State keeper today/ }),
-    ).toBeHidden();
-  });
-
-  test("selecting a day opens the day chat pane", async ({ page }) => {
-    await openCaptureShell(page);
-    await page.getByLabel("Capture text").fill("Stone wall on the ridge");
-    await page.getByRole("button", { name: "Capture" }).click();
-    await expect(
-      page.getByRole("article", { name: /Stone wall on the ridge/ }),
-    ).toBeVisible();
-
-    await page.goto("/threads");
-    const dayButton = page
-      .getByRole("button", { name: /Chat about this day/i })
-      .first();
-    await expect(dayButton).toBeVisible();
-    await dayButton.click();
-    await expect(page).toHaveURL(/\/threads\?day=\d{4}-\d{2}-\d{2}/);
-    await expect(page.getByTestId("daily-digest")).toBeVisible();
-    await expect(page.getByText("Day chat")).toBeVisible();
-    await expect(page.getByTestId("digest-send")).toBeVisible();
-  });
-
-  test("day strip shows one day at a time; All days opens the archive", async ({
-    page,
-  }) => {
-    await openCaptureShell(page);
-    await page.getByLabel("Capture text").fill("Chip strip today capture");
-    await page.getByRole("button", { name: "Capture" }).click();
-    await expect(
-      page.getByRole("article", { name: /Chip strip today capture/ }),
-    ).toBeVisible();
+    await commitCapture(page, "Today's ridge notes");
 
     // Import an older day's Thread the way sync hydration would.
     await page.evaluate(async () => {
       const store = (
         globalThis as typeof globalThis & {
           __WT_CAPTURE_STORE__?: {
-            applyRemoteThreads(
-              threads: Array<object>,
-            ): Promise<unknown>;
+            applyRemoteThreads(threads: Array<object>): Promise<unknown>;
           };
         }
       ).__WT_CAPTURE_STORE__;
@@ -385,38 +276,27 @@ test.describe("trail Threads", () => {
       ]);
     });
 
-    await page.goto("/threads");
-    // Default: only the newest day's section renders.
-    await expect(
-      page.getByRole("link", { name: /Chip strip today capture/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /Older ridge notes/ }),
-    ).toBeHidden();
+    await page.goto("/days");
+    await expect(page.locator(".desk-day")).toHaveCount(2);
 
-    // The older day is one chip away.
-    await expect(page.getByTestId("day-chip-all")).toBeVisible();
-    const chips = page.locator(".threads-day-chip");
-    await expect(chips).toHaveCount(3); // today, older day, All days
-    await chips.nth(1).click();
+    // Opening the older day shows its Thread and nothing from today.
+    await page.locator(".desk-day-open").nth(1).click();
     await expect(
       page.getByRole("link", { name: /Older ridge notes/ }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Chip strip today capture/ }),
-    ).toBeHidden();
+      page.getByRole("link", { name: /Today's ridge notes/ }),
+    ).toHaveCount(0);
 
-    // All days shows the whole archive again.
-    await page.getByTestId("day-chip-all").click();
-    await expect(
-      page.getByRole("link", { name: /Chip strip today capture/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /Older ridge notes/ }),
-    ).toBeVisible();
+    // Leaving the Thread lands back on Days with both walks still listed.
+    await page.getByRole("link", { name: /Older ridge notes/ }).click();
+    await expect(page).toHaveURL(/\/threads\/older-day-thread/);
+    await page.getByRole("link", { name: "← Days" }).click();
+    await expect(page).toHaveURL(/\/days$/);
+    await expect(page.locator(".desk-day")).toHaveCount(2);
   });
 
-  test("the kind strip filters the queue and each row names its kind", async ({
+  test("each Thread row names the kind the Enrichment read it as", async ({
     page,
   }) => {
     await openCaptureShell(page);
@@ -427,11 +307,7 @@ test.describe("trail Threads", () => {
       "We should build a token pool backend",
       "Why is it dark at night when there are so many stars",
     ]) {
-      await page.getByLabel("Capture text").fill(text);
-      await page.getByRole("button", { name: "Capture" }).click();
-      await expect(
-        page.getByRole("article", { name: new RegExp(text.slice(0, 20)) }),
-      ).toBeVisible();
+      await commitCapture(page, text);
     }
 
     // Enrichment classified them server-side; hydration brings the verdicts back.
@@ -480,39 +356,20 @@ test.describe("trail Threads", () => {
       await store!.applyRemoteThreads(remote);
     });
 
-    await page.goto("/threads");
-    await page.getByTestId("day-chip-all").click();
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
 
     // Every Thread carries its kind in the row, in the machine's voice.
     await expect(page.getByTestId("thread-kind-task")).toBeVisible();
     await expect(page.getByTestId("thread-kind-idea")).toBeVisible();
     await expect(page.getByTestId("thread-kind-question")).toBeVisible();
-
-    // To do comes first at the desk, and counts what it filters.
-    const chips = page.locator(".threads-kind-chip");
-    await expect(chips.nth(1)).toContainText("To do");
-    await expect(chips.nth(1)).toContainText("1");
-
-    await page.getByTestId("kind-chip-task").click();
-    await expect(page.getByRole("link", { name: /Call the doctor/ })).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /We should build a token pool/ }),
-    ).toHaveCount(0);
-
-    // Tapping the active kind clears it; every Thread returns.
-    await page.getByTestId("kind-chip-task").click();
-    await expect(
-      page.getByRole("link", { name: /We should build a token pool/ }),
-    ).toBeVisible();
   });
 
   test("a Thread the model could not place asks for a word instead of guessing", async ({
     page,
   }) => {
     await openCaptureShell(page);
-    await page.getByLabel("Capture text").fill("Goldin scope");
-    await page.getByRole("button", { name: "Capture" }).click();
-    await expect(page.getByRole("article", { name: /Goldin scope/ })).toBeVisible();
+    await commitCapture(page, "Goldin scope");
 
     // The Enrichment met a name it could not place and asked rather than
     // researching a public subject that merely sounds similar.
@@ -558,11 +415,19 @@ test.describe("trail Threads", () => {
       ]);
     });
 
-    await page.goto("/threads");
-    await expect(page.getByTestId("thread-ask-chip")).toBeVisible();
-    await expect(page.getByTestId("kind-chip-ask")).toContainText("1");
+    await page.goto("/days");
+    // The day itself says a word is wanted, before anything is opened.
+    await expect(page.locator(".desk-day-open").first()).toContainText(
+      "1 needs a word",
+    );
 
-    await page.getByRole("link", { name: /Goldin scope/ }).click();
+    await page.locator(".desk-day-open").first().click();
+    await expect(page.getByTestId("thread-ask-chip")).toBeVisible();
+    await expect(page.getByTestId("day-sheet-asks")).toContainText(
+      "1 Thread needs a word from you",
+    );
+
+    await page.locator(".thread-row-main").first().click();
     const ask = page.getByTestId("thread-ask");
     await expect(ask).toContainText("Who is Goldin");
 

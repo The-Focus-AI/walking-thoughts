@@ -1,18 +1,20 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { newestThreadId, openCaptureShell } from "./helpers/capture-shell";
 
-async function openShell(page: Page) {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await expect(page.getByText("Shell ready")).toBeVisible();
-}
-
-test("remove-from-device appears only after verified sync and keeps Thread context offline", async ({
+/**
+ * Freeing the phone of an original is a desk decision, so the control lives
+ * on the Thread — never on the trail surface, which is Capture only. It may
+ * only be offered once the private server copy verifies, and the Thread has
+ * to stay readable after the bytes leave the phone.
+ */
+test("remove-from-device appears only after verified sync and keeps the Thread readable", async ({
   page,
 }) => {
-  await openShell(page);
-
-  await page.evaluate(() => {
-    const blobs = new Map<string, Uint8Array>();
+  // Stand-in server: bytes live in localStorage so the "uploaded" copy
+  // survives the walk from the trail surface to the Thread, and uploads
+  // fail while `wt-test-out-of-range` is set.
+  await page.addInitScript(() => {
+    const key = (attachmentId: string) => `wt-test-media:${attachmentId}`;
     (
       globalThis as typeof globalThis & {
         __WT_MEDIA_TRANSPORT__?: {
@@ -27,21 +29,29 @@ test("remove-from-device appears only after verified sync and keeps Thread conte
       }
     ).__WT_MEDIA_TRANSPORT__ = {
       async upload({ attachmentId, bytes }) {
-        blobs.set(attachmentId, new Uint8Array(await bytes.arrayBuffer()));
+        if (localStorage.getItem("wt-test-out-of-range")) {
+          throw new Error("out of range");
+        }
+        const raw = new Uint8Array(await bytes.arrayBuffer());
+        localStorage.setItem(key(attachmentId), JSON.stringify([...raw]));
         return { attachmentId, duplicate: false };
       },
       async verify(attachmentId) {
-        return blobs.has(attachmentId);
+        return localStorage.getItem(key(attachmentId)) !== null;
       },
       async download(attachmentId) {
-        const bytes = blobs.get(attachmentId);
-        if (!bytes) throw new Error("missing");
-        return new Blob([Uint8Array.from(bytes)], { type: "image/jpeg" });
+        const raw = localStorage.getItem(key(attachmentId));
+        if (!raw) throw new Error("missing");
+        return new Blob([Uint8Array.from(JSON.parse(raw) as number[])], {
+          type: "image/jpeg",
+        });
       },
     };
+    localStorage.setItem("wt-test-out-of-range", "1");
   });
 
-  await page.context().setOffline(true);
+  await openCaptureShell(page);
+
   await page.getByLabel("Choose photo or video from device").setInputFiles({
     name: "ridge.jpg",
     mimeType: "image/jpeg",
@@ -50,33 +60,46 @@ test("remove-from-device appears only after verified sync and keeps Thread conte
   await page.getByLabel("Capture text").fill("Ridge wind after rain");
   await page.getByRole("button", { name: "Capture" }).click();
 
-  const article = page.getByRole("article", { name: /Ridge wind after rain/ });
-  await expect(article).toBeVisible();
-  await expect(article.getByText("On device")).toBeVisible();
-  await expect(article.getByText("Saved locally").first()).toBeVisible();
+  const threadId = await newestThreadId(page);
+  await page.goto(`/threads/${threadId}`);
+  const hero = page.getByTestId("thread-capture-hero");
+  await expect(hero).toBeVisible();
+
+  // Nothing reached the server, so the original is the only copy and the
+  // desk must not offer to delete it.
+  await expect(hero.getByText("On device")).toBeVisible();
   await expect(
-    article.getByRole("button", { name: "Remove from device" }),
+    hero.getByRole("button", { name: "Remove from device" }),
   ).toHaveCount(0);
 
-  await page.context().setOffline(false);
+  // Back in range: the media uploads and the offer appears. Each poll nudges
+  // another sync cycle rather than waiting on the 12s shell drain.
+  await page.evaluate(() => localStorage.removeItem("wt-test-out-of-range"));
   await expect
-    .poll(async () =>
-      article.getByRole("button", { name: "Remove from device" }).count(),
+    .poll(
+      async () => {
+        await page.evaluate(() =>
+          window.dispatchEvent(new Event("online")),
+        );
+        return hero.getByRole("button", { name: "Remove from device" }).count();
+      },
+      { timeout: 30_000 },
     )
     .toBe(1);
 
-  await article.getByRole("button", { name: "Remove from device" }).click();
-  await expect(article.getByText("Online only")).toBeVisible();
-  await expect(article.getByText("ridge.jpg")).toBeVisible();
+  await hero.getByRole("button", { name: "Remove from device" }).click();
+  await expect(hero.getByText("Online only")).toBeVisible();
+
+  // The Thread still says what it was about, and which file it holds.
+  await expect(hero.getByText("ridge.jpg")).toBeVisible();
   await expect(
-    article.getByText("Ridge wind after rain", { exact: true }),
+    hero.getByText("Ridge wind after rain", { exact: true }),
   ).toBeVisible();
 
-  await page.context().setOffline(true);
   await page.reload();
-  await expect(
-    page.getByRole("article", { name: /Ridge wind after rain/ }),
-  ).toBeVisible();
+  await expect(page.getByTestId("thread-capture-hero")).toContainText(
+    "Ridge wind after rain",
+  );
   await expect(page.getByText("Online only")).toBeVisible();
-  await expect(page.getByText("ridge.jpg")).toBeVisible();
+  await expect(page.getByText("ridge.jpg").first()).toBeVisible();
 });

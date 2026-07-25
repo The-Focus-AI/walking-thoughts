@@ -151,11 +151,13 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
   await context.setOffline(true);
   await page.getByLabel("Capture text").fill("Airplane-mode observation");
   await page.getByRole("button", { name: "Capture" }).click();
-  await expect(page.getByText("Saved locally").first()).toBeVisible();
+  await expect(page.getByTestId("capture-tally")).toContainText(
+    "1 Saved locally",
+  );
 
+  // Coming back into range is the trigger; no button to press.
   await context.setOffline(false);
-  await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(page.getByText("Complete").first()).toBeVisible();
+  await expect(page.getByTestId("capture-tally")).toContainText("1 Complete");
 
   const pushCount = await page.evaluate(() => {
     return (
@@ -204,8 +206,8 @@ test("browser seam syncs after reconnect and keeps Complete through restart", as
       },
     };
   });
-  await expect(
-    page.getByRole("article", { name: /Airplane-mode observation/ }),
-  ).toBeVisible();
-  await expect(page.getByText("Complete").first()).toBeVisible();
+  await expect(page.getByTestId("capture-tally")).toContainText(
+    "1 Capture today",
+  );
+  await expect(page.getByTestId("capture-tally")).toContainText("1 Complete");
 });

@@ -1,15 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { commitCapture, openCaptureShell } from "./helpers/capture-shell";
 
 /**
  * Public seams:
- * - A persistent bottom tab bar (Capture / Threads / Map / You) is the shared
+ * - A persistent bottom tab bar (Capture / Days / Map / You) is the shared
  *   navigation on every product surface.
- * - Threads carries the glanceable sync pill.
+ * - Days carries the glanceable sync pill.
  * - You reaches the Interview / Memory desk surface.
  */
 
 test.describe("streamlined navigation", () => {
-  test("bottom tab bar reaches Capture, Threads, Map, and You from the shell", async ({
+  test("bottom tab bar reaches Capture, Days, Map, and You from the shell", async ({
     page,
   }) => {
     await page.goto("/offline");
@@ -17,10 +18,10 @@ test.describe("streamlined navigation", () => {
     await expect(tabbar).toBeVisible();
     await expect(tabbar.getByRole("link", { name: "Capture" })).toBeVisible();
 
-    await tabbar.getByRole("link", { name: "Threads" }).click();
-    await expect(page).toHaveURL(/\/threads$/);
+    await tabbar.getByRole("link", { name: "Days" }).click();
+    await expect(page).toHaveURL(/\/days$/);
     await expect(
-      page.getByRole("heading", { name: "Threads", exact: true }),
+      page.getByRole("heading", { name: "Days", exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId("sync-pill")).toBeVisible();
     await expect(
@@ -53,15 +54,11 @@ test.describe("streamlined navigation", () => {
   test("Thread view keeps the tab bar so it is never a dead end", async ({
     page,
   }) => {
-    await page.goto("/offline");
-    await expect(page.getByLabel("Capture text")).toBeVisible();
-    await page.getByLabel("Capture text").fill("Juniper by the switchback");
-    await page.getByRole("button", { name: "Capture" }).click();
-    await expect(
-      page.getByRole("article", { name: /Juniper by the switchback/ }),
-    ).toBeVisible();
+    await openCaptureShell(page);
+    await commitCapture(page, "Juniper by the switchback");
 
-    await page.goto("/threads");
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
     await page
       .getByRole("link", { name: /Juniper by the switchback/ })
       .first()
@@ -70,7 +67,7 @@ test.describe("streamlined navigation", () => {
 
     const tabbar = page.getByRole("navigation", { name: "Primary" });
     await expect(tabbar).toBeVisible();
-    await tabbar.getByRole("link", { name: "Threads" }).click();
-    await expect(page).toHaveURL(/\/threads$/);
+    await tabbar.getByRole("link", { name: "Days" }).click();
+    await expect(page).toHaveURL(/\/days$/);
   });
 });

@@ -1,25 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { commitCapture, newestThreadId } from "./helpers/capture-shell";
 
 async function seedCapture(page: Page, text: string): Promise<string> {
-  await page.getByLabel("Capture text").fill(text);
-  await page.getByRole("button", { name: "Capture" }).click();
-  await expect(
-    page.getByRole("article", { name: new RegExp(text) }),
-  ).toBeVisible();
-  return page.evaluate(async () => {
-    const store = (
-      globalThis as typeof globalThis & {
-        __WT_CAPTURE_STORE__?: {
-          listRecentThreads(): Promise<Array<{ id: string }>>;
-        };
-      }
-    ).__WT_CAPTURE_STORE__;
-    const threads = await store!.listRecentThreads();
-    return threads[0]!.id;
-  });
+  await commitCapture(page, text);
+  return newestThreadId(page);
 }
 
-test("desktop Threads is a split view: day list left, Thread review right", async ({
+test("desktop Days is a split view: day list left, the day or Thread right", async ({
   page,
 }) => {
   await page.goto("/offline");
@@ -32,14 +19,23 @@ test("desktop Threads is a split view: day list left, Thread review right", asyn
 
   // Both panes at once: the day list and the selected Thread's review.
   await expect(
-    page.getByRole("heading", { name: "Threads", exact: true }),
+    page.getByRole("heading", { name: "Days", exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId("thread-chat")).toBeVisible();
   await expect(page.getByTestId("thread-capture-hero")).toContainText(
     "Stone wall into the reservoir",
   );
 
-  // Selecting another row swaps the detail pane without losing the list.
+  // The day the Thread belongs to is one row away, and opening it swaps the
+  // detail pane without losing the list.
+  await page.locator(".desk-day-open").first().click();
+  await expect(page).toHaveURL(/\/days\/\d{4}-\d{2}-\d{2}/);
+  await expect(page.getByTestId("daily-digest")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Days", exact: true }),
+  ).toBeVisible();
+
+  // Selecting a Thread from the day swaps it back.
   await page
     .getByRole("link", { name: /Fern colony on the north side/ })
     .first()
@@ -48,12 +44,9 @@ test("desktop Threads is a split view: day list left, Thread review right", asyn
   await expect(page.getByTestId("thread-capture-hero")).toContainText(
     "Fern colony on the north side",
   );
-  await expect(
-    page.getByRole("heading", { name: "Threads", exact: true }),
-  ).toBeVisible();
 });
 
-test("marking reviewed advances the queue; All and search still reach it", async ({
+test("filing a Thread advances to the next unfiled one from the same day", async ({
   page,
 }) => {
   await page.goto("/offline");
@@ -62,56 +55,42 @@ test("marking reviewed advances the queue; All and search still reach it", async
   const newerId = await seedCapture(page, "Stone wall into the reservoir");
   expect(newerId).not.toBe(olderId);
 
-  // Fake the server review endpoint: echo the decision.
-  await page.evaluate(() => {
-    (globalThis as Record<string, unknown>).__WT_REVIEW_TRANSPORT__ = {
-      async setReviewed(threadId: string, reviewed: boolean) {
-        return {
-          threadId,
-          reviewedAt: reviewed ? new Date().toISOString() : null,
-        };
-      },
-    };
-  });
+  // Fake the server review endpoint: echo the decision. Globals do not
+  // survive a page load, so it is re-injected after each navigation.
+  const installReviewTransport = () =>
+    page.evaluate(() => {
+      (globalThis as Record<string, unknown>).__WT_REVIEW_TRANSPORT__ = {
+        async setReviewed(threadId: string, reviewed: boolean) {
+          return {
+            threadId,
+            reviewedAt: reviewed ? new Date().toISOString() : null,
+          };
+        },
+      };
+    });
 
   await page.goto(`/threads/${newerId}`);
   await expect(page.getByTestId("thread-capture-hero")).toContainText(
     "Stone wall into the reservoir",
   );
 
-  // Re-inject after navigation (globals do not survive page loads).
-  await page.evaluate(() => {
-    (globalThis as Record<string, unknown>).__WT_REVIEW_TRANSPORT__ = {
-      async setReviewed(threadId: string, reviewed: boolean) {
-        return {
-          threadId,
-          reviewedAt: reviewed ? new Date().toISOString() : null,
-        };
-      },
-    };
-  });
+  await installReviewTransport();
   await page.getByTestId("thread-reviewed-toggle").click();
 
-  // Inbox-zero: selection advances to the next new Thread.
+  // Inbox-zero for the day: selection advances to the next unfiled Thread.
   await expect(page).toHaveURL(new RegExp(`/threads/${olderId}`));
   await expect(page.getByTestId("thread-capture-hero")).toContainText(
     "Fern colony on the north side",
   );
 
-  // The reviewed Thread has left the New queue…
-  await expect(
-    page.getByRole("link", { name: /Stone wall into the reservoir/ }),
-  ).toHaveCount(0);
-
-  // …but All still shows it, marked Reviewed.
-  await page.getByRole("tab", { name: "All", exact: true }).click();
+  // The day still holds the filed Thread, marked Reviewed and settled.
+  await page.locator(".desk-day-open").first().click();
   await expect(
     page.getByRole("link", { name: /Stone wall into the reservoir/ }).first(),
   ).toBeVisible();
   await expect(page.getByTestId("thread-reviewed-chip")).toBeVisible();
 
-  // Search reaches reviewed Threads regardless of the queue chip.
-  await page.getByRole("tab", { name: "New" }).click();
+  // Search reaches it from anywhere.
   await page.getByLabel("Search all Threads").fill("stone wall");
   await expect(
     page.getByRole("link", { name: /Stone wall into the reservoir/ }).first(),

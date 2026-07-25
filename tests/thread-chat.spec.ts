@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { commitCapture, newestThreadId } from "./helpers/capture-shell";
 
 /**
  * Public seams:
@@ -10,21 +11,8 @@ import { expect, test, type Page } from "@playwright/test";
 async function seedThread(page: Page, text: string): Promise<string> {
   await page.goto("/offline");
   await expect(page.getByLabel("Capture text")).toBeVisible();
-  await page.getByLabel("Capture text").fill(text);
-  await page.getByRole("button", { name: "Capture" }).click();
-  await expect(page.getByRole("article", { name: new RegExp(text) })).toBeVisible();
-
-  return page.evaluate(async () => {
-    const store = (
-      globalThis as typeof globalThis & {
-        __WT_CAPTURE_STORE__?: {
-          listRecentThreads(): Promise<Array<{ id: string }>>;
-        };
-      }
-    ).__WT_CAPTURE_STORE__;
-    const threads = await store!.listRecentThreads();
-    return threads[0]!.id;
-  });
+  await commitCapture(page, text);
+  return newestThreadId(page);
 }
 
 test.describe("Thread chat", () => {
@@ -183,7 +171,8 @@ test.describe("Thread chat", () => {
     page,
   }) => {
     const threadId = await seedThread(page, "Overlook fungi");
-    await page.goto("/threads");
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
     await page.getByRole("link", { name: /Overlook fungi/ }).first().click();
     await expect(page).toHaveURL(new RegExp(`/threads/${threadId}`));
     await expect(page.getByTestId("thread-chat")).toBeVisible();
@@ -191,7 +180,7 @@ test.describe("Thread chat", () => {
 });
 
 test.describe("Thread trash", () => {
-  test("Trash hides the Thread and returns to the walk view", async ({
+  test("Trash hides the Thread and returns to Days", async ({
     page,
   }) => {
     const threadId = await seedThread(page, "Blurry test photo");
@@ -203,7 +192,7 @@ test.describe("Thread trash", () => {
     page.on("dialog", (dialog) => void dialog.accept());
     await page.getByTestId("thread-trash").click();
 
-    await expect(page).toHaveURL(/\/threads$/);
+    await expect(page).toHaveURL(/\/days$/);
     await expect(
       page.getByRole("link", { name: /Blurry test photo/ }),
     ).toHaveCount(0);

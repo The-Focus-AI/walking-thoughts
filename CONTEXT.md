@@ -16,6 +16,10 @@ _Avoid_: Chat, conversation, folder, inbox
 An AI-generated Thread entry based on that Thread's complete history at a recorded point, retaining which gateway model produced it. Examples include identification, explanation, transcription lookup, or research.
 _Avoid_: Sync, processing, response
 
+**Day**:
+One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The unit of work at the desk — Threads are reached through the day they were walked, not through a flat list.
+_Avoid_: Session, entry, log, feed
+
 **Project**:
 A named bucket the walker files Threads into — an effort, a client, a build. A Thread belongs to at most one. The Enrichment may guess a Project, but only from the list the walker has already made, and its guess is never final: filing at the desk settles it.
 _Avoid_: Folder, tag, category, workspace

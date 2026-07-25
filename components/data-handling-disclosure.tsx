@@ -1,6 +1,7 @@
 import {
   DATA_HANDLING_BODY,
   DATA_HANDLING_TITLE,
+  FOREGROUND_SYNC_IDLE,
   OFFLINE_CAPTURE_PROMISE,
 } from "@/lib/disclosures/copy";
 
@@ -14,6 +15,7 @@ export function DataHandlingDisclosure() {
       <h2>{DATA_HANDLING_TITLE}</h2>
       <p>{DATA_HANDLING_BODY}</p>
       <p>{OFFLINE_CAPTURE_PROMISE}</p>
+      <p>{FOREGROUND_SYNC_IDLE}</p>
     </aside>
   );
 }

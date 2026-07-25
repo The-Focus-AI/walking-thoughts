@@ -4,22 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { ScaleBar } from "@/components/sheet";
-import { statusLabel } from "@/components/thread-entries";
-import { FOREGROUND_SYNC_IDLE } from "@/lib/disclosures/copy";
+import {
+  deskWaitingLabel,
+  summarizeDesk,
+  todayTally,
+} from "@/lib/desk/summary";
 import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
-import { calendarDayKey } from "@/lib/local-capture/calendar-day";
 import {
   prefetchLocation,
   readAvailableLocation,
 } from "@/lib/local-capture/location";
-import {
-  canOfferLocalRemoval,
-  mediaAvailability,
-  mediaAvailabilityLabel,
-  removeLocalOriginal,
-  restoreLocalOriginal,
-} from "@/lib/local-capture/local-media-retention";
-import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import {
   persistenceLabel,
   requestPersistentStorage,
@@ -32,7 +26,6 @@ import {
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
   AttachmentInput,
-  LocalAttachment,
   LocalCapture,
   LocalThread,
   PersistenceResult,
@@ -47,12 +40,7 @@ import {
   runSyncCycle,
   type SyncCycleResult,
 } from "@/lib/sync/cycle";
-import { getMediaTransport } from "@/lib/sync/media-client";
-import {
-  pendingSyncCount,
-  syncFooterSummary,
-  syncRollup,
-} from "@/lib/sync/rollup";
+import { syncRollup } from "@/lib/sync/rollup";
 
 function formatRecordingClock(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -62,16 +50,16 @@ function formatRecordingClock(ms: number): string {
 }
 
 /**
- * Capture-first home surface. Every Capture starts its own Thread
- * (ADR 0011) — no destination picking, no Inbox. The composer sits in
- * line under the Today stream; each Capture links through to its Thread.
+ * The trail surface has one job: get the thought out of the walker's head and
+ * onto this phone. Composer, the map behind it, and a scale-bar footer that
+ * says what today holds and whether anything is waiting at the desk — never
+ * the Threads themselves. Those live on Days, where there is room to read
+ * them (ADR 0011 still holds: each Capture starts its own Thread).
  */
 export function CaptureComposer() {
   const [draft, setDraft] = useState("");
-  const [allCaptures, setAllCaptures] = useState<LocalCapture[]>([]);
-  const [threadsById, setThreadsById] = useState<Map<string, LocalThread>>(
-    new Map(),
-  );
+  const [captures, setCaptures] = useState<LocalCapture[]>([]);
+  const [threads, setThreads] = useState<LocalThread[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [persistence, setPersistence] = useState<PersistenceResult | null>(null);
   const [ready, setReady] = useState(false);
@@ -104,8 +92,8 @@ export function CaptureComposer() {
       store.list(),
       store.listRecentThreads(),
     ]);
-    setAllCaptures(listed);
-    setThreadsById(new Map(recent.map((thread) => [thread.id, thread])));
+    setCaptures(listed);
+    setThreads(recent);
   }
 
   async function runForegroundSync() {
@@ -145,59 +133,6 @@ export function CaptureComposer() {
       setPushOptIn(result);
     } finally {
       setPushBusy(false);
-    }
-  }
-
-  async function onRemoveLocalMedia(
-    captureId: string,
-    attachmentId: string,
-  ) {
-    const transport = getMediaTransport();
-    if (!transport.verify || !transport.download) {
-      setError("Media verification is unavailable");
-      return;
-    }
-    try {
-      await removeLocalOriginal({
-        store: getCaptureStore(),
-        mediaStore: createIdbMediaStore(),
-        captureId,
-        attachmentId,
-        remote: {
-          verify: (id) => transport.verify!(id),
-          download: (id) => transport.download!(id),
-        },
-      });
-      await refreshLists();
-    } catch {
-      setError("Could not remove local media until the server copy is verified");
-    }
-  }
-
-  async function onRestoreLocalMedia(
-    captureId: string,
-    attachmentId: string,
-  ) {
-    const transport = getMediaTransport();
-    if (!transport.download) {
-      setError("Media download is unavailable");
-      return;
-    }
-    try {
-      await restoreLocalOriginal({
-        store: getCaptureStore(),
-        mediaStore: createIdbMediaStore(),
-        captureId,
-        attachmentId,
-        remote: {
-          verify: async (id) =>
-            transport.verify ? transport.verify(id) : true,
-          download: (id) => transport.download!(id),
-        },
-      });
-      await refreshLists();
-    } catch {
-      setError("Could not restore media from the private server copy");
     }
   }
 
@@ -255,7 +190,7 @@ export function CaptureComposer() {
   // Keep Enrichment moving while any Capture is enriching and the shell is open.
   useEffect(() => {
     if (!ready || !online) return;
-    const hasEnriching = allCaptures.some(
+    const hasEnriching = captures.some(
       (capture) => capture.status === "enriching",
     );
     if (!hasEnriching) return;
@@ -264,7 +199,7 @@ export function CaptureComposer() {
     }, 2500);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drain via runForegroundSync
-  }, [ready, online, allCaptures]);
+  }, [ready, online, captures]);
 
   useEffect(() => {
     if (!ready || isPending) return;
@@ -396,13 +331,9 @@ export function CaptureComposer() {
   }
 
   const gps = readAvailableLocation();
-  const todayKey = calendarDayKey(new Date());
-  const todaysCaptures = allCaptures.filter(
-    (capture) => calendarDayKey(new Date(capture.createdAt)) === todayKey,
-  );
-
-  const rollup = syncRollup(allCaptures.map((capture) => capture.status));
-  const footerSummary = syncFooterSummary(rollup, { running: isSyncing });
+  const rollup = syncRollup(captures.map((capture) => capture.status));
+  const desk = summarizeDesk({ threads, captures });
+  const waiting = deskWaitingLabel(desk);
 
   const canCapture =
     ready &&
@@ -410,154 +341,8 @@ export function CaptureComposer() {
     !recordingKind &&
     (draft.trim().length > 0 || pendingAttachments.length > 0);
 
-  const composer = (
-    <div className="capture-card outdoor-card" aria-label="New Capture">
-      {recordingKind ? (
-        <div
-          className="recording-banner"
-          role="status"
-          data-testid="recording-banner"
-        >
-          <span>
-            Recording {recordingKind} · {formatRecordingClock(recordingMs)}
-          </span>
-          <button
-            type="button"
-            className="recording-stop"
-            onClick={() => recordAbortRef.current?.abort()}
-          >
-            Stop recording
-          </button>
-        </div>
-      ) : null}
-      <div className="capture-composer">
-        <label className="capture-field-label" htmlFor="capture-text">
-          Capture text
-        </label>
-        <textarea
-          id="capture-text"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="What did you notice?"
-          rows={2}
-          disabled={!ready || isPending || Boolean(recordingKind)}
-        />
-        <AttachmentDrafts
-          attachments={pendingAttachments}
-          onRemove={(index) =>
-            setPendingAttachments((current) =>
-              current.filter((_, itemIndex) => itemIndex !== index),
-            )
-          }
-        />
-        <div className="capture-actions" role="toolbar" aria-label="Capture actions">
-          <button
-            type="button"
-            className="capture-icon-btn"
-            aria-label="Record audio"
-            aria-pressed={recordingKind === "audio"}
-            title="Record audio (max 10 min)"
-            disabled={!ready || isPending || recordingKind === "video"}
-            onClick={() => toggleRecording("audio")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="9" y="3" width="6" height="11" rx="3" />
-              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="capture-icon-btn"
-            aria-label="Record video"
-            aria-pressed={recordingKind === "video"}
-            title="Record video (max 2 min)"
-            disabled={!ready || isPending || recordingKind === "audio"}
-            onClick={() => toggleRecording("video")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="6" width="12" height="12" rx="2" />
-              <path d="m15 10 6-3v10l-6-3" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="capture-icon-btn"
-            aria-label="Take photo"
-            title="Take photo"
-            disabled={!ready || isPending || Boolean(recordingKind)}
-            onClick={() => cameraInputRef.current?.click()}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 8h3l2-3h6l2 3h3v11H4V8Z" />
-              <circle cx="12" cy="13" r="3.4" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="capture-icon-btn"
-            aria-label="Add photo or video"
-            title="Add photo or video from this phone"
-            disabled={!ready || isPending || Boolean(recordingKind)}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m20.5 12.5-7.8 7.8a5 5 0 0 1-7-7l8.4-8.5a3.4 3.4 0 0 1 4.9 4.9l-8.5 8.4a1.8 1.8 0 0 1-2.5-2.5l7.8-7.8" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="capture-commit"
-            onClick={commit}
-            disabled={!canCapture}
-          >
-            {isPending ? "Saving…" : "Capture"}
-          </button>
-        </div>
-        <input
-          ref={cameraInputRef}
-          className="capture-file-input"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          aria-label="Camera photo input"
-          onChange={(event) => {
-            void onFilesSelected(event.target.files);
-            event.target.value = "";
-            setSaveConfirmation("Photo ready — review, then Capture");
-          }}
-        />
-        <input
-          ref={fileInputRef}
-          className="capture-file-input"
-          type="file"
-          accept="image/*,audio/*,video/*"
-          multiple
-          aria-label="Choose photo or video from device"
-          onChange={(event) => {
-            void onFilesSelected(event.target.files);
-            event.target.value = "";
-            setSaveConfirmation("Media ready — review, then Capture");
-          }}
-        />
-      </div>
-      <p className="capture-context" role="status">
-        <span>Each Capture starts its own Thread</span>
-        <span aria-hidden="true">·</span>
-        <span>GPS {gps ? "on" : "off"}</span>
-        <span aria-hidden="true">·</span>
-        <span>{online ? "Network online" : "Network offline"}</span>
-        {saveConfirmation ? (
-          <>
-            <span aria-hidden="true">·</span>
-            <span>{saveConfirmation}</span>
-          </>
-        ) : null}
-      </p>
-    </div>
-  );
-
   return (
-    <div className="capture-workspace trail-aca">
+    <section className="capture-workspace trail-thread" aria-label="Capture">
       {pushOptIn.status === "offer" ? (
         <div className="capture-push-opt-in" role="status">
           <p>
@@ -574,17 +359,6 @@ export function CaptureComposer() {
           </button>
         </div>
       ) : null}
-      {pushOptIn.status === "denied" ? (
-        <p className="capture-persistence" role="status">
-          Notifications are off for this browser. Capture, sync, and Enrichment
-          still work.
-        </p>
-      ) : null}
-      {pushOptIn.status === "unavailable" ? (
-        <p className="capture-persistence" role="status">
-          {pushOptIn.reason}. Capture, sync, and Enrichment still work.
-        </p>
-      ) : null}
 
       {error ? (
         <p className="capture-error" role="alert">
@@ -592,203 +366,189 @@ export function CaptureComposer() {
         </p>
       ) : null}
 
-      {persistence ? (
-        <p className="capture-persistence" role="status">
-          {persistenceLabel(persistence)}
-        </p>
-      ) : null}
-
-      <section className="capture-section trail-thread" aria-label="Today">
-        <div className="capture-section-header">
-          <h1 className="capture-section-title">Today</h1>
-        </div>
-
-        {todaysCaptures.length > 0 ? (
-          <ul className="capture-list trail-timeline trail-gutter-list">
-            {todaysCaptures.map((capture) => (
-              <li key={capture.id}>
-                <CaptureEntry
-                  capture={capture}
-                  threadTitle={
-                    capture.threadId
-                      ? threadsById.get(capture.threadId)?.title ?? null
-                      : null
-                  }
-                  gutter
-                  onRetry={() => void runForegroundSync()}
-                  onRemoveLocalMedia={onRemoveLocalMedia}
-                  onRestoreLocalMedia={onRestoreLocalMedia}
-                />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="trail-thread-empty">
-            Nothing on today&apos;s walk yet. Each Capture starts its own
-            Thread; research lands there after sync.
-          </p>
-        )}
-
-        {composer}
-
-        <footer
-          className="trail-sync-footer"
-          role="status"
-          data-testid="trail-sync-footer"
-        >
-          <ScaleBar />
-          <div className="trail-sync-footer-lines">
-            <strong className="trail-sync-promise">
-              Committed locally first · Synced when in range
-            </strong>
-            <p className="trail-sync-tally">{footerSummary}</p>
-            <p className="capture-persistence">
-              {pendingSyncCount(rollup) > 0
-                ? `${rollup.saved_locally} local · ${rollup.syncing} syncing · ${rollup.enriching} enriching · ${rollup.needs_attention} need attention`
-                : FOREGROUND_SYNC_IDLE}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="capture-retry"
-            onClick={() => void runForegroundSync()}
-            disabled={!ready || isSyncing}
+      <div className="capture-card outdoor-card" aria-label="New Capture">
+        {recordingKind ? (
+          <div
+            className="recording-banner"
+            role="status"
+            data-testid="recording-banner"
           >
-            Retry
-          </button>
-        </footer>
-      </section>
-    </div>
-  );
-}
-
-function CaptureEntry({
-  capture,
-  threadTitle,
-  onRetry,
-  onRemoveLocalMedia,
-  onRestoreLocalMedia,
-  gutter = false,
-}: {
-  capture: LocalCapture;
-  threadTitle?: string | null;
-  onRetry: () => void;
-  onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
-  onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
-  gutter?: boolean;
-}) {
-  const label =
-    capture.text ||
-    capture.attachments.map((attachment) => attachment.fileName).join(", ") ||
-    "Capture";
-
-  return (
-    <article
-      className={`capture-entry${
-        gutter ? ` capture-gutter gutter-${capture.status}` : ""
-      }`}
-      aria-label={label}
-    >
-      {gutter ? (
-        <div className="station-gutter">
-          <time className="station-time" dateTime={capture.createdAt}>
-            {new Date(capture.createdAt).toLocaleTimeString(undefined, {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })}
-          </time>
-          <span className="gutter-label">{statusLabel(capture.status)}</span>
-        </div>
-      ) : null}
-      <div className={gutter ? "capture-gutter-body" : undefined}>
-      <div className="capture-entry-meta">
-        {gutter ? null : (
-          <>
-            <span className={`capture-status status-${capture.status}`}>
-              {statusLabel(capture.status)}
+            <span>
+              Recording {recordingKind} · {formatRecordingClock(recordingMs)}
             </span>
-            <time dateTime={capture.createdAt}>
-              {new Date(capture.createdAt).toLocaleString()}
-            </time>
-          </>
-        )}
-        {capture.threadId ? (
-          <Link className="topbar-link" href={`/threads/${capture.threadId}`}>
-            {threadTitle ? `Thread: ${threadTitle}` : "Open Thread"}
-          </Link>
+            <button
+              type="button"
+              className="recording-stop"
+              onClick={() => recordAbortRef.current?.abort()}
+            >
+              Stop recording
+            </button>
+          </div>
         ) : null}
+        <div className="capture-composer">
+          <label className="capture-field-label" htmlFor="capture-text">
+            Capture text
+          </label>
+          <textarea
+            id="capture-text"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="What did you notice?"
+            rows={2}
+            disabled={!ready || isPending || Boolean(recordingKind)}
+          />
+          <AttachmentDrafts
+            attachments={pendingAttachments}
+            onRemove={(index) =>
+              setPendingAttachments((current) =>
+                current.filter((_, itemIndex) => itemIndex !== index),
+              )
+            }
+          />
+          <div
+            className="capture-actions"
+            role="toolbar"
+            aria-label="Capture actions"
+          >
+            <button
+              type="button"
+              className="capture-icon-btn"
+              aria-label="Record audio"
+              aria-pressed={recordingKind === "audio"}
+              title="Record audio (max 10 min)"
+              disabled={!ready || isPending || recordingKind === "video"}
+              onClick={() => toggleRecording("audio")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="capture-icon-btn"
+              aria-label="Record video"
+              aria-pressed={recordingKind === "video"}
+              title="Record video (max 2 min)"
+              disabled={!ready || isPending || recordingKind === "audio"}
+              onClick={() => toggleRecording("video")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="6" width="12" height="12" rx="2" />
+                <path d="m15 10 6-3v10l-6-3" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="capture-icon-btn"
+              aria-label="Take photo"
+              title="Take photo"
+              disabled={!ready || isPending || Boolean(recordingKind)}
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 8h3l2-3h6l2 3h3v11H4V8Z" />
+                <circle cx="12" cy="13" r="3.4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="capture-icon-btn"
+              aria-label="Add photo or video"
+              title="Add photo or video from this phone"
+              disabled={!ready || isPending || Boolean(recordingKind)}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m20.5 12.5-7.8 7.8a5 5 0 0 1-7-7l8.4-8.5a3.4 3.4 0 0 1 4.9 4.9l-8.5 8.4a1.8 1.8 0 0 1-2.5-2.5l7.8-7.8" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="capture-commit"
+              onClick={commit}
+              disabled={!canCapture}
+            >
+              {isPending ? "Saving…" : "Capture"}
+            </button>
+          </div>
+          <input
+            ref={cameraInputRef}
+            className="capture-file-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            aria-label="Camera photo input"
+            onChange={(event) => {
+              void onFilesSelected(event.target.files);
+              event.target.value = "";
+              setSaveConfirmation("Photo ready — review, then Capture");
+            }}
+          />
+          <input
+            ref={fileInputRef}
+            className="capture-file-input"
+            type="file"
+            accept="image/*,audio/*,video/*"
+            multiple
+            aria-label="Choose photo or video from device"
+            onChange={(event) => {
+              void onFilesSelected(event.target.files);
+              event.target.value = "";
+              setSaveConfirmation("Media ready — review, then Capture");
+            }}
+          />
+        </div>
+        <p className="capture-context" role="status">
+          <span>Each Capture starts its own Thread</span>
+          <span aria-hidden="true">·</span>
+          <span>GPS {gps ? "on" : "off"}</span>
+          <span aria-hidden="true">·</span>
+          <span>{online ? "Network online" : "Network offline"}</span>
+          {saveConfirmation ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{saveConfirmation}</span>
+            </>
+          ) : null}
+        </p>
       </div>
-      {capture.text ? <p>{capture.text}</p> : null}
-      {capture.attachments.length > 0 ? (
-        <ul className="capture-attachments" aria-label="Attachments">
-          {capture.attachments.map((attachment) => (
-            <AttachmentRow
-              key={attachment.id}
-              captureId={capture.id}
-              attachment={attachment}
-              onRemoveLocalMedia={onRemoveLocalMedia}
-              onRestoreLocalMedia={onRestoreLocalMedia}
-            />
-          ))}
-        </ul>
-      ) : null}
-      {capture.status === "needs_attention" ? (
-        <div className="capture-attention">
-          <span>{capture.syncReason ?? "Synchronization failed"}</span>
-          {capture.syncRetryable !== false ? (
-            <button type="button" className="capture-retry" onClick={onRetry}>
-              Retry
+
+      <footer
+        className="trail-sync-footer"
+        role="status"
+        data-testid="trail-sync-footer"
+      >
+        <ScaleBar />
+        <div className="trail-sync-footer-lines">
+          <strong className="trail-sync-promise">
+            Committed locally first · Synced when in range
+          </strong>
+          <p className="trail-sync-tally" data-testid="capture-tally">
+            {todayTally(captures)}
+          </p>
+          {persistence ? (
+            <p className="capture-persistence">
+              {persistenceLabel(persistence)}
+            </p>
+          ) : null}
+        </div>
+        <div className="trail-sync-footer-actions">
+          <Link className="trail-desk-link" href="/days" data-testid="desk-link">
+            {waiting ? `${waiting} · Days` : "Days"}
+          </Link>
+          {rollup.needs_attention > 0 ? (
+            <button
+              type="button"
+              className="capture-retry"
+              onClick={() => void runForegroundSync()}
+              disabled={!ready || isSyncing}
+            >
+              Retry sync
             </button>
           ) : null}
         </div>
-      ) : null}
-      </div>
-    </article>
-  );
-}
-
-function AttachmentRow({
-  captureId,
-  attachment,
-  onRemoveLocalMedia,
-  onRestoreLocalMedia,
-}: {
-  captureId: string;
-  attachment: LocalAttachment;
-  onRemoveLocalMedia: (captureId: string, attachmentId: string) => void;
-  onRestoreLocalMedia: (captureId: string, attachmentId: string) => void;
-}) {
-  const availability = mediaAvailability(attachment);
-  const offerRemove = canOfferLocalRemoval(attachment);
-
-  return (
-    <li>
-      <span>
-        {attachment.fileName} · {attachment.kind} ·{" "}
-        {statusLabel(attachment.syncStatus)} ·{" "}
-        <span className={`media-availability availability-${availability}`}>
-          {mediaAvailabilityLabel(availability)}
-        </span>
-      </span>
-      {offerRemove ? (
-        <button
-          type="button"
-          className="media-remove-local"
-          onClick={() => onRemoveLocalMedia(captureId, attachment.id)}
-        >
-          Remove from device
-        </button>
-      ) : null}
-      {availability === "online_only" ? (
-        <button
-          type="button"
-          className="media-restore-local"
-          onClick={() => onRestoreLocalMedia(captureId, attachment.id)}
-        >
-          Download to device
-        </button>
-      ) : null}
-    </li>
+      </footer>
+    </section>
   );
 }

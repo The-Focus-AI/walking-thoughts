@@ -46,7 +46,7 @@ function pillView(
 }
 
 /**
- * Glanceable Capture sync rollup. Links to Threads, where each Thread carries
+ * Glanceable Capture sync rollup. Links to Days, where each Thread carries
  * its own status chip.
  */
 export function SyncStatusPill() {
@@ -101,13 +101,13 @@ export function SyncStatusPill() {
 
   return (
     <Link
-      href={authBlocked && online ? "/sign-in" : "/threads"}
+      href={authBlocked && online ? "/sign-in" : "/days"}
       className={`sync-pill sync-pill-${tone}`}
       data-testid="sync-pill"
       title={
         authBlocked && online
           ? "The server refused this device's session — sign in again to sync"
-          : "Capture sync status — open Threads for per-Thread detail"
+          : "Capture sync status — open Days for per-Thread detail"
       }
     >
       <span className="sync-pill-dot" aria-hidden="true" />
