@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { recoverStaleLocalCaptures } from "@/lib/enrichment/recover";
+import {
+  RECHECK_COOLDOWN_MS,
+  recoverStaleLocalCaptures,
+  resetRecoverCooldownForTests,
+} from "@/lib/enrichment/recover";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { createMemoryCaptureStore } from "@/lib/local-capture/store";
 import {
@@ -10,6 +14,7 @@ import {
 
 test.beforeEach(() => {
   resetSyncAuthForTests();
+  resetRecoverCooldownForTests();
 });
 
 test("a refused session is recorded; a served one clears it", () => {
@@ -136,4 +141,48 @@ test("a cached Enrichment that misses a Capture is still re-checked", async () =
   });
 
   expect(asked).toEqual([first.id]);
+});
+
+
+test("a Thread the server has no Enrichments for is not re-asked every cycle", async () => {
+  const store = createMemoryCaptureStore();
+  const orphan = await store.commit("Never enriched", null);
+  await store.applySyncBatch({
+    results: [
+      { id: orphan.id, threadId: orphan.id, sequence: 1, status: "complete" },
+    ],
+    failures: [],
+  });
+  // The sweep re-queues an orphan to "enriching", which would take it out of
+  // scope on its own. Settle it back to complete before each cycle so what is
+  // under test is the cooldown, not the re-queue.
+  const settle = () =>
+    store.applyEnrichmentBatch({
+      results: [{ id: orphan.id, threadId: orphan.id, status: "complete" }],
+    });
+
+  const asked: string[] = [];
+  const sweep = async (now: number) => {
+    await settle();
+    await recoverStaleLocalCaptures(store, {
+      serverCaptureIds: new Set([orphan.id]),
+      // An empty server answer is never worth caching, so nothing accumulates
+      // to quiet the next cycle — the cooldown has to do it.
+      cachedEnrichments: () => [],
+      loadEnrichments: async (threadId) => {
+        asked.push(threadId);
+        return [];
+      },
+      now,
+    });
+  };
+
+  await sweep(0);
+  await sweep(12_000);
+  await sweep(24_000);
+  expect(asked).toEqual([orphan.id]);
+
+  // Once the cooldown lapses it checks again — healing is delayed, not lost.
+  await sweep(RECHECK_COOLDOWN_MS + 1);
+  expect(asked).toEqual([orphan.id, orphan.id]);
 });

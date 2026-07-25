@@ -47,6 +47,20 @@ export function orphanCompleteCaptureIds(
   return orphans;
 }
 
+/**
+ * How long a Thread stays answered once asked. A Thread the server has no
+ * Enrichments for is never worth caching, so without a cooldown it would be
+ * re-asked on every cycle forever — the exact orphan case this sweep exists
+ * to heal, turned into a poll.
+ */
+export const RECHECK_COOLDOWN_MS = 5 * 60_000;
+
+const lastAskedAt = new Map<string, number>();
+
+export function resetRecoverCooldownForTests(): void {
+  lastAskedAt.clear();
+}
+
 export type RecoverStaleResult = {
   requeuedForSync: number;
   requeuedForEnrichment: number;
@@ -69,6 +83,8 @@ export async function recoverStaleLocalCaptures(
      * the browser cache; tests pass their own.
      */
     cachedEnrichments?: (threadId: string) => ThreadEnrichment[];
+    /** Clock for the re-check cooldown; defaults to wall time. */
+    now?: number;
   },
 ): Promise<RecoverStaleResult> {
   const captures = await store.list();
@@ -97,9 +113,15 @@ export async function recoverStaleLocalCaptures(
       ? () => []
       : (threadId: string) => readCachedThreadEnrichments(threadId));
 
+  const now = options.now ?? Date.now();
+  const askedRecently = (threadId: string): boolean => {
+    const previous = lastAskedAt.get(threadId);
+    return previous !== undefined && now - previous < RECHECK_COOLDOWN_MS;
+  };
+
   const unresolved = threadIds.filter((threadId) => {
     const known = readCached(threadId);
-    if (known.length === 0) return true;
+    if (known.length === 0) return !askedRecently(threadId);
     enrichmentsByThread.set(threadId, known);
     const stillUncovered = afterSyncRequeue.some(
       (capture) =>
@@ -108,11 +130,12 @@ export async function recoverStaleLocalCaptures(
         !captureCoveredByEnrichment(capture.id, known),
     );
     if (stillUncovered) enrichmentsByThread.delete(threadId);
-    return stillUncovered;
+    return stillUncovered && !askedRecently(threadId);
   });
 
   await Promise.all(
     unresolved.map(async (threadId) => {
+      lastAskedAt.set(threadId, now);
       const loaded = await options.loadEnrichments(threadId);
       // null → skip orphan detection for this Thread (network unavailable)
       if (loaded !== null) enrichmentsByThread.set(threadId, loaded);
