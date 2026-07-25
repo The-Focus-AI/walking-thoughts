@@ -14,12 +14,20 @@ export type DayCorpusEntry = {
   captureCreatedAt?: string;
 };
 
+/** One prior exchange in an ongoing day chat. */
+export type DayChatTurn = {
+  role: "walker" | "digest";
+  text: string;
+};
+
 export type DayDigestRequest = {
   dayKey: string;
   dayHeading: string;
   question: string;
   corpus: DayCorpusEntry[];
   walkerProfile?: string | null;
+  /** Conversation so far, oldest first — the digest continues it. */
+  history?: DayChatTurn[];
 };
 
 export type DayDigestResult = {

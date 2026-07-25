@@ -1147,12 +1147,71 @@ h1 {
 }
 
 .day-digest-pane {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
   height: calc(100svh - var(--tabbar-h));
-  overflow: auto;
-  padding: max(1rem, env(safe-area-inset-top)) 1.25rem 1.5rem;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem 1rem;
+}
+
+/* The transcript scrolls; header and composer stay put. */
+.day-chat-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.day-chat-log > * {
+  min-width: 0;
+}
+
+.day-chat-walker {
+  margin: 0;
+  justify-self: end;
+  max-width: 85%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(169, 209, 143, 0.35);
+  background: rgba(169, 209, 143, 0.08);
+  font-family: var(--font-capture);
+  font-style: italic;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.day-chat-composer {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.day-digest-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: min-content;
+}
+
+.digest-clear {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.digest-clear:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-strong);
 }
 
 .day-digest-header {
@@ -3130,6 +3189,11 @@ footer {
     max-width: none;
   }
 
+  .threads-detail-pane .day-digest-pane {
+    height: 100%;
+    min-height: 0;
+  }
+
   .threads-detail-pane .thread-chat-log,
   .threads-detail-pane .thread-chat-header,
   .threads-detail-pane .thread-chat-composer {
@@ -3150,6 +3214,47 @@ footer {
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+}
+
+/* Day strip: one horizontal row of day chips — the archive's calendar.
+   It scrolls sideways on its own; the page never does. */
+.threads-day-strip {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.threads-day-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.threads-day-chip.active {
+  border-color: rgba(169, 209, 143, 0.55);
+  background: rgba(169, 209, 143, 0.12);
+  color: var(--identity);
+}
+
+.threads-day-chip-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  opacity: 0.75;
 }
 
 .threads-queue-chips {

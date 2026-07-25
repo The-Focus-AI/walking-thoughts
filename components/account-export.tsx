@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { fetchWithTimeout, MEDIA_TIMEOUT_MS } from "@/lib/net/timeout";
 
 export function AccountExport() {
   const [isPending, startTransition] = useTransition();
@@ -11,10 +12,11 @@ export function AccountExport() {
       void (async () => {
         setError(null);
         try {
-          const response = await fetch("/api/export", {
-            method: "GET",
-            credentials: "same-origin",
-          });
+          const response = await fetchWithTimeout(
+            "/api/export",
+            { method: "GET", credentials: "same-origin" },
+            MEDIA_TIMEOUT_MS,
+          );
           if (!response.ok) {
             const body = (await response.json().catch(() => null)) as {
               error?: string;

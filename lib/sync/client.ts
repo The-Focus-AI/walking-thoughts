@@ -1,4 +1,5 @@
 import type { CaptureStore, LocalCapture } from "@/lib/local-capture/types";
+import { fetchWithTimeout } from "@/lib/net/timeout";
 import type { SyncBatchResponse, SyncCapturePayload } from "./types";
 
 export type SyncPushResult =
@@ -31,7 +32,7 @@ function defaultTransport(): SyncTransport {
 
   return {
     async pushCaptures(captures) {
-      const response = await fetch("/api/sync/captures", {
+      const response = await fetchWithTimeout("/api/sync/captures", {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ captures }),

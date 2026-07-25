@@ -104,7 +104,7 @@ test("marking reviewed advances the queue; All and search still reach it", async
   ).toHaveCount(0);
 
   // …but All still shows it, marked Reviewed.
-  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("tab", { name: "All", exact: true }).click();
   await expect(
     page.getByRole("link", { name: /Stone wall into the reservoir/ }).first(),
   ).toBeVisible();

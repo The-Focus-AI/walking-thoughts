@@ -16,3 +16,14 @@ export function formatDayHeading(dayKey: string): string {
     year: "numeric",
   });
 }
+
+/** Compact chip label for day pickers, e.g. "Fri, Jul 24". */
+export function formatDayShort(dayKey: string): string {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  if (!year || !month || !day) return dayKey;
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
