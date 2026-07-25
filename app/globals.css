@@ -3520,3 +3520,133 @@ footer {
 .day-sheet-asks li::marker {
   color: var(--attention);
 }
+
+
+/* --- Filing: the walker settles what the Enrichment guessed --------------- */
+
+.threads-project-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.threads-project-chip.active {
+  border-color: rgba(244, 207, 114, 0.55);
+  background: rgba(244, 207, 114, 0.12);
+  color: var(--sun);
+}
+
+/* A Project the walker confirmed reads plainly; a guess keeps its question
+   mark and the machine's sky until they settle it. */
+.thread-row-project {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sun);
+}
+
+.thread-row-project.guessed {
+  color: var(--machine);
+}
+
+.thread-file-open {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 0.2rem 0.55rem;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.thread-filing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.6rem 0 0.2rem;
+}
+
+.thread-filing-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.thread-filing-kinds,
+.thread-filing-projects,
+.thread-filing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.thread-filing-kind,
+.thread-filing-project,
+.thread-filing-read,
+.thread-filing-cancel,
+.thread-filing-new button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* The Enrichment's guess, pre-picked: confirming it is one tap. */
+.thread-filing-kind.guessed,
+.thread-filing-project.guessed {
+  border-color: rgba(143, 184, 216, 0.55);
+  background: rgba(143, 184, 216, 0.12);
+  color: var(--machine);
+}
+
+.thread-filing-new {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.thread-filing-new input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.thread-filing-read {
+  border-color: rgba(169, 209, 143, 0.5);
+  color: var(--identity);
+}

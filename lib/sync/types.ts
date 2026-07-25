@@ -49,6 +49,13 @@ export type SyncBatchResponse = {
   failures: SyncFailure[];
 };
 
+/** A named bucket the walker files Threads into: an effort, a client, a build. */
+export type Project = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
 export type ServerThread = {
   id: string;
   title: string;
@@ -65,6 +72,13 @@ export type ServerThread = {
   topics?: string[];
   /** The open question from the newest Enrichment; null when it had none. */
   ask?: string | null;
+  /**
+   * The Project this Thread is filed into. A guess from the Enrichment until
+   * the walker files the Thread; their filing is final.
+   */
+  projectId?: string | null;
+  /** Carried alongside the id so a filed Thread reads correctly offline. */
+  projectName?: string | null;
   captures: Array<{
     id: string;
     text: string;
@@ -162,6 +176,23 @@ export type ThreadRepository = {
     threadId: string,
     reviewedAt: string | null,
   ): Promise<{ threadId: string; reviewedAt: string | null }>;
+  /**
+   * File a Thread at the desk: confirm what it is, put it in a Project, or
+   * simply mark it read. Any of those settles the Thread and clears it from
+   * the New queue. Omitted fields keep their current value.
+   */
+  fileThread(
+    userId: string,
+    threadId: string,
+    filing: {
+      kind?: string | null;
+      projectId?: string | null;
+      reviewedAt: string | null;
+    },
+  ): Promise<ServerThread | null>;
+  listProjects(userId: string): Promise<Project[]>;
+  /** Idempotent by name — filing the same new Project twice makes one. */
+  createProject(userId: string, name: string): Promise<Project>;
   updateThreadTitle?(
     userId: string,
     threadId: string,

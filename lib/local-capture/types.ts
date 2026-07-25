@@ -82,6 +82,9 @@ export type LocalThread = {
    * intent it could not place and asked rather than guessing.
    */
   ask?: string | null;
+  /** The Project this Thread is filed into; a guess until it is Reviewed. */
+  projectId?: string | null;
+  projectName?: string | null;
 };
 
 export type CaptureSyncStatus =
@@ -227,6 +230,14 @@ export type CaptureStore = {
     threadId: string,
     reviewedAt: string | null,
   ): Promise<void>;
+  /** Record what the walker settled while filing a Thread at the desk. */
+  applyThreadFiling(filing: {
+    threadId: string;
+    reviewedAt: string | null;
+    kind?: ThreadKind | null;
+    projectId?: string | null;
+    projectName?: string | null;
+  }): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
   applySyncBatch(batch: SyncBatchApplication): Promise<void>;
@@ -269,6 +280,8 @@ export type CaptureStore = {
       kind?: ThreadKind | null;
       topics?: string[];
       ask?: string | null;
+      projectId?: string | null;
+      projectName?: string | null;
       captures: Array<{
         id: string;
         text: string;

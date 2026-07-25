@@ -9,7 +9,7 @@ import { notifyEnrichmentOutcome } from "@/lib/push/notify";
 import { getPushRepository } from "@/lib/push/repository";
 import { createWebPushSender } from "@/lib/push/send";
 import type { PushRepository, PushSender } from "@/lib/push/types";
-import type { ThreadRepository } from "@/lib/sync/types";
+import type { Project, ThreadRepository } from "@/lib/sync/types";
 import { assertModelSupportsMedia } from "./capabilities";
 import {
   isPermanentEnrichmentError,
@@ -239,6 +239,8 @@ async function runJob(
   placeResolver: NearbyPlaceResolver,
   search: ResearchClient | undefined,
   memoryRepository: WalkerMemoryRepository,
+  projects: Project[],
+  threadRepository: ThreadRepository | undefined,
   push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
@@ -368,6 +370,7 @@ async function runJob(
       requestTitle,
       placesByCaptureId,
       walkerProfile: walkerProfile ?? EMPTY_PROFILE_HINT,
+      projects: projects.map((project) => project.name),
     });
     const generation = await gateway.generate({
       model: running.model,
@@ -378,6 +381,13 @@ async function runJob(
       search,
       memory: memoryTool,
     });
+    const guessedProject = generation.project
+      ? (projects.find(
+          (project) =>
+            project.name.toLowerCase() === generation.project!.toLowerCase(),
+        ) ?? null)
+      : null;
+
     const completed = await repository.completeJob(userId, running.id, {
       text: generation.text,
       model: generation.model,
@@ -389,6 +399,20 @@ async function runJob(
       research: generation.research,
       memoryPatches: appliedPatches,
     });
+
+    // File the Thread into the guessed Project — but only while it is still
+    // unfiled and unassigned. A walker's own filing is final.
+    if (completed.created && guessedProject && threadRepository) {
+      const thread = (await threadRepository.listThreads(userId)).find(
+        (candidate) => candidate.id === running.threadId,
+      );
+      if (thread && !thread.reviewedAt && !thread.projectId) {
+        await threadRepository.fileThread(userId, running.threadId, {
+          projectId: guessedProject.id,
+          reviewedAt: null,
+        });
+      }
+    }
 
     if (completed.created) {
       await maybeNotify(userId, push, {
@@ -468,6 +492,10 @@ export async function processPendingEnrichments(
   const memoryRepository =
     options.memoryRepository ??
     getWalkerMemoryRepository(environment as NodeJS.ProcessEnv);
+  // The model may only file into Projects the walker has already made.
+  const projects = options.threadRepository
+    ? await options.threadRepository.listProjects(userId)
+    : [];
 
   if (options.retryFailed) {
     await repository.requeueFailed(userId);
@@ -495,6 +523,8 @@ export async function processPendingEnrichments(
       placeResolver,
       search,
       memoryRepository,
+      projects,
+      options.threadRepository,
       push,
     );
     results.push(...jobResults);

@@ -286,6 +286,26 @@ export function createMemoryCaptureStore(
         );
       }
     },
+    async applyThreadFiling(filing) {
+      threads = threads.map((thread) =>
+        thread.id === filing.threadId
+          ? {
+              ...thread,
+              reviewedAt: filing.reviewedAt,
+              kind: filing.kind ?? thread.kind ?? null,
+              projectId:
+                filing.projectId === undefined
+                  ? (thread.projectId ?? null)
+                  : filing.projectId,
+              projectName:
+                filing.projectId === undefined
+                  ? (thread.projectName ?? null)
+                  : (filing.projectName ?? null),
+            }
+          : thread,
+      );
+    },
+
     async setThreadReviewed(threadId, reviewedAt) {
       threads = threads.map((thread) =>
         thread.id === threadId ? { ...thread, reviewedAt } : thread,
@@ -919,6 +939,36 @@ export function createIdbCaptureStore(): CaptureStore {
         if (split.trashedThreadId) {
           threadStore.delete(split.trashedThreadId);
         }
+        await transactionDone(transaction);
+      } finally {
+        db.close();
+      }
+    },
+
+    async applyThreadFiling(filing) {
+      const db = await openDatabase();
+      try {
+        const existing = (await requestToPromise(
+          db
+            .transaction("threads", "readonly")
+            .objectStore("threads")
+            .get(filing.threadId),
+        )) as LocalThread | undefined;
+        if (!existing) return;
+        const transaction = db.transaction("threads", "readwrite");
+        transaction.objectStore("threads").put({
+          ...existing,
+          reviewedAt: filing.reviewedAt,
+          kind: filing.kind ?? existing.kind ?? null,
+          projectId:
+            filing.projectId === undefined
+              ? (existing.projectId ?? null)
+              : filing.projectId,
+          projectName:
+            filing.projectId === undefined
+              ? (existing.projectName ?? null)
+              : (filing.projectName ?? null),
+        });
         await transactionDone(transaction);
       } finally {
         db.close();

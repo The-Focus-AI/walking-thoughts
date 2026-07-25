@@ -220,8 +220,21 @@ Steps 1 and 2 of the order below are implemented:
   breakdown, everything needing a word, and the day's to-dos — computed from
   local state, so it paints instantly and works out of range.
 
+- **Threads get filed into Projects.** A Project is a named bucket — an
+  effort, a client, a build — and a Thread belongs to at most one. The
+  Enrichment guesses one, but only from the list the walker has already made
+  (`PROJECT:` header, matched by name; an invented name is dropped), and the
+  guess reads with a question mark until the walker settles it. **Filing** is
+  the desk action: confirm the guessed kind, put it in a Project, or just mark
+  that you read the report. Any of those makes the Thread Reviewed and clears
+  it from New, so the sitting-down-afterwards is done when New is empty. A
+  walker's filing is final — no later Enrichment overrules it.
+
 Still open: per-kind tool sets and step budgets, the per-kind destinations
-(checklist, idea board, map), topic linking, and Memory dedup. The Interview
+(checklist, idea board, map), an all-days overview with real themes, and
+Memory dedup. Topic linking is superseded for grouping: 238 free-form slugs
+across 70 Threads never clustered, and Projects are the walker's own answer to
+the same question. The Interview
 now overlaps the in-Thread question: both exist to teach the system about the
 walker, and the Thread version arrives in context, at the moment the gap
 actually bites.

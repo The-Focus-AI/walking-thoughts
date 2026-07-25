@@ -111,6 +111,8 @@ export type GatewayGeneration = {
   kind: ThreadKind | null;
   topics: string[];
   ask: string | null;
+  /** A Project name the model matched from the walker's own list. */
+  project: string | null;
   sources: EnrichmentSource[];
   research: ResearchStep[];
 };

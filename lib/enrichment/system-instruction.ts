@@ -62,6 +62,8 @@ export function buildEnrichmentPrompt(input: {
   placesByCaptureId?: Record<string, NearbyPlace | null>;
   /** Rendered Memory profile (lib/memory/profile.ts); null when none known. */
   walkerProfile?: string | null;
+  /** The walker's Project names; the guess may only come from this list. */
+  projects?: string[];
 }): string {
   const historyBlock = input.history
     .map((entry) => {
@@ -89,6 +91,9 @@ export function buildEnrichmentPrompt(input: {
     `\`KIND: \` exactly one of ${THREAD_KINDS.join(", ")} — the kind this Thread is now, judged from its whole history. Write \`unclear\` instead of guessing`,
     "`TOPICS: ` up to four lowercase hyphenated topic slugs, comma separated, that would group this Thread with others about the same subject",
     "`ASK: ` one specific question when a name, reference, or intent in the Capture is genuinely unknown to you — otherwise leave this header out entirely",
+    input.projects && input.projects.length > 0
+      ? `\`PROJECT: \` the walker's Project this Thread belongs to, copied exactly from this list — ${input.projects.join(", ")} — or left out when none of them fits. Never invent a Project name`
+      : null,
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -109,7 +114,7 @@ export function buildEnrichmentPrompt(input: {
   return sections.join("\n\n");
 }
 
-const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS|ASK)\s*:\s*(.*)$/i;
+const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS|ASK|PROJECT)\s*:\s*(.*)$/i;
 
 function readTopics(value: string): string[] {
   return [
@@ -143,6 +148,8 @@ export function parseGatewayText(
   topics: string[];
   /** One question the walker must answer before this Thread can go further. */
   ask: string | null;
+  /** A Project name the model recognized; matched to the walker's list later. */
+  project: string | null;
 } {
   const lines = raw.split("\n");
   const headers = new Map<string, string>();
@@ -173,5 +180,6 @@ export function parseGatewayText(
     kind,
     topics,
     ask: headers.get("ASK")?.trim().slice(0, 240) || null,
+    project: headers.get("PROJECT")?.trim().slice(0, 60) || null,
   };
 }

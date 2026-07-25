@@ -1,16 +1,26 @@
+import { asThreadKind } from "@/lib/local-capture/types";
 import { requireSyncAccess } from "@/lib/sync/access";
 import { getThreadRepository } from "@/lib/sync/repository";
 
 export const dynamic = "force-dynamic";
 
-/** Mark a Thread reviewed at the desk (or clear it back to new). */
+/**
+ * File a Thread at the desk. Confirming its kind, putting it in a Project, or
+ * simply having read it all settle the Thread — it leaves the New queue and
+ * the sitting-down-afterwards is done when nothing is left there.
+ */
 export async function POST(request: Request) {
   const access = await requireSyncAccess(request);
   if ("error" in access) return access.error;
 
-  let body: { threadId?: string; reviewed?: boolean };
+  let body: {
+    threadId?: string;
+    reviewed?: boolean;
+    kind?: string | null;
+    projectId?: string | null;
+  };
   try {
-    body = (await request.json()) as { threadId?: string; reviewed?: boolean };
+    body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
@@ -20,13 +30,27 @@ export async function POST(request: Request) {
   }
 
   const reviewedAt = body.reviewed === false ? null : new Date().toISOString();
+  // An unknown kind is dropped rather than stored: the walker's filing is the
+  // one place a kind outranks the model, so it has to be a real one.
+  const kind = body.kind === undefined ? undefined : asThreadKind(body.kind);
+
   try {
-    const result = await getThreadRepository().setThreadReviewed(
-      access.userId,
-      threadId,
+    const repository = getThreadRepository();
+    const thread = await repository.fileThread(access.userId, threadId, {
+      kind,
+      projectId: body.projectId,
       reviewedAt,
-    );
-    return Response.json(result);
+    });
+    if (!thread) {
+      return Response.json({ error: "thread_not_found" }, { status: 404 });
+    }
+    return Response.json({
+      threadId: thread.id,
+      reviewedAt: thread.reviewedAt ?? null,
+      kind: thread.kind ?? null,
+      projectId: thread.projectId ?? null,
+      projectName: thread.projectName ?? null,
+    });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "review_failed";
     if (reason === "thread_not_found") {
