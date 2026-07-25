@@ -24,6 +24,7 @@ import type {
   LocalAttachment,
   LocalCapture,
   LocalThread,
+  ThreadKind,
 } from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
 import { syncRollup } from "@/lib/sync/rollup";
@@ -33,6 +34,31 @@ type ThreadListView = {
   captures: LocalCapture[];
   enrichments: ThreadEnrichment[];
   dayKey: string;
+};
+
+/**
+ * Desk order, not the canonical THREAD_KINDS order: what the walker acts on
+ * comes before what they read, and noise sits last.
+ */
+const QUEUE_KIND_ORDER: ThreadKind[] = [
+  "task",
+  "idea",
+  "question",
+  "observation",
+  "place",
+  "media",
+  "noise",
+];
+
+/** Kind names the walker reads, not the slugs the model writes. */
+const KIND_LABELS: Record<ThreadKind, string> = {
+  task: "To do",
+  idea: "Idea",
+  question: "Question",
+  observation: "Observation",
+  place: "Place",
+  media: "Media",
+  noise: "Noise",
 };
 
 function threadStatus(captures: LocalCapture[]): {
@@ -143,6 +169,8 @@ export function ThreadsQueue({
   const [search, setSearch] = useState("");
   /** Day-strip pick: null = newest day, "all" = the whole archive. */
   const [focusDay, setFocusDay] = useState<string | null>(null);
+  /** Kind-strip pick: null = every kind. */
+  const [focusKind, setFocusKind] = useState<ThreadKind | null>(null);
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -192,13 +220,14 @@ export function ThreadsQueue({
   }, [load]);
 
   // The processing queue: New by default; search reaches everything.
-  const visibleThreads = useMemo(() => {
+  const queueThreads = useMemo(() => {
     const query = search.trim().toLowerCase();
     return threads.filter((view) => {
       if (query) {
         const haystack = [
           view.thread.title,
           ...view.captures.map((capture) => capture.text),
+          ...(view.thread.topics ?? []),
         ]
           .join("\n")
           .toLowerCase();
@@ -212,6 +241,32 @@ export function ThreadsQueue({
       return true;
     });
   }, [threads, queue, search, selectedThreadId]);
+
+  /** Counts for the kind strip, before the kind filter narrows the list. */
+  const kindCounts = useMemo(() => {
+    const counts = new Map<ThreadKind, number>();
+    for (const view of queueThreads) {
+      const kind = view.thread.kind;
+      if (!kind) continue;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    return QUEUE_KIND_ORDER.filter((kind) => counts.has(kind)).map(
+      (kind) => [kind, counts.get(kind)!] as const,
+    );
+  }, [queueThreads]);
+
+  const activeKind =
+    focusKind && kindCounts.some(([kind]) => kind === focusKind)
+      ? focusKind
+      : null;
+
+  const visibleThreads = useMemo(
+    () =>
+      activeKind
+        ? queueThreads.filter((view) => view.thread.kind === activeKind)
+        : queueThreads,
+    [queueThreads, activeKind],
+  );
 
   const byDay = useMemo(() => {
     const groups = new Map<string, ThreadListView[]>();
@@ -382,6 +437,43 @@ export function ThreadsQueue({
           />
         </div>
 
+        {kindCounts.length > 0 ? (
+          <div className="threads-kind-strip" role="tablist" aria-label="Kinds">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeKind === null}
+              data-testid="kind-chip-all"
+              className={
+                activeKind === null
+                  ? "threads-kind-chip active"
+                  : "threads-kind-chip"
+              }
+              onClick={() => setFocusKind(null)}
+            >
+              All kinds
+            </button>
+            {kindCounts.map(([kind, count]) => (
+              <button
+                key={kind}
+                type="button"
+                role="tab"
+                aria-selected={activeKind === kind}
+                data-testid={`kind-chip-${kind}`}
+                className={
+                  activeKind === kind
+                    ? "threads-kind-chip active"
+                    : "threads-kind-chip"
+                }
+                onClick={() => setFocusKind(activeKind === kind ? null : kind)}
+              >
+                <span>{KIND_LABELS[kind]}</span>
+                <span className="threads-kind-chip-count">{count}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {dayKeys.length > 0 && !search.trim() ? (
           <div className="threads-day-strip" role="tablist" aria-label="Days">
             {dayKeys.map((dayKey) => {
@@ -533,6 +625,14 @@ export function ThreadsQueue({
                         </span>
                       </Link>
                       <div className="thread-row-side">
+                        {view.thread.kind ? (
+                          <span
+                            className="thread-row-kind"
+                            data-testid={`thread-kind-${view.thread.kind}`}
+                          >
+                            {KIND_LABELS[view.thread.kind]}
+                          </span>
+                        ) : null}
                         {view.thread.reviewedAt ? (
                           <span
                             className="thread-row-status thread-status-reviewed"

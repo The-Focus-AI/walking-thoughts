@@ -12,6 +12,34 @@ export type ThreadDestination =
   | { type: "thread"; threadId: string }
   | { type: "new_thread" };
 
+/**
+ * What a Thread is, decided by the model as it writes the Enrichment. A
+ * walker does not capture one kind of thing, and each kind wants a different
+ * report and a different destination at the desk.
+ */
+export const THREAD_KINDS = [
+  "question",
+  "idea",
+  "task",
+  "observation",
+  "place",
+  "media",
+  "noise",
+] as const;
+
+export type ThreadKind = (typeof THREAD_KINDS)[number];
+
+/**
+ * Narrow a stored or transmitted value to a kind. Anything the current
+ * vocabulary does not name reads as unclassified rather than reaching the UI.
+ */
+export function asThreadKind(value: unknown): ThreadKind | null {
+  return typeof value === "string" &&
+    (THREAD_KINDS as readonly string[]).includes(value)
+    ? (value as ThreadKind)
+    : null;
+}
+
 export type LocalThread = {
   id: string;
   title: string;
@@ -19,6 +47,10 @@ export type LocalThread = {
   updatedAt: string;
   /** Set once processed at the desk; absent/null = new (in the review queue). */
   reviewedAt?: string | null;
+  /** The newest Enrichment's verdict; null until one classifies the Thread. */
+  kind?: ThreadKind | null;
+  /** Topic slugs that group this Thread with others on the same subject. */
+  topics?: string[];
 };
 
 export type CaptureSyncStatus =

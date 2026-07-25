@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { titleFromText } from "@/lib/local-capture/thread-destination";
+import { asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   PurgeExpiredResult,
@@ -361,7 +362,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           revision: thread.revision,
           updatedAt: thread.updated_at,
           reviewedAt: thread.reviewed_at ?? null,
-          kind: thread.kind ?? null,
+          kind: asThreadKind(thread.kind),
           topics: thread.topics ?? [],
           captures: captures.map((capture) => ({
             id: capture.id,

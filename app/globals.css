@@ -3257,6 +3257,56 @@ footer {
   opacity: 0.75;
 }
 
+/* Kind strip: the machine's reading of what each Thread is. Sky, because
+   the classification is the machine's voice — never the walker's. */
+.threads-kind-strip {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.threads-kind-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.threads-kind-chip.active {
+  border-color: rgba(143, 184, 216, 0.55);
+  background: rgba(143, 184, 216, 0.12);
+  color: var(--machine);
+}
+
+.threads-kind-chip-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+.thread-row-kind {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--machine);
+}
+
 .threads-queue-chips {
   display: flex;
   gap: 0.3rem;

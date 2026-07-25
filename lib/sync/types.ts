@@ -1,4 +1,8 @@
-import type { CaptureLocation, MediaKind } from "@/lib/local-capture/types";
+import type {
+  CaptureLocation,
+  MediaKind,
+  ThreadKind,
+} from "@/lib/local-capture/types";
 
 export type SyncCaptureStatus =
   | "saved_locally"
@@ -56,7 +60,7 @@ export type ServerThread = {
    * What this Thread is, as of its most recent Enrichment — question, idea,
    * task, observation, place, media, or noise. Null until one classifies it.
    */
-  kind?: string | null;
+  kind?: ThreadKind | null;
   /** Topic slugs that group this Thread with others on the same subject. */
   topics?: string[];
   captures: Array<{

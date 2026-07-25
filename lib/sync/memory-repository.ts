@@ -1,4 +1,5 @@
 import { titleFromText } from "@/lib/local-capture/thread-destination";
+import { asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   PurgeExpiredResult,
@@ -333,7 +334,7 @@ export function createMemoryThreadRepository(
             revision: thread.revision,
             updatedAt: thread.updatedAt,
             reviewedAt: thread.reviewedAt ?? null,
-            kind: thread.kind ?? null,
+            kind: asThreadKind(thread.kind),
             topics: thread.topics ?? [],
             captures,
           } satisfies ServerThread;

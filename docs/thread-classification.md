@@ -194,9 +194,19 @@ Steps 1 and 2 of the order below are implemented:
   seven kinds and what each one wants back, and tells the model to let length
   follow the Capture.
 
-Still open: the backfill over the 67 existing Threads, `kind` on
-`sync_threads` for queue grouping, per-kind tool sets and step budgets, the
-kind-aware queue and digest, topic linking, and Memory dedup.
+- **The Thread carries its own kind.** `sync_threads` holds `kind` and
+  `topics`, `completeJob` records the newest Enrichment's verdict through
+  `updateThreadClassification`, and hydration adopts both the way it adopts
+  the review decision — neither enriching nor marking reviewed bumps the
+  revision, so an unconditional adopt is the only thing that works.
+- **The queue reads by kind.** A kind strip above the day strip filters the
+  list and counts each kind; every row names its kind in the machine's sky,
+  never the walker's italic. Desk order puts *To do* first, and tapping the
+  active kind clears the filter.
+
+Still open: per-kind tool sets and step budgets, the kind-aware digest, the
+per-kind destinations (checklist, idea board, map), topic linking, and Memory
+dedup.
 
 ## What the backfill produced
 
