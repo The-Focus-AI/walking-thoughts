@@ -105,7 +105,8 @@
   border-bottom: 1px solid var(--line);
 }
 
-.masthead p {
+.masthead p,
+.masthead h1 {
   margin: 0;
 }
 
@@ -125,6 +126,20 @@
   text-transform: uppercase;
   line-height: 0.95;
   font-size: clamp(2rem, 7vw, 2.9rem);
+}
+
+/* The phone is the field instrument, not the cover of the sheet: the
+   masthead keeps its three lines but gives the height back to the map and
+   the composer. Desktop, where there is room, keeps the full scale. */
+@media (max-width: 899px) {
+  .masthead {
+    gap: 0.1rem;
+    padding: 0.4rem 0 0.5rem;
+  }
+
+  .masthead-title {
+    font-size: 1.45rem;
+  }
 }
 
 .masthead-date {
@@ -226,11 +241,6 @@
   color: var(--ink);
 }
 
-.gutter-syncing .station-time,
-.gutter-enriching .station-time {
-  color: var(--sun);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -283,7 +293,7 @@ a {
 
 .trail-map-hero {
   position: relative;
-  min-height: 42svh;
+  min-height: 36svh;
   border-radius: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -312,7 +322,7 @@ a {
   align-items: flex-end;
   align-content: flex-end;
   justify-content: space-between;
-  min-height: 42svh;
+  min-height: 36svh;
   padding: 1rem 1.1rem 1.2rem;
   background: linear-gradient(transparent 28%, rgba(16, 23, 18, 0.94) 74%);
   pointer-events: none;
@@ -398,7 +408,7 @@ a {
   display: grid;
   gap: 0.65rem;
   align-content: end;
-  min-height: 42svh;
+  min-height: 36svh;
   padding: 1.25rem;
 }
 
@@ -592,22 +602,10 @@ a {
   cursor: wait;
 }
 
-.trail-capture {
+/* Grid items default to min-width auto: one non-wrapping row inside the
+   composer would otherwise widen the whole trail column. */
+.trail-layout > * {
   min-width: 0;
-}
-
-.trail-aca {
-  gap: 0.75rem;
-  padding-bottom: 0.5rem;
-}
-
-.trail-gutter-list .capture-gutter {
-  display: grid;
-  /* minmax(0, …): the body column shrinks under long tokens instead of
-     widening the stream into a sideways scroller. */
-  grid-template-columns: 4.9rem minmax(0, 1fr);
-  gap: 0.65rem;
-  align-items: start;
 }
 
 .gutter-label {
@@ -620,26 +618,15 @@ a {
   padding-top: 0.15rem;
 }
 
-.gutter-syncing .gutter-label,
-.gutter-enriching .gutter-label {
-  color: var(--sun);
-}
-
-.gutter-needs_attention {
-  background: rgba(240, 180, 160, 0.07);
-}
-
-.gutter-needs_attention .gutter-label {
-  color: var(--attention);
-}
-
+/* The sheet closes on one row: the scale bar over the day's tally, with the
+   way to the desk on the right. Two lines of type, never a panel. */
 .trail-sync-footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  gap: 0.4rem 1rem;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 0.5rem;
+  padding: 0.55rem 0.35rem 0.35rem;
   border-top: 2px solid var(--line-strong);
   position: relative;
 }
@@ -659,11 +646,23 @@ a {
 
 .trail-sync-footer-lines {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.1rem;
+  /* Share the row with the way to the desk instead of pushing it onto its
+     own line — the trail screen is one screen. */
+  flex: 1 1 11rem;
+  min-width: 0;
 }
 
 .trail-sync-footer p {
   margin: 0;
+}
+
+.trail-sync-footer .capture-persistence {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .trail-sync-promise {
@@ -685,6 +684,38 @@ a {
   color: var(--ink);
 }
 
+.trail-sync-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+/* The whole bridge from the trail to the desk: a count and a place to go.
+   Moss, because it is the walker's own work waiting — never an alert. */
+.trail-desk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  text-align: right;
+  padding: 0 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--identity);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.trail-desk-link:hover {
+  border-color: var(--ink);
+}
+
 .trail-account {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
@@ -703,14 +734,6 @@ a {
 .trail-account .account-export,
 .trail-account .data-handling {
   margin-top: 1rem;
-}
-
-.trail-shell .capture-section-title {
-  font-size: clamp(1.35rem, 3vw, 1.8rem);
-}
-
-.trail-shell h1.capture-section-title {
-  max-width: none;
 }
 
 .topbar,
@@ -924,30 +947,6 @@ h1 {
   color: var(--muted);
 }
 
-.capture-section {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.capture-section-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.9rem;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.capture-section-title {
-  margin: 0;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  line-height: 0.95;
-  font-size: 1.35rem;
-}
-
 .capture-revision {
   color: var(--muted);
   font-family: var(--font-mono);
@@ -955,17 +954,6 @@ h1 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.62rem;
-}
-
-.capture-list {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.capture-list > li:first-child .capture-entry {
-  border-top: 1px solid var(--line);
 }
 
 .capture-entry {
@@ -1053,11 +1041,7 @@ h1 {
   line-height: 1.45;
 }
 
-.trail-timeline {
-  margin-bottom: 0.25rem;
-}
-
-.threads-queue {
+.desk-workspace {
   display: grid;
   gap: 1.5rem;
   width: min(100%, 48rem);
@@ -1066,7 +1050,7 @@ h1 {
     max(2rem, env(safe-area-inset-bottom));
 }
 
-.threads-queue-header {
+.desk-header {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
@@ -1074,75 +1058,105 @@ h1 {
   align-items: flex-start;
 }
 
-.threads-queue-header h1 {
+.desk-header h1 {
   margin: 0.15rem 0 0.4rem;
   font-size: clamp(1.8rem, 5vw, 2.6rem);
 }
 
-.threads-queue-header p {
+.desk-header p {
   margin: 0;
   max-width: 36rem;
   color: var(--muted);
   line-height: 1.45;
 }
 
-.threads-day {
-  display: grid;
-  gap: 0.75rem;
-}
+/* --- The day list: one ruled row per walk ---------------------------------- */
 
-.threads-day h2 {
+.desk-days {
+  list-style: none;
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  line-height: 1.05;
-  font-size: 1.05rem;
-  color: var(--moss);
-}
-
-.threads-day-select {
+  padding: 0;
   display: grid;
-  gap: 0.15rem;
-  width: 100%;
-  text-align: left;
-  appearance: none;
-  border: 0;
+}
+
+.desk-day {
   border-bottom: 1px solid var(--line);
-  background: transparent;
-  padding: 0.35rem 0.25rem 0.55rem;
+}
+
+.desk-days > li:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.desk-day-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 0.9rem;
+  align-items: baseline;
+  padding: 0.85rem 0.35rem;
+  text-decoration: none;
   color: inherit;
-  cursor: pointer;
-  border-radius: 4px;
 }
 
-.threads-day-select:hover {
-  background: rgba(169, 209, 143, 0.06);
+.desk-day-open:hover .desk-day-title {
+  color: var(--moss);
 }
 
-.threads-day-select[aria-pressed="true"],
-.threads-day-selected .threads-day-select {
-  background: rgba(169, 209, 143, 0.1);
-  border-bottom-color: rgba(169, 209, 143, 0.45);
-}
-
-.threads-day-select-title {
+.desk-day-title {
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   line-height: 1.05;
-  font-size: 1.05rem;
-  color: var(--moss);
+  font-size: 1.15rem;
+  color: var(--ink);
 }
 
-.threads-day-select-hint {
+.desk-day-tally {
+  grid-column: 1;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
+  font-size: 0.62rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--muted);
+}
+
+.desk-day-state {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.desk-day-state-open {
+  color: var(--moss);
+}
+
+/* An unanswered question is stuck work — clay, and never an alarm. */
+.desk-day-attention .desk-day-state-open {
+  color: var(--attention);
+}
+
+.desk-day-selected {
+  background: rgba(169, 209, 143, 0.08);
+}
+
+/* The day's Threads, printed inside the day between its sheet and the chat. */
+.day-threads {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* Filed Threads settle back: still readable, no longer asking. */
+.thread-row-filed .thread-row-title {
   color: var(--muted);
 }
 
@@ -1221,8 +1235,10 @@ h1 {
   align-items: start;
 }
 
+/* The date names the surface; it does not need to shout it. */
 .day-digest-header h1 {
   margin: 0.15rem 0 0.35rem;
+  font-size: clamp(1.25rem, 4.5vw, 1.6rem);
 }
 
 .day-digest-header p {
@@ -2613,11 +2629,12 @@ footer {
   text-transform: uppercase;
 }
 
-/* Quiet Interview entry on the Threads desk header. */
-.threads-queue-side {
-  display: grid;
-  gap: 0.5rem;
-  justify-items: end;
+/* Quiet Interview entry on the Days header. */
+.desk-header-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
 }
 
 .interview-entry {
@@ -2715,7 +2732,7 @@ footer {
 
 /* Every routed surface clears the fixed tab bar. */
 .trail-shell,
-.threads-queue,
+.desk-workspace,
 .offline-maps,
 .journal,
 .thread-chat-page {
@@ -2769,29 +2786,7 @@ footer {
   background: var(--attention);
 }
 
-/* --- Walk view: day photo strip + dense rows ------------------------------ */
-
-.threads-day-photos {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.threads-day-photo {
-  display: block;
-  width: 6.4rem;
-  height: 4.8rem;
-  border-radius: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-
-.threads-day-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+/* --- Desk rows: the walker's words under each Thread title ---------------- */
 
 .thread-row-words {
   color: var(--ink);
@@ -2882,10 +2877,19 @@ footer {
   font-size: 0.68rem;
 }
 
-.thread-media-name {
+/* Where the bytes are, stated plainly under every attachment at the desk. */
+.thread-media-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.45rem;
+  margin: 0.3rem 0 0.35rem;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   overflow-wrap: anywhere;
 }
 
@@ -3105,27 +3109,27 @@ footer {
 
 /* --- Threads master-detail workspace --------------------------------------- */
 
-.threads-list-pane {
+.desk-list-pane {
   display: grid;
   gap: 1.5rem;
 }
 
 /* Phone: selection swaps panes — list OR Thread, never both. */
-.threads-workspace:not(.has-selection) .threads-detail-pane {
+.desk-workspace:not(.has-selection) .desk-detail-pane {
   display: none;
 }
 
-.threads-workspace.has-selection {
+.desk-workspace.has-selection {
   width: 100%;
   max-width: none;
   padding: 0 0 var(--tabbar-h);
 }
 
-.threads-workspace.has-selection .threads-list-pane {
+.desk-workspace.has-selection .desk-list-pane {
   display: none;
 }
 
-.threads-detail-pane .thread-chat {
+.desk-detail-pane .thread-chat {
   /* Bounded, not min: the log scrolls internally so the composer and the
      fixed tab bar always stay on screen (a growing page pushes the layout
      viewport past the visual one on mobile). */
@@ -3138,7 +3142,7 @@ footer {
   justify-content: flex-end;
 }
 
-.threads-detail-empty {
+.desk-detail-empty {
   display: grid;
   place-items: center;
   height: 100%;
@@ -3152,8 +3156,8 @@ footer {
 
 /* Desktop: full-screen split — day list left, Thread review right. */
 @media (min-width: 960px) {
-  .threads-workspace,
-  .threads-workspace.has-selection {
+  .desk-workspace,
+  .desk-workspace.has-selection {
     display: grid;
     grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
     gap: 0;
@@ -3165,8 +3169,8 @@ footer {
     margin: 0;
   }
 
-  .threads-workspace .threads-list-pane,
-  .threads-workspace.has-selection .threads-list-pane {
+  .desk-workspace .desk-list-pane,
+  .desk-workspace.has-selection .desk-list-pane {
     display: grid;
     gap: 1.25rem;
     align-content: start;
@@ -3175,137 +3179,40 @@ footer {
     border-right: 1px solid var(--line);
   }
 
-  .threads-workspace .threads-detail-pane,
-  .threads-workspace.has-selection .threads-detail-pane {
+  .desk-workspace:not(.has-selection) .desk-detail-pane,
+  .desk-workspace.has-selection .desk-detail-pane {
     display: block;
     overflow: hidden;
     min-width: 0;
   }
 
-  .threads-detail-pane .thread-chat {
+  .desk-detail-pane .thread-chat {
     height: 100%;
     min-height: 0;
     width: 100%;
     max-width: none;
   }
 
-  .threads-detail-pane .day-digest-pane {
+  .desk-detail-pane .day-digest-pane {
     height: 100%;
     min-height: 0;
   }
 
-  .threads-detail-pane .thread-chat-log,
-  .threads-detail-pane .thread-chat-header,
-  .threads-detail-pane .thread-chat-composer {
+  .desk-detail-pane .thread-chat-log,
+  .desk-detail-pane .thread-chat-header,
+  .desk-detail-pane .thread-chat-composer {
     width: min(100%, 46rem);
     margin-inline: auto;
     box-sizing: border-box;
   }
 
-  .threads-detail-pane .thread-chat-log {
+  .desk-detail-pane .thread-chat-log {
     overflow-y: auto;
   }
 }
 
-/* --- Review queue: New/All chips + search ---------------------------------- */
-
-.threads-queue-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-/* Day strip: one horizontal row of day chips — the archive's calendar.
-   It scrolls sideways on its own; the page never does. */
-.threads-day-strip {
-  display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-  scrollbar-width: thin;
-}
-
-.threads-day-chip {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.threads-day-chip.active {
-  border-color: rgba(169, 209, 143, 0.55);
-  background: rgba(169, 209, 143, 0.12);
-  color: var(--identity);
-}
-
-.threads-day-chip-count {
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-  opacity: 0.75;
-}
-
-/* Kind strip: the machine's reading of what each Thread is. Sky, because
-   the classification is the machine's voice — never the walker's. */
-.threads-kind-strip {
-  display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-  scrollbar-width: thin;
-}
-
-.threads-kind-chip {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.threads-kind-chip.active {
-  border-color: rgba(143, 184, 216, 0.55);
-  background: rgba(143, 184, 216, 0.12);
-  color: var(--machine);
-}
-
-.threads-kind-chip-count {
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-  opacity: 0.75;
-}
-
 /* Clay is stuck work that needs the walker — an unanswered question is
    exactly that, and never an alarm. */
-.threads-kind-chip-ask.active {
-  border-color: rgba(240, 180, 160, 0.55);
-  background: rgba(240, 180, 160, 0.12);
-  color: var(--attention);
-}
-
 .thread-row-ask {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -3366,31 +3273,6 @@ footer {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--machine);
-}
-
-.threads-queue-chips {
-  display: flex;
-  gap: 0.3rem;
-  padding: 0.2rem;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-}
-
-.threads-queue-chip {
-  border: 0;
-  border-radius: 4px;
-  padding: 0.35rem 0.9rem;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.threads-queue-chip.active {
-  background: rgba(169, 209, 143, 0.14);
-  color: var(--identity);
 }
 
 .threads-search {
@@ -3484,70 +3366,20 @@ footer {
   font-variant-numeric: tabular-nums;
 }
 
-.day-sheet-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.day-sheet-block-label {
+/* Clay: an unanswered question is stuck work that needs the walker. */
+.day-sheet-asks {
   margin: 0;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 0.62rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
-}
-
-.day-sheet-block ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.95rem;
-}
-
-.day-sheet-block a {
-  color: var(--ink);
-}
-
-.day-sheet-asks .day-sheet-block-label {
-  color: var(--attention);
-}
-
-.day-sheet-asks li::marker {
   color: var(--attention);
 }
 
 
 /* --- Filing: the walker settles what the Enrichment guessed --------------- */
-
-.threads-project-chip {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.threads-project-chip.active {
-  border-color: rgba(244, 207, 114, 0.55);
-  background: rgba(244, 207, 114, 0.12);
-  color: var(--sun);
-}
 
 /* A Project the walker confirmed reads plainly; a guess keeps its question
    mark and the machine's sky until they settle it. */

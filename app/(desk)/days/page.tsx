@@ -1,8 +1,8 @@
 export const metadata = {
-  title: "Threads — Walking Thoughts",
+  title: "Days — Walking Thoughts",
 };
 
 /** The workspace renders from the layout; this route adds nothing. */
-export default function ThreadsPage() {
+export default function DaysPage() {
   return null;
 }

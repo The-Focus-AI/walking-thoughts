@@ -106,8 +106,10 @@ export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
 type DailyDigestPanelProps = {
   /** Local calendar day (YYYY-MM-DD) to chat about. */
   dayKey: string;
-  /** Mobile close — returns to the day list. */
+  /** Close — returns to the day list. */
   onClose?: () => void;
+  /** The day's Threads, printed between the day sheet and the conversation. */
+  children?: React.ReactNode;
 };
 
 /**
@@ -157,43 +159,31 @@ function DaySheetPanel({ sheet }: { sheet: DaySheet }) {
         </p>
       ) : null}
 
+      {/* What the day still wants is stated once, as a count. The Threads
+          themselves are listed right below with their own chips — repeating
+          them here made the same link appear twice. */}
       {sheet.needsWord.length > 0 ? (
-        <div className="day-sheet-block day-sheet-asks">
-          <p className="day-sheet-block-label">Needs a word from you</p>
-          <ul>
-            {sheet.needsWord.map((thread) => (
-              <li key={thread.threadId}>
-                <a href={`/threads/${thread.threadId}`}>{thread.title}</a>
-                {thread.ask ? <span> — {thread.ask}</span> : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {sheet.toDo.length > 0 ? (
-        <div className="day-sheet-block">
-          <p className="day-sheet-block-label">To do from this day</p>
-          <ul>
-            {sheet.toDo.map((thread) => (
-              <li key={thread.threadId}>
-                <a href={`/threads/${thread.threadId}`}>{thread.title}</a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <p className="day-sheet-asks" data-testid="day-sheet-asks">
+          {sheet.needsWord.length}{" "}
+          {sheet.needsWord.length === 1 ? "Thread needs" : "Threads need"} a
+          word from you
+        </p>
       ) : null}
     </aside>
   );
 }
 
 /**
- * An ongoing chat with one whole day — every Thread's Captures and
- * Enrichments. The transcript is retained on this phone per day, and each
- * ask carries the conversation so far, so the walker can go back and
- * forth instead of firing one-off digests.
+ * One day at the desk: what it holds, the Threads it left, and an ongoing
+ * conversation with all of them at once. The transcript is retained on this
+ * phone per day, and each ask carries the conversation so far, so the walker
+ * can go back and forth instead of firing one-off digests.
  */
-export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
+export function DailyDigestPanel({
+  dayKey,
+  onClose,
+  children,
+}: DailyDigestPanelProps) {
   const dayHeading = formatDayHeading(dayKey);
   const isToday = dayKey === calendarDayKey();
   const [draft, setDraft] = useState("");
@@ -321,12 +311,9 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
     >
       <header className="day-digest-header">
         <div>
-          <p className="eyebrow">Day chat</p>
+          <p className="eyebrow">{isToday ? "Today" : "Day"}</p>
           <h1>{dayHeading}</h1>
-          <p>
-            Talk with every Thread from this day — the conversation keeps its
-            history on this phone.
-          </p>
+          <p>Read it, file it, and ask the whole day anything.</p>
         </div>
         <div className="day-digest-header-tools">
           {messages.length > 0 ? (
@@ -343,7 +330,7 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
             <button
               type="button"
               className="journal-close"
-              aria-label="Close day chat"
+              aria-label="Close day"
               onClick={onClose}
             >
               <svg
@@ -363,6 +350,7 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
 
       <div className="day-chat-log" ref={logRef}>
         {sheet ? <DaySheetPanel sheet={sheet} /> : null}
+        {children}
         {messages.length === 0 && !busy ? (
           <div
             className="digest-suggestions"

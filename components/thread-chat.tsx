@@ -10,6 +10,13 @@ import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
 import { readAvailableLocation } from "@/lib/local-capture/location";
+import {
+  canOfferLocalRemoval,
+  mediaAvailability,
+  mediaAvailabilityLabel,
+  removeLocalOriginal,
+  restoreLocalOriginal,
+} from "@/lib/local-capture/local-media-retention";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import { chronologicalThreadEntries } from "@/lib/local-capture/thread-timeline";
@@ -20,6 +27,7 @@ import type {
   LocalThread,
 } from "@/lib/local-capture/types";
 import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
+import { getMediaTransport } from "@/lib/sync/media-client";
 import { getReviewTransport } from "@/lib/sync/review-client";
 import { getSplitTransport } from "@/lib/sync/split-client";
 import { threadToMarkdown } from "@/lib/thread-export/markdown";
@@ -99,11 +107,73 @@ function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
       />
     );
   }
-  return <span className="thread-media-name">{attachment.fileName}</span>;
+  // Nothing to show: the meta line under it already names the file and says
+  // where the bytes are.
+  return null;
+}
+
+type MediaRetention = {
+  onRemoveLocal: (captureId: string, attachmentId: string) => void;
+  onRestoreLocal: (captureId: string, attachmentId: string) => void;
+};
+
+/**
+ * One attachment with its honest storage state: where the bytes are, and the
+ * one act available on them. Freeing the phone is a desk decision — it can
+ * only be offered once the private server copy is verified.
+ */
+function MediaItem({
+  captureId,
+  attachment,
+  retention,
+}: {
+  captureId: string;
+  attachment: LocalAttachment;
+  retention?: MediaRetention;
+}) {
+  const availability = mediaAvailability(attachment);
+  return (
+    <li>
+      <MediaPreview attachment={attachment} />
+      <p className="thread-media-meta">
+        <span>{attachment.fileName}</span>
+        <span aria-hidden="true">·</span>
+        <span className={`media-availability availability-${availability}`}>
+          {mediaAvailabilityLabel(availability)}
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>{statusLabel(attachment.syncStatus)}</span>
+      </p>
+      {retention && canOfferLocalRemoval(attachment) ? (
+        <button
+          type="button"
+          className="media-remove-local"
+          onClick={() => retention.onRemoveLocal(captureId, attachment.id)}
+        >
+          Remove from device
+        </button>
+      ) : null}
+      {retention && availability === "online_only" ? (
+        <button
+          type="button"
+          className="media-restore-local"
+          onClick={() => retention.onRestoreLocal(captureId, attachment.id)}
+        >
+          Download to device
+        </button>
+      ) : null}
+    </li>
+  );
 }
 
 /** The Thread's base Capture, presented as the page's subject. */
-function CaptureHero({ capture }: { capture: LocalCapture }) {
+function CaptureHero({
+  capture,
+  retention,
+}: {
+  capture: LocalCapture;
+  retention?: MediaRetention;
+}) {
   return (
     <article
       className="thread-capture-hero"
@@ -114,9 +184,12 @@ function CaptureHero({ capture }: { capture: LocalCapture }) {
       {capture.attachments.length > 0 ? (
         <ul className="thread-capture-media">
           {capture.attachments.map((attachment) => (
-            <li key={attachment.id}>
-              <MediaPreview attachment={attachment} />
-            </li>
+            <MediaItem
+              key={attachment.id}
+              captureId={capture.id}
+              attachment={attachment}
+              retention={retention}
+            />
           ))}
         </ul>
       ) : null}
@@ -150,7 +223,13 @@ function CaptureHero({ capture }: { capture: LocalCapture }) {
  * (time over status) with the walker's words in italic serif — the italic
  * itself says "you said this"; no speaker labels, no bubbles.
  */
-function ConversationCapture({ capture }: { capture: LocalCapture }) {
+function ConversationCapture({
+  capture,
+  retention,
+}: {
+  capture: LocalCapture;
+  retention?: MediaRetention;
+}) {
   return (
     <article
       className="thread-entry capture-gutter"
@@ -176,9 +255,12 @@ function ConversationCapture({ capture }: { capture: LocalCapture }) {
         {capture.attachments.length > 0 ? (
           <ul className="chat-attachments">
             {capture.attachments.map((attachment) => (
-              <li key={attachment.id}>
-                <MediaPreview attachment={attachment} />
-              </li>
+              <MediaItem
+                key={attachment.id}
+                captureId={capture.id}
+                attachment={attachment}
+                retention={retention}
+              />
             ))}
           </ul>
         ) : null}
@@ -282,6 +364,63 @@ export function ThreadChat({
     };
   }, []);
 
+  /**
+   * Free the phone of one original once the private server copy verifies —
+   * and pull it back down on request. The Thread stays readable either way.
+   */
+  async function onRemoveLocal(captureId: string, attachmentId: string) {
+    const transport = getMediaTransport();
+    if (!transport.verify || !transport.download) {
+      setError("Media verification is unavailable");
+      return;
+    }
+    try {
+      await removeLocalOriginal({
+        store: getCaptureStore(),
+        mediaStore: createIdbMediaStore(),
+        captureId,
+        attachmentId,
+        remote: {
+          verify: (id) => transport.verify!(id),
+          download: (id) => transport.download!(id),
+        },
+      });
+      await refresh();
+    } catch {
+      setError("Could not remove local media until the server copy is verified");
+    }
+  }
+
+  async function onRestoreLocal(captureId: string, attachmentId: string) {
+    const transport = getMediaTransport();
+    if (!transport.download) {
+      setError("Media download is unavailable");
+      return;
+    }
+    try {
+      await restoreLocalOriginal({
+        store: getCaptureStore(),
+        mediaStore: createIdbMediaStore(),
+        captureId,
+        attachmentId,
+        remote: {
+          verify: async (id) => (transport.verify ? transport.verify(id) : true),
+          download: (id) => transport.download!(id),
+        },
+      });
+      await refresh();
+    } catch {
+      setError("Could not restore media from the private server copy");
+    }
+  }
+
+  const retention: MediaRetention = {
+    onRemoveLocal: (captureId, attachmentId) =>
+      void onRemoveLocal(captureId, attachmentId),
+    onRestoreLocal: (captureId, attachmentId) =>
+      void onRestoreLocal(captureId, attachmentId),
+  };
+
   /** The desk-processing action: reviewed Threads leave the New queue. */
   async function toggleReviewed() {
     if (reviewBusy || !thread) return;
@@ -319,7 +458,7 @@ export function ThreadChat({
       const store = getCaptureStore();
       await store.trashThread(threadId);
       void runSyncCycle({ store });
-      router.push("/threads");
+      router.push("/days");
     } catch {
       setError("Could not move this Thread to Trash");
     }
@@ -341,12 +480,12 @@ export function ThreadChat({
         // Server already has these Captures in their own Threads (or never
         // saw this local grouping) — hydration rehomes them to server truth.
         await runSyncCycle({ store });
-        router.push("/threads");
+        router.push("/days");
         return;
       }
       await store.applyThreadSplit(result);
       void runSyncCycle({ store });
-      router.push("/threads");
+      router.push("/days");
     } catch {
       setError("Could not split this Thread");
     } finally {
@@ -408,8 +547,8 @@ export function ThreadChat({
       <header className="thread-chat-header">
         <div>
           {!embedded ? (
-            <Link className="topbar-link" href="/threads">
-              ← Threads
+            <Link className="topbar-link" href="/days">
+              ← Days
             </Link>
           ) : null}
           <h1>{thread?.title ?? "Thread"}</h1>
@@ -511,11 +650,15 @@ export function ThreadChat({
         aria-live="polite"
       >
         {baseCapture?.kind === "capture" ? (
-          <CaptureHero capture={baseCapture.capture} />
+          <CaptureHero capture={baseCapture.capture} retention={retention} />
         ) : null}
         {conversation.map((entry) =>
           entry.kind === "capture" ? (
-            <ConversationCapture key={entry.capture.id} capture={entry.capture} />
+            <ConversationCapture
+              key={entry.capture.id}
+              capture={entry.capture}
+              retention={retention}
+            />
           ) : (
             <EnrichmentReport
               key={entry.enrichment.id}

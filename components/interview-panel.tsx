@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AccountExport } from "@/components/account-export";
 import { AppNav } from "@/components/app-nav";
+import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { ScaleBar } from "@/components/sheet";
 import type { InterviewTurn } from "@/lib/interview/types";
 import { revertedPatchIds } from "@/lib/memory/patches";
@@ -433,10 +435,19 @@ export function InterviewPanel() {
         <PatchLedger patches={patches} onRevert={(id) => void revert(id)} />
       </section>
 
+      <details className="trail-account">
+        <summary>Account &amp; data handling</summary>
+        <AccountExport />
+        <DataHandlingDisclosure />
+      </details>
+
       <footer className="interview-footer">
         <ScaleBar />
         <p className="interview-footer-line">
           Learned from your own words · revertible line by line
+        </p>
+        <p className="interview-footer-line">
+          Local first · Private cloud media · no end-to-end encryption claim
         </p>
         <p className="interview-footer-line">
           {memories.length} {memories.length === 1 ? "Memory" : "Memories"} ·{" "}

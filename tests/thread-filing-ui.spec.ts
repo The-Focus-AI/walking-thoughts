@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openCaptureShell } from "./helpers/capture-shell";
+import { commitCapture, openCaptureShell } from "./helpers/capture-shell";
 
 /**
  * Filing at the desk: the walker confirms what the Enrichment guessed, puts
@@ -46,11 +46,13 @@ test("filing a Thread clears it from New", async ({ page }) => {
   });
 
   await openCaptureShell(page);
-  await page.getByLabel("Capture text").fill("The umwelten reader should show sensory worlds");
-  await page.getByRole("button", { name: "Capture" }).click();
-  await expect(page.getByRole("article", { name: /umwelten reader/ })).toBeVisible();
+  await commitCapture(page, "The umwelten reader should show sensory worlds");
 
-  await page.goto("/threads");
+  await page.goto("/days");
+  await expect(page.locator(".desk-day-open").first()).toContainText(
+    "1 waiting",
+  );
+  await page.locator(".desk-day-open").first().click();
   const row = page.getByRole("link", { name: /umwelten reader/ });
   await expect(row).toBeVisible();
 
@@ -59,18 +61,15 @@ test("filing a Thread clears it from New", async ({ page }) => {
   await expect(page.getByTestId("thread-filing")).toBeVisible();
   await page.getByTestId("file-project-proj-umwelten").click();
 
-  // Filed: the Thread has left the New queue, and the sit-down is done.
-  await expect(row).toHaveCount(0);
-  await expect(
-    page.getByText("Everything is filed. Sitting down afterwards is done."),
-  ).toBeVisible();
-
-  // All still reaches it, carrying the Project it was filed into.
-  await page.getByRole("tab", { name: "All" }).click();
+  // Filed: the Thread settles in place, carrying the Project it went into,
+  // and the day says the sit-down is done.
   await expect(row).toBeVisible();
   await expect(page.getByTestId("thread-project-chip")).toHaveText("Umwelten");
   await expect(page.getByTestId("thread-reviewed-chip")).toBeVisible();
-  await expect(page.getByTestId("project-chip-proj-umwelten")).toContainText(
-    "1",
+  await expect(page.locator(".thread-row")).toHaveClass(/thread-row-filed/);
+
+  await page.goto("/days");
+  await expect(page.locator(".desk-day-open").first()).toContainText(
+    "All filed",
   );
 });

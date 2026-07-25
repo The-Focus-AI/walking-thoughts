@@ -13,7 +13,7 @@ export function OfflineReadiness() {
       "/",
       "/offline",
       "/offline-maps",
-      "/threads",
+      "/days",
       "/journal",
       "/manifest.webmanifest",
       "/icon-192.svg",

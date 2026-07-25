@@ -58,11 +58,13 @@ test.describe("offline text Captures", () => {
 
     await page.getByRole("button", { name: "Capture" }).click();
 
-    const saved = page.getByRole("article", {
-      name: /Trail fork smelled like pine sap/,
-    });
-    await expect(saved).toBeVisible();
-    await expect(saved.getByText("Saved locally")).toBeVisible();
+    // The trail surface reports the day as a tally, not a list of entries.
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "1 Capture today",
+    );
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "1 Saved locally",
+    );
     await expect(page.getByLabel("Capture text")).toHaveValue("");
     await expect(page.getByText(/Device storage:/)).toBeVisible();
     await expect
@@ -85,10 +87,9 @@ test.describe("offline text Captures", () => {
       .toBeNull();
 
     await page.reload();
-    await expect(
-      page.getByRole("article", { name: /Trail fork smelled like pine sap/ }),
-    ).toBeVisible();
-    await expect(page.getByText("Saved locally")).toBeVisible();
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "1 Saved locally",
+    );
 
     await page
       .getByLabel("Capture text")
@@ -128,8 +129,8 @@ test.describe("offline text Captures", () => {
     await expect(page.getByLabel("Capture text")).toHaveValue(
       "Keep this draft if storage fails",
     );
-    await expect(
-      page.getByRole("article", { name: /Keep this draft if storage fails/ }),
-    ).toHaveCount(0);
+    await expect(page.getByTestId("capture-tally")).toContainText(
+      "1 Capture today",
+    );
   });
 });

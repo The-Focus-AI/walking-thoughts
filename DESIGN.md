@@ -292,8 +292,13 @@ from the losing Field Notebook variant); UI text sits at 1.45–1.5.
   in condensed 500), instrument strip, log, footer. Chrome that floats
   (tab bar, sync pill, capture dock) sits outside the sheet.
 - **Mobile first, thumb first.** Android-first PWA: fixed bottom tab bar
-  (Capture / Threads / Map / You), Capture dock sticky above it in the thumb
+  (Capture / Days / Map / You), Capture dock sticky above it in the thumb
   zone. Respect `env(safe-area-inset-*)` everywhere.
+- **Two surfaces, two jobs.** Capture is the trail instrument and holds
+  only the map, the composer, and the day's tally — never a list of
+  Threads. Days is the desk, where a walk is read, answered, and filed.
+  The only thing that crosses from desk to trail is one line of count
+  ("2 reports ready"), never the reports themselves.
 - **Dense on mobile, spacious on desktop.** The phone is the field
   instrument — notebook, topo map, kneeboard: tight 8–12px gaps, the
   station gutter carrying structure, no decorative padding. The desktop

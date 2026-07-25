@@ -33,13 +33,14 @@ const TABS: Tab[] = [
     ),
   },
   {
-    href: "/threads",
-    label: "Threads",
-    isActive: (pathname) => pathname.startsWith("/threads"),
+    href: "/days",
+    label: "Days",
+    isActive: (pathname) =>
+      pathname.startsWith("/days") || pathname.startsWith("/threads"),
     icon: (
       <svg {...ICON_PROPS}>
-        <path d="M21 12a8 8 0 0 1-8 8H4l1.6-3.2A8 8 0 1 1 21 12Z" />
-        <path d="M8.5 10.5h7M8.5 13.5h4.5" />
+        <rect x="3.5" y="5" width="17" height="15" rx="1.5" />
+        <path d="M3.5 10h17M8 3v4M16 3v4" />
       </svg>
     ),
   },
@@ -70,7 +71,7 @@ const TABS: Tab[] = [
 
 /**
  * Persistent bottom tab bar — the single navigation surface shared by every
- * screen so Capture, Threads, Map, and You are always one thumb-tap away.
+ * screen so Capture, Days, Map, and You are always one thumb-tap away.
  */
 export function AppNav() {
   const pathname = usePathname() ?? "/";

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { commitCapture, openCaptureShell } from "./helpers/capture-shell";
 
 /**
  * Public seam: asking a day digest must POST /api/digest even when
@@ -7,13 +8,8 @@ import { expect, test } from "@playwright/test";
 test("day digest Ask reaches /api/digest without waiting on hung Enrichments", async ({
   page,
 }) => {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await page.getByLabel("Capture text").fill("Ridge wall question for digest");
-  await page.getByRole("button", { name: "Capture" }).click();
-  await expect(
-    page.getByRole("article", { name: /Ridge wall question for digest/ }),
-  ).toBeVisible();
+  await openCaptureShell(page);
+  await commitCapture(page, "Ridge wall question for digest");
 
   let digestPosted = false;
   await page.route("**/api/digest", async (route) => {
@@ -31,15 +27,12 @@ test("day digest Ask reaches /api/digest without waiting on hung Enrichments", a
   // Hang Enrichment reads after the Capture exists — Ask must not wait on them.
   await page.route("**/api/enrichment/threads/**", () => {});
 
-  await page.goto("/threads");
+  await page.goto("/days");
+  await page.locator(".desk-day-open").first().click();
+  await expect(page.getByTestId("daily-digest")).toBeVisible();
   await expect(page.getByRole("link", { name: /Ridge wall/ })).toBeVisible({
     timeout: 15_000,
   });
-  await page
-    .getByRole("button", { name: /Chat about this day/i })
-    .first()
-    .click();
-  await expect(page.getByTestId("daily-digest")).toBeVisible();
 
   await page
     .getByRole("button", { name: "Create a task checklist of the day" })
@@ -57,13 +50,8 @@ test("day digest Ask reaches /api/digest without waiting on hung Enrichments", a
  * the turns so far, and the transcript survives a reload.
  */
 test("day chat keeps history across asks and reloads", async ({ page }) => {
-  await page.goto("/offline");
-  await expect(page.getByLabel("Capture text")).toBeVisible();
-  await page.getByLabel("Capture text").fill("Mossy ledge by the spring");
-  await page.getByRole("button", { name: "Capture" }).click();
-  await expect(
-    page.getByRole("article", { name: /Mossy ledge by the spring/ }),
-  ).toBeVisible();
+  await openCaptureShell(page);
+  await commitCapture(page, "Mossy ledge by the spring");
 
   const histories: unknown[][] = [];
   await page.route("**/api/digest", async (route) => {
@@ -79,11 +67,8 @@ test("day chat keeps history across asks and reloads", async ({ page }) => {
     });
   });
 
-  await page.goto("/threads");
-  await page
-    .getByRole("button", { name: /Chat about this day/i })
-    .first()
-    .click();
+  await page.goto("/days");
+  await page.locator(".desk-day-open").first().click();
   await expect(page.getByTestId("daily-digest")).toBeVisible();
 
   // First ask starts the conversation.

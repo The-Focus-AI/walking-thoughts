@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { captureCount } from "./helpers/capture-shell";
 
 function installFakeRecorder(page: import("@playwright/test").Page) {
   return page.addInitScript(() => {
@@ -65,10 +66,11 @@ test("compact capture dock records audio via tap-to-toggle and stages for review
   await expect(page.getByText(/Recording ready|review/i).first()).toBeVisible();
   await page.getByRole("button", { name: "Capture" }).click();
 
-  await expect(
-    page.getByRole("article").filter({ hasText: /audio-/i }),
-  ).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("Saved locally").first()).toBeVisible();
+  await expect.poll(() => captureCount(page)).toBe(1);
+  await expect(page.getByTestId("capture-tally")).toContainText(
+    "1 Capture today",
+  );
+  await expect(page.getByLabel("Selected media")).toHaveCount(0);
   await expect(page.getByText(/Network offline|Network online/)).toBeVisible();
 });
 
@@ -89,14 +91,13 @@ test("video record stages a preview draft instead of auto-committing", async ({
   await expect(
     page.getByRole("button", { name: "Add photo or video" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("article").filter({ hasText: /video-/i }),
-  ).toHaveCount(0);
+  await expect.poll(() => captureCount(page)).toBe(0);
 
   await page.getByRole("button", { name: "Capture" }).click();
-  await expect(
-    page.getByRole("article").filter({ hasText: /video-/i }),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => captureCount(page)).toBe(1);
+  await expect(page.getByTestId("capture-tally")).toContainText(
+    "1 Capture today",
+  );
 });
 
 test("capture dock fits narrow phones without horizontal scrolling", async ({
