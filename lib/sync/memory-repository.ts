@@ -1,4 +1,5 @@
 import { titleFromText } from "@/lib/local-capture/thread-destination";
+import { asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   PurgeExpiredResult,
@@ -23,11 +24,18 @@ type StoredThread = {
   revision: number;
   updatedAt: string;
   reviewedAt?: string | null;
+  kind?: string | null;
+  topics?: string[];
+  ask?: string | null;
+  projectId?: string | null;
 };
+
+type StoredProject = { id: string; userId: string; name: string; createdAt: string };
 
 type MemoryState = {
   captures: Map<string, StoredCapture>;
   threads: Map<string, StoredThread>;
+  projects: Map<string, StoredProject>;
   /** idempotencyKey -> capture id */
   idempotency: Map<string, string>;
   trash: Map<string, TrashRecord & { userId: string }>;
@@ -39,6 +47,7 @@ function createState(): MemoryState {
   return {
     captures: new Map(),
     threads: new Map(),
+    projects: new Map(),
     idempotency: new Map(),
     trash: new Map(),
     trashOps: new Map(),
@@ -331,6 +340,13 @@ export function createMemoryThreadRepository(
             revision: thread.revision,
             updatedAt: thread.updatedAt,
             reviewedAt: thread.reviewedAt ?? null,
+            kind: asThreadKind(thread.kind),
+            topics: thread.topics ?? [],
+            ask: thread.ask ?? null,
+            projectId: thread.projectId ?? null,
+            projectName: thread.projectId
+              ? (db.projects.get(`${userId}:${thread.projectId}`)?.name ?? null)
+              : null,
             captures,
           } satisfies ServerThread;
         })
@@ -452,6 +468,79 @@ export function createMemoryThreadRepository(
       const existing = db.threads.get(key);
       if (!existing) return;
       db.threads.set(key, { ...existing, title });
+    },
+
+    async listProjects(userId) {
+      return [...state().projects.values()]
+        .filter((project) => project.userId === userId)
+        .map(({ id, name, createdAt }) => ({ id, name, createdAt }))
+        .sort((a, b) => (a.name < b.name ? -1 : 1));
+    },
+
+    async createProject(userId, name) {
+      const db = state();
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("project_name_required");
+      const existing = [...db.projects.values()].find(
+        (project) => project.userId === userId && project.name === trimmed,
+      );
+      if (existing) {
+        return {
+          id: existing.id,
+          name: existing.name,
+          createdAt: existing.createdAt,
+        };
+      }
+      const project: StoredProject = {
+        id: crypto.randomUUID(),
+        userId,
+        name: trimmed,
+        createdAt: new Date().toISOString(),
+      };
+      db.projects.set(`${userId}:${project.id}`, project);
+      return {
+        id: project.id,
+        name: project.name,
+        createdAt: project.createdAt,
+      };
+    },
+
+    async fileThread(userId, threadId, filing) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return null;
+      db.threads.set(key, {
+        ...existing,
+        reviewedAt: filing.reviewedAt,
+        kind: filing.kind ?? existing.kind ?? null,
+        projectId:
+          filing.projectId === undefined
+            ? (existing.projectId ?? null)
+            : filing.projectId,
+      });
+      const threads = await this.listThreads(userId);
+      return threads.find((thread) => thread.id === threadId) ?? null;
+    },
+
+    async updateThreadClassification(userId, threadId, classification) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return;
+      db.threads.set(key, {
+        ...existing,
+        // An Enrichment that could not tell leaves the prior verdict standing,
+        // and a walker's own filing outranks any later guess.
+        kind: existing.reviewedAt
+          ? (existing.kind ?? null)
+          : (classification.kind ?? existing.kind ?? null),
+        topics:
+          classification.topics.length > 0
+            ? classification.topics
+            : (existing.topics ?? []),
+        ask: classification.ask,
+      });
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

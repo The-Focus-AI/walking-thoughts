@@ -1,25 +1,19 @@
-import type { CaptureLocation, MediaKind } from "@/lib/local-capture/types";
+import type {
+  CaptureLocation,
+  MediaKind,
+  ThreadKind,
+} from "@/lib/local-capture/types";
 import type { ResearchClient, ResearchStep } from "./research";
 import type { WebSearchClient, WebSearchResult } from "./search";
 
 export type EnrichmentJobStatus = "queued" | "running" | "failed" | "complete";
 
 /**
- * What a Thread is, decided by the model as it writes the Enrichment. Drives
- * the register of the report and, downstream, where the Thread belongs:
- * tasks in a checklist, ideas on a board, places on the map.
+ * The kind drives the register of the report and, downstream, where the
+ * Thread belongs: tasks in a checklist, ideas on a board, places on the map.
+ * Declared with the other Thread types so both sides share one list.
  */
-export const THREAD_KINDS = [
-  "question",
-  "idea",
-  "task",
-  "observation",
-  "place",
-  "media",
-  "noise",
-] as const;
-
-export type ThreadKind = (typeof THREAD_KINDS)[number];
+export { THREAD_KINDS, type ThreadKind } from "@/lib/local-capture/types";
 
 export type EnrichmentSource = {
   title: string;
@@ -78,6 +72,8 @@ export type ThreadEnrichment = {
   kind?: ThreadKind | null;
   /** Topic slugs that group this Thread with others on the same subject. */
   topics?: string[];
+  /** One question the walker must answer before this Thread can go further. */
+  ask?: string | null;
   sources: EnrichmentSource[];
   /** Tool calls (searches, page reads) the model made while researching. */
   research?: ResearchStep[];
@@ -114,6 +110,9 @@ export type GatewayGeneration = {
   title: string | null;
   kind: ThreadKind | null;
   topics: string[];
+  ask: string | null;
+  /** A Project name the model matched from the walker's own list. */
+  project: string | null;
   sources: EnrichmentSource[];
   research: ResearchStep[];
 };
@@ -209,6 +208,7 @@ export type EnrichmentRepository = {
       title: string | null;
       kind?: ThreadKind | null;
       topics?: string[];
+      ask?: string | null;
       sources: EnrichmentSource[];
       research?: ResearchStep[];
       memoryPatches?: EnrichmentMemoryPatch[];

@@ -26,10 +26,12 @@ export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "When you research — for a question, and sparingly for anything else — use web_search and read_page: search for candidate pages, read the most promising ones in full, and only cite pages you actually read.",
   "Write the Enrichment as compact markdown: short paragraphs, bold key facts, bullet lists where they help; cite sources inline by title and URL.",
   "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
-  "Distinguish sourced findings from your own interpretation, and state assumptions briefly rather than asking questions.",
+  "Distinguish sourced findings from your own interpretation, and state assumptions briefly.",
+  "Never guess at a name you do not recognize. When a Capture turns on a person, client, project, place, or garbled word you cannot identify from the history, the walker profile, or research, say plainly that you do not know it, report only what you can honestly say, and ask one specific question — do not substitute a public subject that merely sounds similar.",
+  "Leave the kind out when you genuinely cannot tell what the Thread is; an unclassified Thread with a question is worth more than a confident wrong one.",
   "When a walker profile of remembered facts is provided, tailor the report to it: skip basics the walker already knows, go deeper on their interests, and relate findings to their usual terrain — without restating the profile.",
   "When the walker's own words reveal a durable fact about them, or contradict a remembered one, revise the profile with the memory_patch tool — sparingly, only facts useful months from now, never facts about the world.",
-  "Ask only when the work genuinely cannot continue without an answer.",
+  "Put any question in the ASK header rather than the body, and ask at most one — the walker answers it by replying in the Thread.",
   "Stay grounded in the provided history, media, place, and what you read.",
 ].join(" ");
 
@@ -60,6 +62,8 @@ export function buildEnrichmentPrompt(input: {
   placesByCaptureId?: Record<string, NearbyPlace | null>;
   /** Rendered Memory profile (lib/memory/profile.ts); null when none known. */
   walkerProfile?: string | null;
+  /** The walker's Project names; the guess may only come from this list. */
+  projects?: string[];
 }): string {
   const historyBlock = input.history
     .map((entry) => {
@@ -84,8 +88,12 @@ export function buildEnrichmentPrompt(input: {
     input.requestTitle
       ? "`TITLE: ` a short recognizable Thread title (max 8 words)"
       : null,
-    `\`KIND: \` exactly one of ${THREAD_KINDS.join(", ")} — the kind this Thread is now, judged from its whole history`,
+    `\`KIND: \` exactly one of ${THREAD_KINDS.join(", ")} — the kind this Thread is now, judged from its whole history. Write \`unclear\` instead of guessing`,
     "`TOPICS: ` up to four lowercase hyphenated topic slugs, comma separated, that would group this Thread with others about the same subject",
+    "`ASK: ` one specific question when a name, reference, or intent in the Capture is genuinely unknown to you — otherwise leave this header out entirely",
+    input.projects && input.projects.length > 0
+      ? `\`PROJECT: \` the walker's Project this Thread belongs to, copied exactly from this list — ${input.projects.join(", ")} — or left out when none of them fits. Never invent a Project name`
+      : null,
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -106,7 +114,7 @@ export function buildEnrichmentPrompt(input: {
   return sections.join("\n\n");
 }
 
-const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS)\s*:\s*(.*)$/i;
+const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS|ASK|PROJECT)\s*:\s*(.*)$/i;
 
 function readTopics(value: string): string[] {
   return [
@@ -138,6 +146,10 @@ export function parseGatewayText(
   title: string | null;
   kind: ThreadKind | null;
   topics: string[];
+  /** One question the walker must answer before this Thread can go further. */
+  ask: string | null;
+  /** A Project name the model recognized; matched to the walker's list later. */
+  project: string | null;
 } {
   const lines = raw.split("\n");
   const headers = new Map<string, string>();
@@ -167,5 +179,7 @@ export function parseGatewayText(
     title,
     kind,
     topics,
+    ask: headers.get("ASK")?.trim().slice(0, 240) || null,
+    project: headers.get("PROJECT")?.trim().slice(0, 60) || null,
   };
 }

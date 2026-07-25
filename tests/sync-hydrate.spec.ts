@@ -382,3 +382,40 @@ test("applyRemoteThreads adopts the server's review decision without a revision 
   const view = await store.listThread("thread-phone");
   expect(view.thread.reviewedAt).toBe("2026-07-23T18:00:00.000Z");
 });
+
+test("applyRemoteThreads adopts the server's classification without a revision bump", async () => {
+  const store = createMemoryCaptureStore({
+    threads: [
+      {
+        id: "thread-phone",
+        title: "Ridge line opens west",
+        revision: 1,
+        updatedAt: "2026-07-20T14:00:00.000Z",
+        kind: null,
+        topics: [],
+      },
+    ],
+    captures: [
+      {
+        id: "capture-phone",
+        text: "Ridge line opens west",
+        createdAt: "2026-07-20T14:00:00.000Z",
+        location: null,
+        status: "complete",
+        threadId: "thread-phone",
+        sequence: 1,
+        attachments: [],
+      },
+    ],
+  });
+
+  // Enrichment classifies without touching the revision, exactly as marking
+  // reviewed does — the Thread must still pick the verdict up.
+  await store.applyRemoteThreads([
+    phoneThread({ kind: "place", topics: ["ridge", "litchfield-hills"] }),
+  ]);
+
+  const view = await store.listThread("thread-phone");
+  expect(view.thread.kind).toBe("place");
+  expect(view.thread.topics).toEqual(["ridge", "litchfield-hills"]);
+});

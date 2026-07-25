@@ -8,6 +8,7 @@ import { DailyDigestPanel } from "@/components/daily-digest-panel";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { SyncStatusPill } from "@/components/sync-status-pill";
 import { ThreadChat } from "@/components/thread-chat";
+import { ThreadFiling } from "@/components/thread-filing";
 import {
   loadThreadEnrichments,
   readCachedThreadEnrichments,
@@ -20,11 +21,16 @@ import {
 } from "@/lib/local-capture/calendar-day";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import type {
-  LocalAttachment,
-  LocalCapture,
-  LocalThread,
+import {
+  KIND_DESK_ORDER,
+  KIND_LABELS,
+  type LocalAttachment,
+  type LocalCapture,
+  type LocalThread,
+  type ThreadKind,
 } from "@/lib/local-capture/types";
+import { getReviewTransport } from "@/lib/sync/review-client";
+import type { Project } from "@/lib/sync/types";
 import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
 import { syncRollup } from "@/lib/sync/rollup";
 
@@ -147,6 +153,11 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
   const [search, setSearch] = useState("");
   /** Day-strip pick: null = newest day, "all" = the whole archive. */
   const [focusDay, setFocusDay] = useState<string | null>(null);
+  /** Kind-strip pick: null = every kind, "ask" = only Threads with a question. */
+  const [focusKind, setFocusKind] = useState<ThreadKind | "ask" | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  /** Project-strip pick: null = every Project. */
+  const [focusProject, setFocusProject] = useState<string | null>(null);
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -187,6 +198,19 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    void getReviewTransport()
+      .listProjects?.()
+      .then((list) => {
+        if (active && list) setProjects(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     void load();
     const onCycle = () => void load();
     window.addEventListener(SYNC_CYCLE_EVENT, onCycle);
@@ -196,13 +220,14 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
   }, [load]);
 
   // The processing queue: New by default; search reaches everything.
-  const visibleThreads = useMemo(() => {
+  const queueThreads = useMemo(() => {
     const query = search.trim().toLowerCase();
     return threads.filter((view) => {
       if (query) {
         const haystack = [
           view.thread.title,
           ...view.captures.map((capture) => capture.text),
+          ...(view.thread.topics ?? []),
         ]
           .join("\n")
           .toLowerCase();
@@ -216,6 +241,69 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
       return true;
     });
   }, [threads, queue, search, selectedThreadId]);
+
+  /** Counts for the kind strip, before the kind filter narrows the list. */
+  const kindCounts = useMemo(() => {
+    const counts = new Map<ThreadKind, number>();
+    for (const view of queueThreads) {
+      const kind = view.thread.kind;
+      if (!kind) continue;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    return KIND_DESK_ORDER.filter((kind) => counts.has(kind)).map(
+      (kind) => [kind, counts.get(kind)!] as const,
+    );
+  }, [queueThreads]);
+
+  const askCount = useMemo(
+    () => queueThreads.filter((view) => Boolean(view.thread.ask)).length,
+    [queueThreads],
+  );
+
+  const activeKind =
+    focusKind === "ask"
+      ? askCount > 0
+        ? "ask"
+        : null
+      : focusKind && kindCounts.some(([kind]) => kind === focusKind)
+        ? focusKind
+        : null;
+
+  /** Projects with Threads in view, named from the Threads themselves so the
+      strip still reads offline. */
+  const projectCounts = useMemo(() => {
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const view of queueThreads) {
+      const id = view.thread.projectId;
+      if (!id) continue;
+      const name =
+        view.thread.projectName ??
+        projects.find((project) => project.id === id)?.name ??
+        "Project";
+      const entry = counts.get(id) ?? { name, count: 0 };
+      counts.set(id, { name: entry.name, count: entry.count + 1 });
+    }
+    return [...counts.entries()].sort((a, b) =>
+      a[1].name < b[1].name ? -1 : 1,
+    );
+  }, [queueThreads, projects]);
+
+  const activeProject =
+    focusProject && projectCounts.some(([id]) => id === focusProject)
+      ? focusProject
+      : null;
+
+  const visibleThreads = useMemo(() => {
+    const byProject = activeProject
+      ? queueThreads.filter((view) => view.thread.projectId === activeProject)
+      : queueThreads;
+    if (activeKind === "ask") {
+      return byProject.filter((view) => Boolean(view.thread.ask));
+    }
+    return activeKind
+      ? byProject.filter((view) => view.thread.kind === activeKind)
+      : byProject;
+  }, [queueThreads, activeKind, activeProject]);
 
   const byDay = useMemo(() => {
     const groups = new Map<string, ThreadListView[]>();
@@ -406,6 +494,105 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
           />
         </div>
 
+        {kindCounts.length > 0 || askCount > 0 ? (
+          <div className="threads-kind-strip" role="tablist" aria-label="Kinds">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeKind === null}
+              data-testid="kind-chip-all"
+              className={
+                activeKind === null
+                  ? "threads-kind-chip active"
+                  : "threads-kind-chip"
+              }
+              onClick={() => setFocusKind(null)}
+            >
+              All kinds
+            </button>
+            {askCount > 0 ? (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeKind === "ask"}
+                data-testid="kind-chip-ask"
+                className={
+                  activeKind === "ask"
+                    ? "threads-kind-chip threads-kind-chip-ask active"
+                    : "threads-kind-chip threads-kind-chip-ask"
+                }
+                onClick={() =>
+                  setFocusKind(activeKind === "ask" ? null : "ask")
+                }
+              >
+                <span>Needs a word</span>
+                <span className="threads-kind-chip-count">{askCount}</span>
+              </button>
+            ) : null}
+            {kindCounts.map(([kind, count]) => (
+              <button
+                key={kind}
+                type="button"
+                role="tab"
+                aria-selected={activeKind === kind}
+                data-testid={`kind-chip-${kind}`}
+                className={
+                  activeKind === kind
+                    ? "threads-kind-chip active"
+                    : "threads-kind-chip"
+                }
+                onClick={() => setFocusKind(activeKind === kind ? null : kind)}
+              >
+                <span>{KIND_LABELS[kind]}</span>
+                <span className="threads-kind-chip-count">{count}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {projectCounts.length > 0 ? (
+          <div
+            className="threads-kind-strip"
+            role="tablist"
+            aria-label="Projects"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeProject === null}
+              data-testid="project-chip-all"
+              className={
+                activeProject === null
+                  ? "threads-project-chip active"
+                  : "threads-project-chip"
+              }
+              onClick={() => setFocusProject(null)}
+            >
+              All projects
+            </button>
+            {projectCounts.map(([id, { name, count }]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={activeProject === id}
+                data-testid={`project-chip-${id}`}
+                className={
+                  activeProject === id
+                    ? "threads-project-chip active"
+                    : "threads-project-chip"
+                }
+                onClick={() =>
+                  setFocusProject(activeProject === id ? null : id)
+                }
+              >
+                <span>{name}</span>
+                <span className="threads-kind-chip-count">{count}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {dayKeys.length > 0 && !search.trim() ? (
           <div className="threads-day-strip" role="tablist" aria-label="Days">
             {dayKeys.map((dayKey) => {
@@ -460,7 +647,7 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
             {search
               ? "No Threads match that search."
               : queue === "new" && threads.length > 0
-                ? "Nothing waiting. Every Thread is marked Reviewed."
+                ? "Everything is filed. Sitting down afterwards is done."
                 : "No Threads yet. Add a Capture from the Capture tab — it starts its own Thread."}
           </p>
         ) : null}
@@ -557,6 +744,48 @@ export function ThreadsQueue({ children }: { children?: React.ReactNode }) {
                         </span>
                       </Link>
                       <div className="thread-row-side">
+                        {view.thread.projectName ? (
+                          <span
+                            className={
+                              view.thread.reviewedAt
+                                ? "thread-row-project"
+                                : "thread-row-project guessed"
+                            }
+                            data-testid="thread-project-chip"
+                          >
+                            {view.thread.projectName}
+                            {view.thread.reviewedAt ? "" : "?"}
+                          </span>
+                        ) : null}
+                        <ThreadFiling
+                          thread={view.thread}
+                          projects={projects}
+                          onFiled={() => void load()}
+                          onProjectCreated={(project) =>
+                            setProjects((current) =>
+                              current.some((item) => item.id === project.id)
+                                ? current
+                                : [...current, project],
+                            )
+                          }
+                        />
+                        {view.thread.ask ? (
+                          <span
+                            className="thread-row-ask"
+                            data-testid="thread-ask-chip"
+                            title={view.thread.ask}
+                          >
+                            Needs a word
+                          </span>
+                        ) : null}
+                        {view.thread.kind ? (
+                          <span
+                            className="thread-row-kind"
+                            data-testid={`thread-kind-${view.thread.kind}`}
+                          >
+                            {KIND_LABELS[view.thread.kind]}
+                          </span>
+                        ) : null}
                         {view.thread.reviewedAt ? (
                           <span
                             className="thread-row-status thread-status-reviewed"

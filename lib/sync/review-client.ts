@@ -1,9 +1,32 @@
 import { fetchWithTimeout } from "@/lib/net/timeout";
+import type { Project } from "./types";
+
+/** What the walker settled about a Thread while filing it. */
+export type ThreadFiling = {
+  reviewed: boolean;
+  kind?: string | null;
+  projectId?: string | null;
+};
+
+export type FiledThread = {
+  threadId: string;
+  reviewedAt: string | null;
+  kind?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
+};
+
 export type ReviewTransport = {
   setReviewed(
     threadId: string,
     reviewed: boolean,
   ): Promise<{ threadId: string; reviewedAt: string | null } | null>;
+  fileThread?(
+    threadId: string,
+    filing: ThreadFiling,
+  ): Promise<FiledThread | null>;
+  listProjects?(): Promise<Project[] | null>;
+  createProject?(name: string): Promise<Project | null>;
 };
 
 type ReviewGlobals = typeof globalThis & {
@@ -35,6 +58,48 @@ function defaultTransport(): ReviewTransport {
           threadId: string;
           reviewedAt: string | null;
         };
+      } catch {
+        return null;
+      }
+    },
+
+    async fileThread(threadId, filing) {
+      try {
+        const response = await fetchWithTimeout("/api/sync/review", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ threadId, ...filing }),
+        });
+        if (!response.ok) return null;
+        return (await response.json()) as FiledThread;
+      } catch {
+        return null;
+      }
+    },
+
+    async listProjects() {
+      try {
+        const response = await fetchWithTimeout("/api/sync/projects", {
+          headers: headers(),
+        });
+        if (!response.ok) return null;
+        const body = (await response.json()) as { projects?: Project[] };
+        return body.projects ?? [];
+      } catch {
+        return null;
+      }
+    },
+
+    async createProject(name) {
+      try {
+        const response = await fetchWithTimeout("/api/sync/projects", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ name }),
+        });
+        if (!response.ok) return null;
+        const body = (await response.json()) as { project?: Project };
+        return body.project ?? null;
       } catch {
         return null;
       }

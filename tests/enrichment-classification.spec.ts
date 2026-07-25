@@ -52,12 +52,47 @@ test("header lines carry the title, kind, and topics off the body", () => {
   );
 });
 
+test("an unknown name becomes a question instead of a guess", () => {
+  const parsed = parseGatewayText(
+    [
+      "TITLE: Scope of work for Goldin",
+      "KIND: task",
+      "TOPICS: goldin, scope-of-work",
+      "ASK: Who is Goldin — a client, a project, or a person?",
+      "",
+      "I do not know who Goldin is, so I have not researched it.",
+    ].join("\n"),
+    true,
+  );
+
+  expect(parsed.kind).toBe("task");
+  expect(parsed.ask).toBe(
+    "Who is Goldin — a client, a project, or a person?",
+  );
+  expect(parsed.text).toBe(
+    "I do not know who Goldin is, so I have not researched it.",
+  );
+});
+
+test("an unclear kind leaves the Thread unclassified but keeps the question", () => {
+  const parsed = parseGatewayText(
+    ["KIND: unclear", "ASK: What does \"windwizer\" refer to?", "", "Body."].join(
+      "\n",
+    ),
+    false,
+  );
+
+  expect(parsed.kind).toBeNull();
+  expect(parsed.ask).toBe('What does "windwizer" refer to?');
+});
+
 test("a report with no headers keeps its whole body", () => {
   const parsed = parseGatewayText("Mist sits in the valley this morning.", true);
 
   expect(parsed.title).toBeNull();
   expect(parsed.kind).toBeNull();
   expect(parsed.topics).toEqual([]);
+  expect(parsed.ask).toBeNull();
   expect(parsed.text).toBe("Mist sits in the valley this morning.");
 });
 
@@ -138,4 +173,140 @@ test("the Thread's kind and topics are stored with its Enrichment", async () => 
   const stored = await enrichment.listThreadEnrichments("user_a", threadId);
   expect(stored[0]?.kind).toBe("idea");
   expect(stored[0]?.topics).toEqual(["token-billing", "litellm"]);
+
+  // And the Thread itself carries the verdict, so a queue can group by kind
+  // without reading every report.
+  const thread = (await threads.listThreads("user_a")).find(
+    (candidate) => candidate.id === threadId,
+  );
+  expect(thread?.kind).toBe("idea");
+  expect(thread?.topics).toEqual(["token-billing", "litellm"]);
+});
+
+test("an open question rides on the Thread and a later Enrichment clears it", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const enrichment = createMemoryEnrichmentRepository(NS, threads);
+  const blobStore = createMemoryBlobStore(NS);
+
+  await threads.upsertCaptures("user_b", [
+    {
+      id: "cap-goldin",
+      text: "Goldin scope",
+      createdAt: "2026-07-23T12:03:00.000Z",
+      location: null,
+      threadId: null,
+      sequence: 1,
+      idempotencyKey: "cap-goldin",
+      attachments: [],
+    },
+  ]);
+
+  const asking = await processPendingEnrichments("user_b", enrichment, {
+    gateway: createFakeGatewayClient(async () => ({
+      text: "I do not know who Goldin is.",
+      title: "Goldin scope",
+      kind: null,
+      ask: "Who is Goldin?",
+    })),
+    blobStore,
+    threadRepository: threads,
+    pushSender: null,
+  });
+  const threadId = asking.results[0]!.threadId;
+
+  const unresolved = (await threads.listThreads("user_b")).find(
+    (candidate) => candidate.id === threadId,
+  );
+  expect(unresolved?.ask).toBe("Who is Goldin?");
+  expect(unresolved?.kind).toBeNull();
+
+  // The walker answers by replying in the Thread; the next report settles it.
+  await threads.upsertCaptures("user_b", [
+    {
+      id: "cap-answer",
+      text: "Goldin is a client — this is a scope of work for them",
+      createdAt: "2026-07-23T18:00:00.000Z",
+      location: null,
+      threadId,
+      sequence: 2,
+      idempotencyKey: "cap-answer",
+      attachments: [],
+    },
+  ]);
+  await processPendingEnrichments("user_b", enrichment, {
+    gateway: createFakeGatewayClient(async () => ({
+      text: "Draft scope of work for the Goldin engagement.",
+      kind: "task" as const,
+      topics: ["goldin", "scope-of-work"],
+    })),
+    blobStore,
+    threadRepository: threads,
+    pushSender: null,
+  });
+
+  const settled = (await threads.listThreads("user_b")).find(
+    (candidate) => candidate.id === threadId,
+  );
+  expect(settled?.ask).toBeNull();
+  expect(settled?.kind).toBe("task");
+});
+
+test("an Enrichment that cannot tell leaves the prior kind standing", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const enrichment = createMemoryEnrichmentRepository(NS, threads);
+
+  await threads.upsertCaptures("user_c", [
+    {
+      id: "cap-known",
+      text: "Where did we get the stones for the patio?",
+      createdAt: "2026-07-22T10:11:00.000Z",
+      location: null,
+      threadId: null,
+      sequence: 1,
+      idempotencyKey: "cap-known",
+      attachments: [],
+    },
+  ]);
+  const options = {
+    blobStore: createMemoryBlobStore(NS),
+    threadRepository: threads,
+    pushSender: null,
+  };
+  const first = await processPendingEnrichments("user_c", enrichment, {
+    ...options,
+    gateway: createFakeGatewayClient(async () => ({
+      text: "Call the yard.",
+      title: "Sourcing stone",
+      kind: "task" as const,
+      topics: ["stone"],
+    })),
+  });
+  const threadId = first.results[0]!.threadId;
+
+  await threads.upsertCaptures("user_c", [
+    {
+      id: "cap-followup",
+      text: "hm",
+      createdAt: "2026-07-22T11:00:00.000Z",
+      location: null,
+      threadId,
+      sequence: 2,
+      idempotencyKey: "cap-followup",
+      attachments: [],
+    },
+  ]);
+  await processPendingEnrichments("user_c", enrichment, {
+    ...options,
+    gateway: createFakeGatewayClient(async () => ({
+      text: "Not enough to go on.",
+      ask: "What would you like to do with this?",
+    })),
+  });
+
+  const thread = (await threads.listThreads("user_c")).find(
+    (candidate) => candidate.id === threadId,
+  );
+  expect(thread?.kind).toBe("task");
+  expect(thread?.topics).toEqual(["stone"]);
+  expect(thread?.ask).toBe("What would you like to do with this?");
 });

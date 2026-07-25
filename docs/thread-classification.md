@@ -194,9 +194,92 @@ Steps 1 and 2 of the order below are implemented:
   seven kinds and what each one wants back, and tells the model to let length
   follow the Capture.
 
-Still open: the backfill over the 67 existing Threads, `kind` on
-`sync_threads` for queue grouping, per-kind tool sets and step budgets, the
-kind-aware queue and digest, topic linking, and Memory dedup.
+- **The Thread carries its own kind.** `sync_threads` holds `kind` and
+  `topics`, `completeJob` records the newest Enrichment's verdict through
+  `updateThreadClassification`, and hydration adopts both the way it adopts
+  the review decision — neither enriching nor marking reviewed bumps the
+  revision, so an unconditional adopt is the only thing that works.
+- **The queue reads by kind.** A kind strip above the day strip filters the
+  list and counts each kind; every row names its kind in the machine's sky,
+  never the walker's italic. Desk order puts *To do* first, and tapping the
+  active kind clears the filter.
+
+- **It asks instead of guessing.** "Goldin scope" was not a garbled
+  observatory — it was a reminder to write a scope of work for a client named
+  Goldin, and nothing in the walker profile could have told the model that.
+  The instruction now forbids substituting a public subject that merely sounds
+  similar: an unrecognized name produces an `ASK` header with one specific
+  question, an omitted or `unclear` kind, and a report limited to what can
+  honestly be said. The question rides on the Thread, shows as **Needs a word**
+  in the queue and its own filter chip, and appears above the reply composer —
+  answering is an ordinary reply Capture, which re-enriches the Thread and
+  clears the question. An Enrichment that still cannot tell leaves the prior
+  kind standing rather than erasing it.
+- **The day has a sheet.** Selecting a day opens with what the day *is* before
+  any question is asked: Threads, Captures, media, reviewed, the kind
+  breakdown, everything needing a word, and the day's to-dos — computed from
+  local state, so it paints instantly and works out of range.
+
+- **Threads get filed into Projects.** A Project is a named bucket — an
+  effort, a client, a build — and a Thread belongs to at most one. The
+  Enrichment guesses one, but only from the list the walker has already made
+  (`PROJECT:` header, matched by name; an invented name is dropped), and the
+  guess reads with a question mark until the walker settles it. **Filing** is
+  the desk action: confirm the guessed kind, put it in a Project, or just mark
+  that you read the report. Any of those makes the Thread Reviewed and clears
+  it from New, so the sitting-down-afterwards is done when New is empty. A
+  walker's filing is final — no later Enrichment overrules it.
+
+Still open: per-kind tool sets and step budgets, the per-kind destinations
+(checklist, idea board, map), an all-days overview with real themes, and
+Memory dedup. Topic linking is superseded for grouping: 238 free-form slugs
+across 70 Threads never clustered, and Projects are the walker's own answer to
+the same question. The Interview
+now overlaps the in-Thread question: both exist to teach the system about the
+walker, and the Thread version arrives in context, at the moment the gap
+actually bites.
+
+## What the backfill produced
+
+`scripts/classify-threads.mjs` classified all 69 production Threads (67 above
+plus two from the following morning) with `anthropic/claude-sonnet-5`, writing
+`kind` and `topics` onto both the Thread and its latest Enrichment, and
+retitling the 12 Threads whose titles were auto-derived — five placeholder
+`Thread` rows and seven 80-character sentence fragments became
+"Untitled Video Capture", "Token pool as pluggable backend",
+"Standardize token cost tracking per user/agent", and so on.
+
+| Kind | Model | Hand-classified above |
+| --- | --- | --- |
+| question | 23 | 16 |
+| idea | 20 | 25 |
+| task | 8 | 6 |
+| place | 8 | 8 |
+| media | 5 | 5 |
+| observation | 4 | 5 |
+| noise | 1 | 2 |
+
+Three things the run shows:
+
+1. **The model reads grammar where intent matters.** Places and media agree
+   exactly; the disagreement is entirely inside the work Threads. "Let's
+   figure out a growth plan for the focus newsletter" became a *question*
+   because it is phrased as one, and "Find that Will Self post…" became a
+   *task* because it starts with an imperative — both are ideas the walker
+   wants to work on later. The register guidance should say that explicitly:
+   what decides idea vs. question is whether the answer lives in the world or
+   in the walker's own project.
+2. **A false `noise` is the expensive error.** "Goldin scope" — a garbled
+   dictation of Goldendale Observatory — was classified `noise`, and noise is
+   the one kind the proposal hides from the queue. Worth a guard: never
+   `noise` when the Thread already carries a substantive report.
+3. **Free-form topics do not cluster.** 236 distinct slugs across 69 Threads,
+   only 20 shared by more than one Thread, and most of those are incidental
+   (`fog`, `photo`, `location`). The four token-billing Threads came back as
+   `token-cost`, `token-pool`, `billing`, and `token-metering` — the cluster
+   the corpus obviously contains, split four ways. Topic linking needs the
+   existing vocabulary passed into the prompt with an instruction to reuse a
+   slug that already fits, or grouping by embedding rather than by string.
 
 ## Suggested order
 

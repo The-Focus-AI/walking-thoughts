@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { titleFromText } from "@/lib/local-capture/thread-destination";
+import { asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   PurgeExpiredResult,
@@ -33,6 +34,31 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         ALTER TABLE sync_threads
         ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS kind TEXT
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS topics JSONB NOT NULL DEFAULT '[]'::jsonb
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS ask TEXT
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS sync_projects (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL,
+          UNIQUE (user_id, name)
+        )
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS project_id TEXT
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_captures (
@@ -305,22 +331,29 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     async listThreads(userId) {
       await ensure();
       const threads = (await sql`
-        SELECT id, title, revision, updated_at, reviewed_at
-        FROM sync_threads
-        WHERE user_id = ${userId}
+        SELECT t.id, t.title, t.revision, t.updated_at, t.reviewed_at, t.kind,
+               t.topics, t.ask, t.project_id, p.name AS project_name
+        FROM sync_threads t
+        LEFT JOIN sync_projects p ON p.id = t.project_id AND p.user_id = t.user_id
+        WHERE t.user_id = ${userId}
           AND NOT EXISTS (
             SELECT 1 FROM sync_trash
             WHERE sync_trash.user_id = ${userId}
               AND sync_trash.kind = 'thread'
-              AND sync_trash.target_id = sync_threads.id
+              AND sync_trash.target_id = t.id
           )
-        ORDER BY updated_at DESC
+        ORDER BY t.updated_at DESC
       `) as Array<{
         id: string;
         title: string;
         revision: number;
         updated_at: string;
         reviewed_at: string | null;
+        kind: string | null;
+        topics: string[] | null;
+        ask: string | null;
+        project_id: string | null;
+        project_name: string | null;
       }>;
 
       const result = [];
@@ -351,6 +384,11 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           revision: thread.revision,
           updatedAt: thread.updated_at,
           reviewedAt: thread.reviewed_at ?? null,
+          kind: asThreadKind(thread.kind),
+          topics: thread.topics ?? [],
+          ask: thread.ask ?? null,
+          projectId: thread.project_id ?? null,
+          projectName: thread.project_name ?? null,
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -369,6 +407,76 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         UPDATE sync_threads
         SET title = ${title}
+        WHERE user_id = ${userId} AND id = ${threadId}
+      `;
+    },
+
+    async listProjects(userId) {
+      await ensure();
+      const rows = (await sql`
+        SELECT id, name, created_at FROM sync_projects
+        WHERE user_id = ${userId}
+        ORDER BY name ASC
+      `) as Array<{ id: string; name: string; created_at: string }>;
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        createdAt: row.created_at,
+      }));
+    },
+
+    async createProject(userId, name) {
+      await ensure();
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("project_name_required");
+      const rows = (await sql`
+        INSERT INTO sync_projects (id, user_id, name, created_at)
+        VALUES (${crypto.randomUUID()}, ${userId}, ${trimmed}, ${new Date().toISOString()})
+        ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id, name, created_at
+      `) as Array<{ id: string; name: string; created_at: string }>;
+      return {
+        id: rows[0].id,
+        name: rows[0].name,
+        createdAt: rows[0].created_at,
+      };
+    },
+
+    async fileThread(userId, threadId, filing) {
+      await ensure();
+      const updated = (await sql`
+        UPDATE sync_threads
+        SET reviewed_at = ${filing.reviewedAt},
+            kind = COALESCE(${filing.kind ?? null}, kind),
+            project_id = CASE
+              WHEN ${filing.projectId === undefined} THEN project_id
+              ELSE ${filing.projectId ?? null}
+            END
+        WHERE user_id = ${userId} AND id = ${threadId}
+        RETURNING id
+      `) as Array<{ id: string }>;
+      if (updated.length === 0) return null;
+      const threads = await this.listThreads(userId);
+      return threads.find((thread) => thread.id === threadId) ?? null;
+    },
+
+    async updateThreadClassification(userId, threadId, classification) {
+      await ensure();
+      // An Enrichment that could not tell leaves the prior verdict standing;
+      // the question it asked always replaces the previous one, so answering
+      // a Thread clears it.
+      await sql`
+        UPDATE sync_threads
+        SET kind = CASE
+              WHEN reviewed_at IS NOT NULL THEN kind
+              ELSE COALESCE(${classification.kind}, kind)
+            END,
+            topics = CASE
+              WHEN ${classification.topics.length} > 0
+                THEN ${JSON.stringify(classification.topics)}::jsonb
+              ELSE topics
+            END,
+            ask = ${classification.ask}
         WHERE user_id = ${userId} AND id = ${threadId}
       `;
     },

@@ -1,4 +1,8 @@
-import type { CaptureLocation, MediaKind } from "@/lib/local-capture/types";
+import type {
+  CaptureLocation,
+  MediaKind,
+  ThreadKind,
+} from "@/lib/local-capture/types";
 
 export type SyncCaptureStatus =
   | "saved_locally"
@@ -45,6 +49,13 @@ export type SyncBatchResponse = {
   failures: SyncFailure[];
 };
 
+/** A named bucket the walker files Threads into: an effort, a client, a build. */
+export type Project = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
 export type ServerThread = {
   id: string;
   title: string;
@@ -52,6 +63,22 @@ export type ServerThread = {
   updatedAt: string;
   /** Set when the walker processed this Thread at the desk; null = new. */
   reviewedAt?: string | null;
+  /**
+   * What this Thread is, as of its most recent Enrichment — question, idea,
+   * task, observation, place, media, or noise. Null until one classifies it.
+   */
+  kind?: ThreadKind | null;
+  /** Topic slugs that group this Thread with others on the same subject. */
+  topics?: string[];
+  /** The open question from the newest Enrichment; null when it had none. */
+  ask?: string | null;
+  /**
+   * The Project this Thread is filed into. A guess from the Enrichment until
+   * the walker files the Thread; their filing is final.
+   */
+  projectId?: string | null;
+  /** Carried alongside the id so a filed Thread reads correctly offline. */
+  projectName?: string | null;
   captures: Array<{
     id: string;
     text: string;
@@ -149,10 +176,37 @@ export type ThreadRepository = {
     threadId: string,
     reviewedAt: string | null,
   ): Promise<{ threadId: string; reviewedAt: string | null }>;
+  /**
+   * File a Thread at the desk: confirm what it is, put it in a Project, or
+   * simply mark it read. Any of those settles the Thread and clears it from
+   * the New queue. Omitted fields keep their current value.
+   */
+  fileThread(
+    userId: string,
+    threadId: string,
+    filing: {
+      kind?: string | null;
+      projectId?: string | null;
+      reviewedAt: string | null;
+    },
+  ): Promise<ServerThread | null>;
+  listProjects(userId: string): Promise<Project[]>;
+  /** Idempotent by name — filing the same new Project twice makes one. */
+  createProject(userId: string, name: string): Promise<Project>;
   updateThreadTitle?(
     userId: string,
     threadId: string,
     title: string,
+  ): Promise<void>;
+  /** Record what the latest Enrichment judged this Thread to be. */
+  updateThreadClassification?(
+    userId: string,
+    threadId: string,
+    classification: {
+      kind: string | null;
+      topics: string[];
+      ask: string | null;
+    },
   ): Promise<void>;
   applyTrashMutations(
     userId: string,

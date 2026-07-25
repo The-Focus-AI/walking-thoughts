@@ -12,6 +12,60 @@ export type ThreadDestination =
   | { type: "thread"; threadId: string }
   | { type: "new_thread" };
 
+/**
+ * What a Thread is, decided by the model as it writes the Enrichment. A
+ * walker does not capture one kind of thing, and each kind wants a different
+ * report and a different destination at the desk.
+ */
+export const THREAD_KINDS = [
+  "question",
+  "idea",
+  "task",
+  "observation",
+  "place",
+  "media",
+  "noise",
+] as const;
+
+export type ThreadKind = (typeof THREAD_KINDS)[number];
+
+/**
+ * Desk order, not the declaration order: what the walker acts on comes
+ * before what they read, and noise sits last. Shared by every surface that
+ * lists kinds so they never disagree.
+ */
+export const KIND_DESK_ORDER: ThreadKind[] = [
+  "task",
+  "idea",
+  "question",
+  "observation",
+  "place",
+  "media",
+  "noise",
+];
+
+/** Kind names the walker reads, not the slugs the model writes. */
+export const KIND_LABELS: Record<ThreadKind, string> = {
+  task: "To do",
+  idea: "Idea",
+  question: "Question",
+  observation: "Observation",
+  place: "Place",
+  media: "Media",
+  noise: "Noise",
+};
+
+/**
+ * Narrow a stored or transmitted value to a kind. Anything the current
+ * vocabulary does not name reads as unclassified rather than reaching the UI.
+ */
+export function asThreadKind(value: unknown): ThreadKind | null {
+  return typeof value === "string" &&
+    (THREAD_KINDS as readonly string[]).includes(value)
+    ? (value as ThreadKind)
+    : null;
+}
+
 export type LocalThread = {
   id: string;
   title: string;
@@ -19,6 +73,18 @@ export type LocalThread = {
   updatedAt: string;
   /** Set once processed at the desk; absent/null = new (in the review queue). */
   reviewedAt?: string | null;
+  /** The newest Enrichment's verdict; null until one classifies the Thread. */
+  kind?: ThreadKind | null;
+  /** Topic slugs that group this Thread with others on the same subject. */
+  topics?: string[];
+  /**
+   * The open question from the newest Enrichment — the model met a name or
+   * intent it could not place and asked rather than guessing.
+   */
+  ask?: string | null;
+  /** The Project this Thread is filed into; a guess until it is Reviewed. */
+  projectId?: string | null;
+  projectName?: string | null;
 };
 
 export type CaptureSyncStatus =
@@ -164,6 +230,14 @@ export type CaptureStore = {
     threadId: string,
     reviewedAt: string | null,
   ): Promise<void>;
+  /** Record what the walker settled while filing a Thread at the desk. */
+  applyThreadFiling(filing: {
+    threadId: string;
+    reviewedAt: string | null;
+    kind?: ThreadKind | null;
+    projectId?: string | null;
+    projectName?: string | null;
+  }): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
   applySyncBatch(batch: SyncBatchApplication): Promise<void>;
@@ -202,6 +276,12 @@ export type CaptureStore = {
       title: string;
       revision: number;
       updatedAt: string;
+      reviewedAt?: string | null;
+      kind?: ThreadKind | null;
+      topics?: string[];
+      ask?: string | null;
+      projectId?: string | null;
+      projectName?: string | null;
       captures: Array<{
         id: string;
         text: string;

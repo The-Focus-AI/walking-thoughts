@@ -415,4 +415,159 @@ test.describe("trail Threads", () => {
       page.getByRole("link", { name: /Older ridge notes/ }),
     ).toBeVisible();
   });
+
+  test("the kind strip filters the queue and each row names its kind", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+
+    // Three Captures the walker would treat differently at the desk.
+    for (const text of [
+      "Call the doctor to schedule the blood work",
+      "We should build a token pool backend",
+      "Why is it dark at night when there are so many stars",
+    ]) {
+      await page.getByLabel("Capture text").fill(text);
+      await page.getByRole("button", { name: "Capture" }).click();
+      await expect(
+        page.getByRole("article", { name: new RegExp(text.slice(0, 20)) }),
+      ).toBeVisible();
+    }
+
+    // Enrichment classified them server-side; hydration brings the verdicts back.
+    await page.evaluate(async () => {
+      const store = (
+        globalThis as typeof globalThis & {
+          __WT_CAPTURE_STORE__?: {
+            listRecentThreads(): Promise<
+              Array<{ id: string; title: string; revision: number; updatedAt: string }>
+            >;
+            listThread(id: string): Promise<{
+              captures: Array<{ id: string; text: string; createdAt: string; sequence: number }>;
+            }>;
+            applyRemoteThreads(threads: unknown[]): Promise<unknown>;
+          };
+        }
+      ).__WT_CAPTURE_STORE__;
+      const threads = await store!.listRecentThreads();
+      const kindFor = (title: string) =>
+        title.startsWith("Call the doctor")
+          ? "task"
+          : title.startsWith("We should build")
+            ? "idea"
+            : "question";
+      const remote = await Promise.all(
+        threads.map(async (thread) => {
+          const view = await store!.listThread(thread.id);
+          return {
+            id: thread.id,
+            title: thread.title,
+            revision: thread.revision,
+            updatedAt: thread.updatedAt,
+            kind: kindFor(thread.title),
+            topics: ["morning-walk"],
+            captures: view.captures.map((capture) => ({
+              id: capture.id,
+              text: capture.text,
+              createdAt: capture.createdAt,
+              location: null,
+              sequence: capture.sequence,
+              attachments: [],
+            })),
+          };
+        }),
+      );
+      await store!.applyRemoteThreads(remote);
+    });
+
+    await page.goto("/threads");
+    await page.getByTestId("day-chip-all").click();
+
+    // Every Thread carries its kind in the row, in the machine's voice.
+    await expect(page.getByTestId("thread-kind-task")).toBeVisible();
+    await expect(page.getByTestId("thread-kind-idea")).toBeVisible();
+    await expect(page.getByTestId("thread-kind-question")).toBeVisible();
+
+    // To do comes first at the desk, and counts what it filters.
+    const chips = page.locator(".threads-kind-chip");
+    await expect(chips.nth(1)).toContainText("To do");
+    await expect(chips.nth(1)).toContainText("1");
+
+    await page.getByTestId("kind-chip-task").click();
+    await expect(page.getByRole("link", { name: /Call the doctor/ })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /We should build a token pool/ }),
+    ).toHaveCount(0);
+
+    // Tapping the active kind clears it; every Thread returns.
+    await page.getByTestId("kind-chip-task").click();
+    await expect(
+      page.getByRole("link", { name: /We should build a token pool/ }),
+    ).toBeVisible();
+  });
+
+  test("a Thread the model could not place asks for a word instead of guessing", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await page.getByLabel("Capture text").fill("Goldin scope");
+    await page.getByRole("button", { name: "Capture" }).click();
+    await expect(page.getByRole("article", { name: /Goldin scope/ })).toBeVisible();
+
+    // The Enrichment met a name it could not place and asked rather than
+    // researching a public subject that merely sounds similar.
+    await page.evaluate(async () => {
+      type SeedStore = {
+        listRecentThreads(): Promise<
+          Array<{ id: string; title: string; revision: number; updatedAt: string }>
+        >;
+        listThread(id: string): Promise<{
+          captures: Array<{
+            id: string;
+            text: string;
+            createdAt: string;
+            sequence: number;
+          }>;
+        }>;
+        applyRemoteThreads(threads: unknown[]): Promise<unknown>;
+      };
+      const store = (
+        globalThis as typeof globalThis & { __WT_CAPTURE_STORE__?: SeedStore }
+      ).__WT_CAPTURE_STORE__!;
+      const threads = await store.listRecentThreads();
+      const thread = threads[0]!;
+      const view = await store.listThread(thread.id);
+      await store.applyRemoteThreads([
+        {
+          id: thread.id,
+          title: thread.title,
+          revision: thread.revision,
+          updatedAt: thread.updatedAt,
+          kind: null,
+          topics: [],
+          ask: "Who is Goldin — a client, a project, or a person?",
+          captures: view.captures.map((capture) => ({
+            id: capture.id,
+            text: capture.text,
+            createdAt: capture.createdAt,
+            location: null,
+            sequence: capture.sequence,
+            attachments: [],
+          })),
+        },
+      ]);
+    });
+
+    await page.goto("/threads");
+    await expect(page.getByTestId("thread-ask-chip")).toBeVisible();
+    await expect(page.getByTestId("kind-chip-ask")).toContainText("1");
+
+    await page.getByRole("link", { name: /Goldin scope/ }).click();
+    const ask = page.getByTestId("thread-ask");
+    await expect(ask).toContainText("Who is Goldin");
+
+    // Answering is an ordinary reply in the Thread — no separate interview.
+    await ask.getByRole("button", { name: "Answer in this Thread" }).click();
+    await expect(page.locator("#thread-chat-followup")).toBeFocused();
+  });
 });
