@@ -35,6 +35,14 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ
       `;
       await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS kind TEXT
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS topics JSONB NOT NULL DEFAULT '[]'::jsonb
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS sync_captures (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
@@ -305,7 +313,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     async listThreads(userId) {
       await ensure();
       const threads = (await sql`
-        SELECT id, title, revision, updated_at, reviewed_at
+        SELECT id, title, revision, updated_at, reviewed_at, kind, topics
         FROM sync_threads
         WHERE user_id = ${userId}
           AND NOT EXISTS (
@@ -321,6 +329,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         revision: number;
         updated_at: string;
         reviewed_at: string | null;
+        kind: string | null;
+        topics: string[] | null;
       }>;
 
       const result = [];
@@ -351,6 +361,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           revision: thread.revision,
           updatedAt: thread.updated_at,
           reviewedAt: thread.reviewed_at ?? null,
+          kind: thread.kind ?? null,
+          topics: thread.topics ?? [],
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -369,6 +381,16 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         UPDATE sync_threads
         SET title = ${title}
+        WHERE user_id = ${userId} AND id = ${threadId}
+      `;
+    },
+
+    async updateThreadClassification(userId, threadId, classification) {
+      await ensure();
+      await sql`
+        UPDATE sync_threads
+        SET kind = ${classification.kind},
+            topics = ${JSON.stringify(classification.topics)}
         WHERE user_id = ${userId} AND id = ${threadId}
       `;
     },

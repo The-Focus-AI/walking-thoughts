@@ -23,6 +23,8 @@ type StoredThread = {
   revision: number;
   updatedAt: string;
   reviewedAt?: string | null;
+  kind?: string | null;
+  topics?: string[];
 };
 
 type MemoryState = {
@@ -331,6 +333,8 @@ export function createMemoryThreadRepository(
             revision: thread.revision,
             updatedAt: thread.updatedAt,
             reviewedAt: thread.reviewedAt ?? null,
+            kind: thread.kind ?? null,
+            topics: thread.topics ?? [],
             captures,
           } satisfies ServerThread;
         })
@@ -452,6 +456,18 @@ export function createMemoryThreadRepository(
       const existing = db.threads.get(key);
       if (!existing) return;
       db.threads.set(key, { ...existing, title });
+    },
+
+    async updateThreadClassification(userId, threadId, classification) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return;
+      db.threads.set(key, {
+        ...existing,
+        kind: classification.kind,
+        topics: classification.topics,
+      });
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

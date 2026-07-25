@@ -209,6 +209,13 @@ export function createMemoryEnrichmentRepository(
             enrichment.title,
           );
         }
+        if (enrichment.kind && threadRepository.updateThreadClassification) {
+          await threadRepository.updateThreadClassification(
+            userId,
+            job.threadId,
+            { kind: enrichment.kind, topics: enrichment.topics ?? [] },
+          );
+        }
       }
       for (const captureId of job.targetCaptureIds) {
         if (!db.includedBy.has(`${userId}:${captureId}`)) {

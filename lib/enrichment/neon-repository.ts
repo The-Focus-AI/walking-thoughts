@@ -508,6 +508,15 @@ export function createNeonEnrichmentRepository(
             enrichment.title,
           );
         }
+        // The Thread carries the newest Enrichment's verdict, so the queue can
+        // group by kind without reading every report.
+        if (enrichment.kind && threadRepository.updateThreadClassification) {
+          await threadRepository.updateThreadClassification(
+            userId,
+            job.threadId,
+            { kind: enrichment.kind, topics: enrichment.topics ?? [] },
+          );
+        }
       }
 
       for (const captureId of job.targetCaptureIds) {

@@ -198,6 +198,48 @@ Still open: the backfill over the 67 existing Threads, `kind` on
 `sync_threads` for queue grouping, per-kind tool sets and step budgets, the
 kind-aware queue and digest, topic linking, and Memory dedup.
 
+## What the backfill produced
+
+`scripts/classify-threads.mjs` classified all 69 production Threads (67 above
+plus two from the following morning) with `anthropic/claude-sonnet-5`, writing
+`kind` and `topics` onto both the Thread and its latest Enrichment, and
+retitling the 12 Threads whose titles were auto-derived — five placeholder
+`Thread` rows and seven 80-character sentence fragments became
+"Untitled Video Capture", "Token pool as pluggable backend",
+"Standardize token cost tracking per user/agent", and so on.
+
+| Kind | Model | Hand-classified above |
+| --- | --- | --- |
+| question | 23 | 16 |
+| idea | 20 | 25 |
+| task | 8 | 6 |
+| place | 8 | 8 |
+| media | 5 | 5 |
+| observation | 4 | 5 |
+| noise | 1 | 2 |
+
+Three things the run shows:
+
+1. **The model reads grammar where intent matters.** Places and media agree
+   exactly; the disagreement is entirely inside the work Threads. "Let's
+   figure out a growth plan for the focus newsletter" became a *question*
+   because it is phrased as one, and "Find that Will Self post…" became a
+   *task* because it starts with an imperative — both are ideas the walker
+   wants to work on later. The register guidance should say that explicitly:
+   what decides idea vs. question is whether the answer lives in the world or
+   in the walker's own project.
+2. **A false `noise` is the expensive error.** "Goldin scope" — a garbled
+   dictation of Goldendale Observatory — was classified `noise`, and noise is
+   the one kind the proposal hides from the queue. Worth a guard: never
+   `noise` when the Thread already carries a substantive report.
+3. **Free-form topics do not cluster.** 236 distinct slugs across 69 Threads,
+   only 20 shared by more than one Thread, and most of those are incidental
+   (`fog`, `photo`, `location`). The four token-billing Threads came back as
+   `token-cost`, `token-pool`, `billing`, and `token-metering` — the cluster
+   the corpus obviously contains, split four ways. Topic linking needs the
+   existing vocabulary passed into the prompt with an instruction to reuse a
+   slug that already fits, or grouping by embedding rather than by string.
+
 ## Suggested order
 
 1. **Fix the two reliability bugs first** — multi-step text join and the

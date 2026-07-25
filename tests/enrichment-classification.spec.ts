@@ -138,4 +138,12 @@ test("the Thread's kind and topics are stored with its Enrichment", async () => 
   const stored = await enrichment.listThreadEnrichments("user_a", threadId);
   expect(stored[0]?.kind).toBe("idea");
   expect(stored[0]?.topics).toEqual(["token-billing", "litellm"]);
+
+  // And the Thread itself carries the verdict, so a queue can group by kind
+  // without reading every report.
+  const thread = (await threads.listThreads("user_a")).find(
+    (candidate) => candidate.id === threadId,
+  );
+  expect(thread?.kind).toBe("idea");
+  expect(thread?.topics).toEqual(["token-billing", "litellm"]);
 });

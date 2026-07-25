@@ -52,6 +52,13 @@ export type ServerThread = {
   updatedAt: string;
   /** Set when the walker processed this Thread at the desk; null = new. */
   reviewedAt?: string | null;
+  /**
+   * What this Thread is, as of its most recent Enrichment — question, idea,
+   * task, observation, place, media, or noise. Null until one classifies it.
+   */
+  kind?: string | null;
+  /** Topic slugs that group this Thread with others on the same subject. */
+  topics?: string[];
   captures: Array<{
     id: string;
     text: string;
@@ -153,6 +160,12 @@ export type ThreadRepository = {
     userId: string,
     threadId: string,
     title: string,
+  ): Promise<void>;
+  /** Record what the latest Enrichment judged this Thread to be. */
+  updateThreadClassification?(
+    userId: string,
+    threadId: string,
+    classification: { kind: string | null; topics: string[] },
   ): Promise<void>;
   applyTrashMutations(
     userId: string,
