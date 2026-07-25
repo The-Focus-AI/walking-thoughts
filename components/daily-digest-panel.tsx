@@ -12,6 +12,11 @@ import { collectDayCorpus } from "@/lib/digest/corpus";
 import type { DayCorpusEntry, DayDigestResult } from "@/lib/digest/types";
 import { readCachedThreadEnrichments } from "@/lib/enrichment/thread-view";
 import {
+  fetchWithTimeout,
+  isTimeoutError,
+  MODEL_TIMEOUT_MS,
+} from "@/lib/net/timeout";
+import {
   calendarDayKey,
   formatDayHeading,
 } from "@/lib/local-capture/calendar-day";
@@ -152,19 +157,23 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
             : `No Captures for ${dayHeading}.`,
         );
       }
-      const response = await fetch("/api/digest", {
-        method: "POST",
-        headers: digestHeaders(),
-        body: JSON.stringify({
-          dayKey,
-          dayHeading,
-          question: trimmed,
-          corpus,
-          history: before
-            .slice(-HISTORY_TURN_LIMIT)
-            .map(({ role, text }) => ({ role, text })),
-        }),
-      });
+      const response = await fetchWithTimeout(
+        "/api/digest",
+        {
+          method: "POST",
+          headers: digestHeaders(),
+          body: JSON.stringify({
+            dayKey,
+            dayHeading,
+            question: trimmed,
+            corpus,
+            history: before
+              .slice(-HISTORY_TURN_LIMIT)
+              .map(({ role, text }) => ({ role, text })),
+          }),
+        },
+        MODEL_TIMEOUT_MS,
+      );
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
           error?: string;
@@ -190,9 +199,11 @@ export function DailyDigestPanel({ dayKey, onClose }: DailyDigestPanelProps) {
       setError(
         offline
           ? "Day chat needs a connection. It will be here when you're back in range."
-          : cause instanceof Error
-            ? cause.message
-            : "Digest could not run.",
+          : isTimeoutError(cause)
+            ? "The signal is too weak right now — your question is back in the box, try again in better range."
+            : cause instanceof Error
+              ? cause.message
+              : "Digest could not run.",
       );
     } finally {
       setBusy(false);

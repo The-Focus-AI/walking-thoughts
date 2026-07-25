@@ -1,4 +1,5 @@
 import type { CaptureStore, LocalTrashRecord } from "@/lib/local-capture/types";
+import { fetchWithTimeout } from "@/lib/net/timeout";
 import type { TrashBatchResponse, TrashMutation, TrashRecord } from "./types";
 
 export type TrashPushResult = { unavailable: true } | TrashBatchResponse;
@@ -30,7 +31,7 @@ function headers(): HeadersInit {
 function defaultTransport(): TrashTransport {
   return {
     async pushTrashMutations(mutations) {
-      const response = await fetch("/api/sync/trash", {
+      const response = await fetchWithTimeout("/api/sync/trash", {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ mutations }),
@@ -56,7 +57,7 @@ function defaultTransport(): TrashTransport {
       return (await response.json()) as TrashBatchResponse;
     },
     async pullTrash() {
-      const response = await fetch("/api/sync/trash", {
+      const response = await fetchWithTimeout("/api/sync/trash", {
         method: "GET",
         headers: headers(),
       });

@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/net/timeout";
 import {
   hasOfferedPushOptIn,
   markPushOptInOffered,
@@ -73,7 +74,7 @@ function defaultPushClient(): PushClient {
       if (testUser) {
         headers["x-walking-thoughts-test-user"] = testUser;
       }
-      const response = await fetch("/api/push/subscribe", {
+      const response = await fetchWithTimeout("/api/push/subscribe", {
         method: "POST",
         headers,
         body: JSON.stringify(body),

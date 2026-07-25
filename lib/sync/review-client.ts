@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/net/timeout";
 export type ReviewTransport = {
   setReviewed(
     threadId: string,
@@ -24,7 +25,7 @@ function defaultTransport(): ReviewTransport {
   return {
     async setReviewed(threadId, reviewed) {
       try {
-        const response = await fetch("/api/sync/review", {
+        const response = await fetchWithTimeout("/api/sync/review", {
           method: "POST",
           headers: headers(),
           body: JSON.stringify({ threadId, reviewed }),
