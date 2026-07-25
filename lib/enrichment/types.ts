@@ -4,6 +4,23 @@ import type { WebSearchClient, WebSearchResult } from "./search";
 
 export type EnrichmentJobStatus = "queued" | "running" | "failed" | "complete";
 
+/**
+ * What a Thread is, decided by the model as it writes the Enrichment. Drives
+ * the register of the report and, downstream, where the Thread belongs:
+ * tasks in a checklist, ideas on a board, places on the map.
+ */
+export const THREAD_KINDS = [
+  "question",
+  "idea",
+  "task",
+  "observation",
+  "place",
+  "media",
+  "noise",
+] as const;
+
+export type ThreadKind = (typeof THREAD_KINDS)[number];
+
 export type EnrichmentSource = {
   title: string;
   url: string;
@@ -57,6 +74,10 @@ export type ThreadEnrichment = {
   targetCaptureIds: string[];
   createdAt: string;
   title?: string | null;
+  /** The kind this Thread was judged to be when this report was written. */
+  kind?: ThreadKind | null;
+  /** Topic slugs that group this Thread with others on the same subject. */
+  topics?: string[];
   sources: EnrichmentSource[];
   /** Tool calls (searches, page reads) the model made while researching. */
   research?: ResearchStep[];
@@ -91,6 +112,8 @@ export type GatewayGeneration = {
   text: string;
   model: string;
   title: string | null;
+  kind: ThreadKind | null;
+  topics: string[];
   sources: EnrichmentSource[];
   research: ResearchStep[];
 };
@@ -184,6 +207,8 @@ export type EnrichmentRepository = {
       text: string;
       model: string;
       title: string | null;
+      kind?: ThreadKind | null;
+      topics?: string[];
       sources: EnrichmentSource[];
       research?: ResearchStep[];
       memoryPatches?: EnrichmentMemoryPatch[];

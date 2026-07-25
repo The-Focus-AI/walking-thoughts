@@ -1,11 +1,30 @@
 import type { CaptureLocation } from "@/lib/local-capture/types";
 import type { NearbyPlace } from "./place";
-import type { FrozenHistoryEntry } from "./types";
+import { THREAD_KINDS, type FrozenHistoryEntry, type ThreadKind } from "./types";
+
+/**
+ * What each kind of Capture actually wants back. A walker does not capture
+ * one kind of thing: across the first 67 production Threads, 37% were ideas
+ * to build later and 12% were photographs with no question in them, yet a
+ * six-word photo caption was earning a 2,400-character research report.
+ */
+const KIND_REGISTERS = [
+  "question — a genuine lookup: research it and write the cited report.",
+  "idea — something the walker wants to build later: sharpen their own thinking rather than lecture. Restate the idea in one tight paragraph, note prior art or the obvious existing tool, and end with the open questions that decide it.",
+  "task — something to do: give the action, the contact, and the hours or phone number if you can find them. Three sentences at most, no essay.",
+  "observation — an opinion or aphorism: reply to it. Name the idea if it has a name, agree or push back, and stay short.",
+  "place — a photograph or a moment: identify what is actually there, name the place, add the one fact worth knowing. A few sentences.",
+  "media — media with no words: caption or describe only what the attachment actually contains, and title the Thread.",
+  "noise — a test or an accident: say so in one line and stop.",
+].join(" ");
 
 export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "You are Walking Thoughts, a research companion that turns each outdoor Capture into a report the walker reads back at the desk.",
-  "Infer the question inside the Capture (identify, explain, place in context, look up) and research it: when web_search and read_page tools are available, search for candidate pages, read the most promising ones in full, and only cite pages you actually read.",
-  "Write the Enrichment as a compact markdown report: short paragraphs, bold key facts, bullet lists where they help; cite sources inline by title and URL.",
+  "First decide what kind of Capture this is, then match your register to it:",
+  KIND_REGISTERS,
+  "Let length follow the Capture: only a real question earns a full report, and no Capture earns padding.",
+  "When you research — for a question, and sparingly for anything else — use web_search and read_page: search for candidate pages, read the most promising ones in full, and only cite pages you actually read.",
+  "Write the Enrichment as compact markdown: short paragraphs, bold key facts, bullet lists where they help; cite sources inline by title and URL.",
   "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
   "Distinguish sourced findings from your own interpretation, and state assumptions briefly rather than asking questions.",
   "When a walker profile of remembered facts is provided, tailor the report to it: skip basics the walker already knows, go deeper on their interests, and relate findings to their usual terrain — without restating the profile.",
@@ -60,9 +79,16 @@ export function buildEnrichmentPrompt(input: {
     })
     .join("\n");
   const targets = input.targetCaptureIds.join(", ");
-  const titleLine = input.requestTitle
-    ? "Also propose a short recognizable Thread title (max 8 words) on the first line as `TITLE: ...`, then the Enrichment body."
-    : "Respond with the Enrichment body only.";
+  const frontMatter = [
+    "Open your response with these header lines, one per line, then a blank line, then the Enrichment body:",
+    input.requestTitle
+      ? "`TITLE: ` a short recognizable Thread title (max 8 words)"
+      : null,
+    `\`KIND: \` exactly one of ${THREAD_KINDS.join(", ")} — the kind this Thread is now, judged from its whole history`,
+    "`TOPICS: ` up to four lowercase hyphenated topic slugs, comma separated, that would group this Thread with others about the same subject",
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   const sections = [
     `Thread title: ${input.threadTitle}`,
@@ -75,23 +101,71 @@ export function buildEnrichmentPrompt(input: {
     "Research with the web_search and read_page tools when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",
     "Complete Thread history at the frozen basis:",
     historyBlock || "(empty)",
-    titleLine,
+    frontMatter,
   );
   return sections.join("\n\n");
 }
 
+const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS)\s*:\s*(.*)$/i;
+
+function readTopics(value: string): string[] {
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((topic) =>
+          topic
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, ""),
+        )
+        .filter((topic) => topic.length > 0),
+    ),
+  ].slice(0, 4);
+}
+
+/**
+ * Split the model's header lines from the Enrichment body. Headers the model
+ * omits, and anything it invents, are simply absent — a missing KIND leaves
+ * the Thread unclassified rather than failing the job.
+ */
 export function parseGatewayText(
   raw: string,
   requestTitle: boolean,
-): { text: string; title: string | null } {
-  if (!requestTitle) {
-    return { text: raw.trim(), title: null };
+): {
+  text: string;
+  title: string | null;
+  kind: ThreadKind | null;
+  topics: string[];
+} {
+  const lines = raw.split("\n");
+  const headers = new Map<string, string>();
+  let index = 0;
+  for (; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.trim().length === 0 && headers.size === 0) continue;
+    const match = line.match(HEADER_LINE);
+    if (!match) break;
+    headers.set(match[1].toUpperCase(), match[2].trim());
   }
-  const match = raw.match(/^\s*TITLE:\s*(.+)\s*\n([\s\S]*)$/i);
-  if (!match) {
-    return { text: raw.trim(), title: null };
-  }
-  const title = match[1].trim().replace(/^["']|["']$/g, "").slice(0, 80);
-  const text = match[2].trim();
-  return { text: text || raw.trim(), title: title || null };
+
+  const body = lines.slice(index).join("\n").trim();
+  const rawTitle = requestTitle ? (headers.get("TITLE") ?? "") : "";
+  const title =
+    rawTitle.replace(/^["']|["']$/g, "").trim().slice(0, 80) || null;
+  const rawKind = headers.get("KIND")?.trim().toLowerCase() ?? "";
+  const kind = (THREAD_KINDS as readonly string[]).includes(rawKind)
+    ? (rawKind as ThreadKind)
+    : null;
+  const topics = readTopics(headers.get("TOPICS") ?? "");
+
+  return {
+    // A model that answers with headers and nothing else still has its words
+    // kept, rather than storing an empty Enrichment.
+    text: body || raw.trim(),
+    title,
+    kind,
+    topics,
+  };
 }

@@ -168,6 +168,36 @@ Run one classification-only pass over the 67 existing Threads (title + kind +
 topics, no research) to populate the new columns, so the new surfaces have
 content on day one rather than starting empty.
 
+## What has shipped
+
+Steps 1 and 2 of the order below are implemented:
+
+- **Defect 1 fixed.** `collectGeneratedText` in `lib/enrichment/gateway.ts`
+  joins the text of every step, so a report followed by a `memory_patch` call
+  survives.
+- **Defect 2 fixed.** `lib/enrichment/failures.ts` names both permanent
+  classes — missing media and media the job's model cannot read — and adds a
+  `MAX_ENRICHMENT_ATTEMPTS` backstop for failures no pattern anticipates. Both
+  repositories honour it, and `needs_attention` results now report
+  `retryable` honestly instead of always `true`.
+- **Unsupported media is recoverable.** A job's model is frozen at queue time,
+  so a permanently-failed job under an *old* model no longer blocks the
+  Thread: pointing `AI_GATEWAY_MODEL` at a model that reads video queues a
+  fresh, model-scoped job. Every other Thread keeps its stable idempotency
+  key, so changing models never re-enriches work that already succeeded.
+- **Classification contract.** The model now opens each Enrichment with
+  `TITLE` / `KIND` / `TOPICS` header lines; `parseGatewayText` splits them off
+  the body, ignores an invented kind, and slugs topics. `kind` and `topics`
+  persist on the Enrichment row (`ALTER TABLE enrichments` in the Neon
+  repository) and ride through `ThreadEnrichment`.
+- **Register guidance.** `DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION` names all
+  seven kinds and what each one wants back, and tells the model to let length
+  follow the Capture.
+
+Still open: the backfill over the 67 existing Threads, `kind` on
+`sync_threads` for queue grouping, per-kind tool sets and step budgets, the
+kind-aware queue and digest, topic linking, and Memory dedup.
+
 ## Suggested order
 
 1. **Fix the two reliability bugs first** — multi-step text join and the

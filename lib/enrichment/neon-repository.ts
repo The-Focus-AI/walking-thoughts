@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import type { ThreadRepository } from "@/lib/sync/types";
+import { MAX_ENRICHMENT_ATTEMPTS } from "./failures";
 import type {
   EnrichmentJob,
   EnrichmentRepository,
@@ -64,6 +65,14 @@ export function createNeonEnrichmentRepository(
       await sql`
         ALTER TABLE enrichments
         ADD COLUMN IF NOT EXISTS memory_patches JSONB NOT NULL DEFAULT '[]'::jsonb
+      `;
+      await sql`
+        ALTER TABLE enrichments
+        ADD COLUMN IF NOT EXISTS kind TEXT
+      `;
+      await sql`
+        ALTER TABLE enrichments
+        ADD COLUMN IF NOT EXISTS topics JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS enrichment_inclusions (
@@ -188,7 +197,8 @@ export function createNeonEnrichmentRepository(
       await ensure();
       const rows = (await sql`
         SELECT id, thread_id, text, model, basis_revision, basis_entry_ids,
-               target_capture_ids, title, sources, research, memory_patches, created_at
+               target_capture_ids, title, kind, topics, sources, research,
+               memory_patches, created_at
         FROM enrichments
         WHERE user_id = ${userId} AND thread_id = ${threadId}
         ORDER BY created_at ASC
@@ -201,6 +211,8 @@ export function createNeonEnrichmentRepository(
         basis_entry_ids: string[];
         target_capture_ids: string[];
         title: string | null;
+        kind: ThreadEnrichment["kind"];
+        topics: string[] | null;
         sources: ThreadEnrichment["sources"];
         research: ThreadEnrichment["research"];
         memory_patches: ThreadEnrichment["memoryPatches"];
@@ -216,6 +228,8 @@ export function createNeonEnrichmentRepository(
         targetCaptureIds: row.target_capture_ids,
         createdAt: row.created_at,
         title: row.title,
+        kind: row.kind ?? null,
+        topics: row.topics ?? [],
         sources: row.sources ?? [],
         research: row.research ?? [],
         memoryPatches: row.memory_patches ?? [],
@@ -403,7 +417,8 @@ export function createNeonEnrichmentRepository(
       const enrichmentId = `enrichment:${job.id}`;
       const existing = (await sql`
         SELECT id, thread_id, text, model, basis_revision, basis_entry_ids,
-               target_capture_ids, title, sources, research, memory_patches, created_at
+               target_capture_ids, title, kind, topics, sources, research,
+               memory_patches, created_at
         FROM enrichments
         WHERE user_id = ${userId} AND id = ${enrichmentId}
         LIMIT 1
@@ -416,6 +431,8 @@ export function createNeonEnrichmentRepository(
         basis_entry_ids: string[];
         target_capture_ids: string[];
         title: string | null;
+        kind: ThreadEnrichment["kind"];
+        topics: string[] | null;
         sources: ThreadEnrichment["sources"];
         research: ThreadEnrichment["research"];
         memory_patches: ThreadEnrichment["memoryPatches"];
@@ -435,6 +452,8 @@ export function createNeonEnrichmentRepository(
           targetCaptureIds: existing[0].target_capture_ids,
           createdAt: existing[0].created_at,
           title: existing[0].title,
+          kind: existing[0].kind ?? null,
+          topics: existing[0].topics ?? [],
           sources: existing[0].sources ?? [],
           research: existing[0].research ?? [],
           memoryPatches: existing[0].memory_patches ?? [],
@@ -445,8 +464,8 @@ export function createNeonEnrichmentRepository(
         await sql`
           INSERT INTO enrichments (
             id, user_id, thread_id, text, model, basis_revision,
-            basis_entry_ids, target_capture_ids, title, sources, research,
-            memory_patches, created_at
+            basis_entry_ids, target_capture_ids, title, kind, topics, sources,
+            research, memory_patches, created_at
           ) VALUES (
             ${enrichmentId},
             ${userId},
@@ -457,6 +476,8 @@ export function createNeonEnrichmentRepository(
             ${JSON.stringify(job.basisEntryIds)},
             ${JSON.stringify(job.targetCaptureIds)},
             ${enrichment.title},
+            ${enrichment.kind ?? null},
+            ${JSON.stringify(enrichment.topics ?? [])},
             ${JSON.stringify(enrichment.sources ?? [])},
             ${JSON.stringify(enrichment.research ?? [])},
             ${JSON.stringify(enrichment.memoryPatches ?? [])},
@@ -474,6 +495,8 @@ export function createNeonEnrichmentRepository(
           targetCaptureIds: [...job.targetCaptureIds],
           createdAt,
           title: enrichment.title,
+          kind: enrichment.kind ?? null,
+          topics: enrichment.topics ?? [],
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
@@ -523,22 +546,32 @@ export function createNeonEnrichmentRepository(
 
     async requeueFailed(userId, jobId) {
       await ensure();
+      // Permanent failures (source media gone, model cannot read the media)
+      // must not retry forever, and nothing retries past the attempt cap.
+      // These predicates mirror lib/enrichment/failures.ts.
       if (jobId) {
         const updated = (await sql`
           UPDATE enrichment_jobs
           SET status = 'queued', error = NULL
           WHERE user_id = ${userId} AND id = ${jobId} AND status = 'failed'
-            AND (error IS NULL OR error NOT LIKE 'missing\_original\_media\_%')
+            AND attempts < ${MAX_ENRICHMENT_ATTEMPTS}
+            AND (error IS NULL OR (
+              error NOT LIKE 'missing\_original\_media\_%'
+              AND error NOT LIKE 'model\_%\_unsupported\_media\_%'
+            ))
           RETURNING id
         `) as Array<{ id: string }>;
         return updated.length;
       }
-      // Permanent failures (source media gone) must not retry forever.
       const updated = (await sql`
         UPDATE enrichment_jobs
         SET status = 'queued', error = NULL
         WHERE user_id = ${userId} AND status = 'failed'
-          AND (error IS NULL OR error NOT LIKE 'missing\_original\_media\_%')
+          AND attempts < ${MAX_ENRICHMENT_ATTEMPTS}
+          AND (error IS NULL OR (
+            error NOT LIKE 'missing\_original\_media\_%'
+            AND error NOT LIKE 'model\_%\_unsupported\_media\_%'
+          ))
         RETURNING id
       `) as Array<{ id: string }>;
       return updated.length;

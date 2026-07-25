@@ -11,6 +11,10 @@ import { createWebPushSender } from "@/lib/push/send";
 import type { PushRepository, PushSender } from "@/lib/push/types";
 import type { ThreadRepository } from "@/lib/sync/types";
 import { assertModelSupportsMedia } from "./capabilities";
+import {
+  isPermanentEnrichmentError,
+  MAX_ENRICHMENT_ATTEMPTS,
+} from "./failures";
 import { enrichmentSystemAndModel, getGatewayClient } from "./gateway";
 import {
   getNearbyPlaceResolver,
@@ -55,13 +59,7 @@ function createJobId(): string {
   return crypto.randomUUID();
 }
 
-/**
- * Failures that no retry can fix — the source data is gone. These jobs must
- * not re-enter the queue (one did 6,400 futile attempts in production).
- */
-export function isPermanentEnrichmentError(reason: string): boolean {
-  return reason.startsWith("missing_original_media_");
-}
+export { isPermanentEnrichmentError };
 
 function pendingCaptureIds(thread: EnrichmentThreadSnapshot): string[] {
   return thread.entries
@@ -71,13 +69,39 @@ function pendingCaptureIds(thread: EnrichmentThreadSnapshot): string[] {
     .map((entry) => entry.id);
 }
 
-function hasOpenEnrichJob(jobs: EnrichmentJob[], threadId: string): boolean {
+/**
+ * A job for this Thread that the queue is still waiting on. A permanent
+ * failure under a *different* model does not block: swapping
+ * AI_GATEWAY_MODEL to one that reads video is exactly how a walker recovers
+ * a Capture the old model refused, and its job's model is frozen.
+ */
+function hasOpenEnrichJob(
+  jobs: EnrichmentJob[],
+  threadId: string,
+  model: string,
+): boolean {
   return jobs.some(
     (job) =>
       job.threadId === threadId &&
       (job.status === "queued" ||
         job.status === "running" ||
-        job.status === "failed"),
+        (job.status === "failed" && !isStaleModelFailure(job, model))),
+  );
+}
+
+/** Whether the queue would ever pick this failed job up again. */
+function isRetryableJob(job: EnrichmentJob): boolean {
+  return (
+    !isPermanentEnrichmentError(job.error ?? "") &&
+    job.attempts < MAX_ENRICHMENT_ATTEMPTS
+  );
+}
+
+function isStaleModelFailure(job: EnrichmentJob, model: string): boolean {
+  return (
+    job.status === "failed" &&
+    job.model !== model &&
+    isPermanentEnrichmentError(job.error ?? "")
   );
 }
 
@@ -112,12 +136,20 @@ async function queueJobsForThreads(
   ]);
 
   for (const thread of threads) {
-    if (hasOpenEnrichJob(openJobs, thread.id)) continue;
+    if (hasOpenEnrichJob(openJobs, thread.id, model)) continue;
     const targetCaptureIds = pendingCaptureIds(thread);
     if (targetCaptureIds.length === 0) continue;
 
     const basisHistory = freezeHistory(thread);
-    const idempotencyKey = `enrich:${thread.id}:r${thread.revision}`;
+    // Scope the key to the model only when retrying past a permanent failure
+    // under another model — every other Thread keeps its stable key so the
+    // model changing never re-enriches work that already succeeded.
+    const retryingUnderNewModel = openJobs.some(
+      (job) => job.threadId === thread.id && isStaleModelFailure(job, model),
+    );
+    const idempotencyKey = retryingUnderNewModel
+      ? `enrich:${thread.id}:r${thread.revision}:${model}`
+      : `enrich:${thread.id}:r${thread.revision}`;
     const existing = await repository.getOrCreateJob(userId, {
       id: createJobId(),
       idempotencyKey,
@@ -215,7 +247,7 @@ async function runJob(
       threadId: job.threadId,
       status: "needs_attention" as const,
       reason: job.error ?? "enrichment_failed",
-      retryable: true,
+      retryable: isRetryableJob(job),
     }));
   }
 
@@ -272,7 +304,7 @@ async function runJob(
         threadId: running.threadId,
         status: "needs_attention" as const,
         reason: capability.reason,
-        retryable: true,
+        retryable: !isPermanentEnrichmentError(capability.reason),
       }));
     }
 
@@ -350,6 +382,8 @@ async function runJob(
       text: generation.text,
       model: generation.model,
       title: generation.title,
+      kind: generation.kind,
+      topics: generation.topics,
       sources: generation.sources,
       research: generation.research,
       memoryPatches: appliedPatches,
@@ -476,7 +510,7 @@ export async function processPendingEnrichments(
         threadId: job.threadId,
         status: "needs_attention" as const,
         reason: job.error ?? "enrichment_failed",
-        retryable: true,
+        retryable: isRetryableJob(job),
       })),
     );
   }
