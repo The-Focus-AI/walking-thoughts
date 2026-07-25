@@ -16,6 +16,7 @@ import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
   calendarDayKey,
   formatDayHeading,
+  formatDayShort,
 } from "@/lib/local-capture/calendar-day";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
 import { getCaptureStore } from "@/lib/local-capture/store";
@@ -140,6 +141,8 @@ export function ThreadsQueue({
   const [error, setError] = useState<string | null>(null);
   const [queue, setQueue] = useState<"new" | "all">("new");
   const [search, setSearch] = useState("");
+  /** Day-strip pick: null = newest day, "all" = the whole archive. */
+  const [focusDay, setFocusDay] = useState<string | null>(null);
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -219,6 +222,23 @@ export function ThreadsQueue({
     }
     return [...groups.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   }, [visibleThreads]);
+
+  /**
+   * The day strip keeps the page small: one day of Threads at a time.
+   * Search reaches everything; a stale pick falls back to the newest day.
+   */
+  const dayKeys = useMemo(() => byDay.map(([dayKey]) => dayKey), [byDay]);
+  const activeDay = search.trim()
+    ? "all"
+    : focusDay === "all"
+      ? "all"
+      : focusDay && dayKeys.includes(focusDay)
+        ? focusDay
+        : (dayKeys[0] ?? "all");
+  const visibleByDay =
+    activeDay === "all"
+      ? byDay
+      : byDay.filter(([dayKey]) => dayKey === activeDay);
 
   /** Threads in display order (day by day) for swipe stepping. */
   const orderedThreadIds = useMemo(
@@ -305,7 +325,7 @@ export function ThreadsQueue({
             <p className="eyebrow">By day</p>
             <h1>Threads</h1>
             <p>
-              Select a day to digest its Captures and Enrichments, or open one
+              Pick a day to browse it, chat across its Threads, or open one
               Thread to read and reply.
             </p>
           </div>
@@ -362,6 +382,49 @@ export function ThreadsQueue({
           />
         </div>
 
+        {dayKeys.length > 0 && !search.trim() ? (
+          <div className="threads-day-strip" role="tablist" aria-label="Days">
+            {dayKeys.map((dayKey) => {
+              const count = byDay.find(([key]) => key === dayKey)?.[1].length;
+              const isActive = activeDay === dayKey;
+              return (
+                <button
+                  key={dayKey}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  data-testid={`day-chip-${dayKey}`}
+                  className={
+                    isActive ? "threads-day-chip active" : "threads-day-chip"
+                  }
+                  onClick={() => setFocusDay(dayKey)}
+                >
+                  <span>
+                    {dayKey === calendarDayKey()
+                      ? "Today"
+                      : formatDayShort(dayKey)}
+                  </span>
+                  <span className="threads-day-chip-count">{count}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeDay === "all"}
+              data-testid="day-chip-all"
+              className={
+                activeDay === "all"
+                  ? "threads-day-chip active"
+                  : "threads-day-chip"
+              }
+              onClick={() => setFocusDay("all")}
+            >
+              All days
+            </button>
+          </div>
+        ) : null}
+
         {error ? (
           <p className="capture-error" role="alert">
             {error}
@@ -378,7 +441,7 @@ export function ThreadsQueue({
           </p>
         ) : null}
 
-        {byDay.map(([dayKey, dayThreads]) => {
+        {visibleByDay.map(([dayKey, dayThreads]) => {
           const dayPhotos = dayThreads.flatMap((view) =>
             view.captures.flatMap((capture) =>
               capture.attachments
@@ -407,7 +470,9 @@ export function ThreadsQueue({
                 onClick={() => selectDay(dayKey)}
               >
                 <span className="threads-day-select-title">{heading}</span>
-                <span className="threads-day-select-hint">Digest this day</span>
+                <span className="threads-day-select-hint">
+                  Chat about this day
+                </span>
               </button>
               {dayPhotos.length > 0 ? (
                 <div

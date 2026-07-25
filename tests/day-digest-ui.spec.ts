@@ -35,7 +35,10 @@ test("day digest Ask reaches /api/digest without waiting on hung Enrichments", a
   await expect(page.getByRole("link", { name: /Ridge wall/ })).toBeVisible({
     timeout: 15_000,
   });
-  await page.getByRole("button", { name: /Digest this day/i }).first().click();
+  await page
+    .getByRole("button", { name: /Chat about this day/i })
+    .first()
+    .click();
   await expect(page.getByTestId("daily-digest")).toBeVisible();
 
   await page
@@ -47,4 +50,73 @@ test("day digest Ask reaches /api/digest without waiting on hung Enrichments", a
     "Check the ridge wall",
     { timeout: 8_000 },
   );
+});
+
+/**
+ * Public seam: the day chat is an ongoing conversation — each ask carries
+ * the turns so far, and the transcript survives a reload.
+ */
+test("day chat keeps history across asks and reloads", async ({ page }) => {
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture text")).toBeVisible();
+  await page.getByLabel("Capture text").fill("Mossy ledge by the spring");
+  await page.getByRole("button", { name: "Capture" }).click();
+  await expect(
+    page.getByRole("article", { name: /Mossy ledge by the spring/ }),
+  ).toBeVisible();
+
+  const histories: unknown[][] = [];
+  await page.route("**/api/digest", async (route) => {
+    const body = route.request().postDataJSON() as { history?: unknown[] };
+    histories.push(body.history ?? []);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        text: `Reply ${histories.length}`,
+        model: "test-model",
+      }),
+    });
+  });
+
+  await page.goto("/threads");
+  await page
+    .getByRole("button", { name: /Chat about this day/i })
+    .first()
+    .click();
+  await expect(page.getByTestId("daily-digest")).toBeVisible();
+
+  // First ask starts the conversation.
+  await page.getByLabel("Ask about this day").fill("What did I notice?");
+  await page.getByTestId("digest-send").click();
+  await expect(page.getByTestId("digest-result")).toContainText("Reply 1");
+  expect(histories[0]).toEqual([]);
+
+  // Second ask carries the first exchange.
+  await page.getByLabel("Ask about this day").fill("Turn that into tasks");
+  await page.getByTestId("digest-send").click();
+  await expect(page.getByTestId("digest-result").nth(1)).toContainText(
+    "Reply 2",
+  );
+  expect(histories[1]).toEqual([
+    { role: "walker", text: "What did I notice?" },
+    { role: "digest", text: "Reply 1" },
+  ]);
+
+  // The transcript is retained on this phone.
+  await page.reload();
+  await expect(page.getByTestId("daily-digest")).toBeVisible();
+  await expect(page.getByTestId("digest-walker").nth(1)).toContainText(
+    "Turn that into tasks",
+  );
+  await expect(page.getByTestId("digest-result").nth(1)).toContainText(
+    "Reply 2",
+  );
+
+  // Clear chat empties the retained transcript.
+  await page.getByRole("button", { name: "Clear chat" }).click();
+  await expect(page.getByTestId("digest-result")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId("daily-digest")).toBeVisible();
+  await expect(page.getByTestId("digest-result")).toHaveCount(0);
 });
