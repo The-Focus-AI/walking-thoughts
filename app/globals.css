@@ -2403,6 +2403,27 @@ footer {
   text-transform: uppercase;
 }
 
+/*
+ * The evidence behind a Proposed Project: the walker's own Threads, listed
+ * the way the survey log lists them. Machine-titled, so upright.
+ */
+.interview-proposal-threads {
+  margin: 0.6rem 0 0;
+  padding: 0 0 0 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.interview-proposal-threads a {
+  color: inherit;
+}
+
+.interview-proposal-threads a:hover {
+  color: var(--text);
+}
+
 /* The walker's answer is the natural feature: italic serif, nothing else. */
 .interview-answer {
   margin: 0;

@@ -3,6 +3,9 @@ import { titleFromText } from "@/lib/local-capture/thread-destination";
 import { asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
+  Project,
+  ProjectProposal,
+  ProjectState,
   PurgeExpiredResult,
   PurgeTarget,
   SyncBatchResponse,
@@ -15,6 +18,22 @@ import type {
   TrashMutationResult,
   TrashRecord,
 } from "./types";
+
+type ProjectRow = {
+  id: string;
+  name: string;
+  state: ProjectState;
+  created_at: string;
+};
+
+function mapProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    state: row.state,
+    createdAt: row.created_at,
+  };
+}
 
 export function createNeonThreadRepository(databaseUrl: string): ThreadRepository {
   const sql = neon(databaseUrl);
@@ -59,6 +78,12 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         ALTER TABLE sync_threads
         ADD COLUMN IF NOT EXISTS project_id TEXT
+      `;
+      // Rows that predate Proposed Projects were made by the walker, so they
+      // are confirmed; only an Enrichment's guess starts out proposed.
+      await sql`
+        ALTER TABLE sync_projects
+        ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'confirmed'
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_captures (
@@ -254,6 +279,27 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     return (await loadTrashOp(userId, mutation.idempotencyKey)) ?? result;
   }
 
+  /**
+   * One row per name. A name that already exists keeps the state it has, so
+   * proposing something the walker confirmed or rejected never resurrects it.
+   */
+  async function upsertProject(
+    userId: string,
+    name: string,
+    initial: ProjectState,
+  ): Promise<Project> {
+    await ensure();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("project_name_required");
+    const rows = (await sql`
+      INSERT INTO sync_projects (id, user_id, name, state, created_at)
+      VALUES (${crypto.randomUUID()}, ${userId}, ${trimmed}, ${initial}, ${new Date().toISOString()})
+      ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
+      RETURNING id, name, state, created_at
+    `) as Array<ProjectRow>;
+    return mapProject(rows[0]);
+  }
+
   return {
     async upsertCaptures(userId, captures) {
       await ensure();
@@ -414,32 +460,96 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     async listProjects(userId) {
       await ensure();
       const rows = (await sql`
-        SELECT id, name, created_at FROM sync_projects
-        WHERE user_id = ${userId}
+        SELECT id, name, state, created_at FROM sync_projects
+        WHERE user_id = ${userId} AND state = 'confirmed'
         ORDER BY name ASC
-      `) as Array<{ id: string; name: string; created_at: string }>;
-      return rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        createdAt: row.created_at,
-      }));
+      `) as Array<ProjectRow>;
+      return rows.map(mapProject);
     },
 
     async createProject(userId, name) {
+      return upsertProject(userId, name, "confirmed");
+    },
+
+    async proposeProject(userId, name) {
+      return upsertProject(userId, name, "proposed");
+    },
+
+    async listProposedProjects(userId) {
       await ensure();
-      const trimmed = name.trim();
-      if (!trimmed) throw new Error("project_name_required");
       const rows = (await sql`
-        INSERT INTO sync_projects (id, user_id, name, created_at)
-        VALUES (${crypto.randomUUID()}, ${userId}, ${trimmed}, ${new Date().toISOString()})
-        ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
-        RETURNING id, name, created_at
-      `) as Array<{ id: string; name: string; created_at: string }>;
-      return {
-        id: rows[0].id,
-        name: rows[0].name,
-        createdAt: rows[0].created_at,
-      };
+        SELECT p.id, p.name, p.state, p.created_at,
+               t.id AS thread_id, t.title AS thread_title
+        FROM sync_projects p
+        LEFT JOIN sync_threads t
+          ON t.project_id = p.id
+         AND t.user_id = p.user_id
+         AND NOT EXISTS (
+           SELECT 1 FROM sync_trash
+           WHERE sync_trash.user_id = p.user_id
+             AND sync_trash.kind = 'thread'
+             AND sync_trash.target_id = t.id
+         )
+        WHERE p.user_id = ${userId} AND p.state = 'proposed'
+        ORDER BY p.created_at ASC
+      `) as Array<
+        ProjectRow & { thread_id: string | null; thread_title: string | null }
+      >;
+      const proposals = new Map<string, ProjectProposal>();
+      for (const row of rows) {
+        const proposal = proposals.get(row.id) ?? {
+          ...mapProject(row),
+          threadCount: 0,
+          threads: [],
+        };
+        if (row.thread_id) {
+          proposal.threads.push({
+            id: row.thread_id,
+            title: row.thread_title ?? "",
+          });
+          proposal.threadCount += 1;
+        }
+        proposals.set(row.id, proposal);
+      }
+      return [...proposals.values()].sort(
+        (a, b) => b.threadCount - a.threadCount,
+      );
+    },
+
+    async listRejectedProjectNames(userId) {
+      await ensure();
+      const rows = (await sql`
+        SELECT name FROM sync_projects
+        WHERE user_id = ${userId} AND state = 'rejected'
+        ORDER BY name ASC
+      `) as Array<{ name: string }>;
+      return rows.map((row) => row.name);
+    },
+
+    async settleProject(userId, projectId, verdict) {
+      await ensure();
+      const name = verdict.state === "confirmed" ? verdict.name?.trim() : null;
+      const rows = (await sql`
+        UPDATE sync_projects
+        SET state = ${verdict.state},
+            name = COALESCE(${name || null}, name)
+        WHERE user_id = ${userId} AND id = ${projectId}
+        RETURNING id, name, state, created_at
+      `) as Array<ProjectRow>;
+      if (rows.length === 0) return null;
+
+      // A rejected guess leaves no residue: release the Threads it collected,
+      // except the ones the walker had already filed there.
+      if (verdict.state === "rejected") {
+        await sql`
+          UPDATE sync_threads
+          SET project_id = NULL
+          WHERE user_id = ${userId}
+            AND project_id = ${projectId}
+            AND reviewed_at IS NULL
+        `;
+      }
+      return mapProject(rows[0]);
     },
 
     async fileThread(userId, threadId, filing) {

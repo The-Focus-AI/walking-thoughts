@@ -31,6 +31,7 @@ export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "Leave the kind out when you genuinely cannot tell what the Thread is; an unclassified Thread with a question is worth more than a confident wrong one.",
   "When a walker profile of remembered facts is provided, tailor the report to it: skip basics the walker already knows, go deeper on their interests, and relate findings to their usual terrain — without restating the profile.",
   "When the walker's own words reveal a durable fact about them, or contradict a remembered one, revise the profile with the memory_patch tool — sparingly, only facts useful months from now, never facts about the world.",
+  "A Memory is true whether or not the walker ever acts on it: who they are, where they live and walk, what they know, what draws their eye. Anything naming an effort, a build, a client, or a product is a Project, not a Memory — put it in the PROJECT or PROPOSE header instead of memory_patch. Owning a business is a Memory; building a piece of software is a Project.",
   "Put any question in the ASK header rather than the body, and ask at most one — the walker answers it by replying in the Thread.",
   "Stay grounded in the provided history, media, place, and what you read.",
 ].join(" ");
@@ -64,6 +65,14 @@ export function buildEnrichmentPrompt(input: {
   walkerProfile?: string | null;
   /** The walker's Project names; the guess may only come from this list. */
   projects?: string[];
+  /**
+   * Proposed Project names. Offered alongside the walker's own so a later
+   * Thread joins an existing proposal instead of coining a rival name for the
+   * same effort — the failure that split one token-billing effort four ways.
+   */
+  proposedProjects?: string[];
+  /** Names the walker rejected; never propose these again. */
+  rejectedProjects?: string[];
 }): string {
   const historyBlock = input.history
     .map((entry) => {
@@ -83,6 +92,13 @@ export function buildEnrichmentPrompt(input: {
     })
     .join("\n");
   const targets = input.targetCaptureIds.join(", ");
+  // Confirmed and proposed names share one list: joining a proposal is the
+  // same act as joining a Project, and the model should not have to know
+  // which is which to do the right thing.
+  const knownProjects = [
+    ...(input.projects ?? []),
+    ...(input.proposedProjects ?? []),
+  ];
   const frontMatter = [
     "Open your response with these header lines, one per line, then a blank line, then the Enrichment body:",
     input.requestTitle
@@ -91,9 +107,14 @@ export function buildEnrichmentPrompt(input: {
     `\`KIND: \` exactly one of ${THREAD_KINDS.join(", ")} — the kind this Thread is now, judged from its whole history. Write \`unclear\` instead of guessing`,
     "`TOPICS: ` up to four lowercase hyphenated topic slugs, comma separated, that would group this Thread with others about the same subject",
     "`ASK: ` one specific question when a name, reference, or intent in the Capture is genuinely unknown to you — otherwise leave this header out entirely",
-    input.projects && input.projects.length > 0
-      ? `\`PROJECT: \` the walker's Project this Thread belongs to, copied exactly from this list — ${input.projects.join(", ")} — or left out when none of them fits. Never invent a Project name`
+    knownProjects.length > 0
+      ? `\`PROJECT: \` the Project this Thread belongs to, copied exactly from this list — ${knownProjects.join(", ")} — or left out when none of them fits. Never invent a name here; prefer joining one of these over proposing a new one`
       : null,
+    `\`PROPOSE: \` only when this Thread is part of an ongoing effort, build, client, or product that is absent from the list above, a short name for it (max 60 characters). Leave it out for a one-off — a Thread that is simply about something is not a Project${
+      input.rejectedProjects && input.rejectedProjects.length > 0
+        ? `. Never propose these, the walker has rejected them — ${input.rejectedProjects.join(", ")}`
+        : ""
+    }`,
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -114,7 +135,10 @@ export function buildEnrichmentPrompt(input: {
   return sections.join("\n\n");
 }
 
-const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS|ASK|PROJECT)\s*:\s*(.*)$/i;
+const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS|ASK|PROJECT|PROPOSE)\s*:\s*(.*)$/i;
+
+/** A Project name is one line of prose at most; keep the store tidy. */
+export const MAX_PROJECT_NAME_LENGTH = 60;
 
 function readTopics(value: string): string[] {
   return [
@@ -150,6 +174,8 @@ export function parseGatewayText(
   ask: string | null;
   /** A Project name the model recognized; matched to the walker's list later. */
   project: string | null;
+  /** A name for an effort absent from that list; becomes a Proposed Project. */
+  propose: string | null;
 } {
   const lines = raw.split("\n");
   const headers = new Map<string, string>();
@@ -180,6 +206,9 @@ export function parseGatewayText(
     kind,
     topics,
     ask: headers.get("ASK")?.trim().slice(0, 240) || null,
-    project: headers.get("PROJECT")?.trim().slice(0, 60) || null,
+    project:
+      headers.get("PROJECT")?.trim().slice(0, MAX_PROJECT_NAME_LENGTH) || null,
+    propose:
+      headers.get("PROPOSE")?.trim().slice(0, MAX_PROJECT_NAME_LENGTH) || null,
   };
 }
