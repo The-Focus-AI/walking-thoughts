@@ -83,5 +83,11 @@ Memories.
   (`scripts/revert-project-memories.mjs`), never by rewriting the log — ADR
   0013's Changes timeline then shows honestly that the system believed these
   were walker facts and that we changed our mind.
+- Every Memory the old Interview wrote goes with them, wholesale rather than
+  by merit: seven thin lines distilled from three one-line answers, they are
+  the artifact of the mechanism this ADR retires. The profile starts from
+  what Enrichments learn, which is where all three surviving Memories came
+  from anyway. It keeps no `place` line afterwards — the walker's town was
+  relearned from a Capture about morning coffee once, and will be again.
 - Once a Project exists, `PROJECT:` starts being emitted for every subsequent
   Capture, so the guess loop that has been dead since launch turns over.

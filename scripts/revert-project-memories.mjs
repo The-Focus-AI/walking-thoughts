@@ -1,11 +1,13 @@
 /**
  * Take Projects back out of the walker profile (ADR 0014).
  *
- * Replays the Memory Patch log into the current Memory set, sorts every live
- * Memory against the line ADR 0014 draws — a Memory is true whether or not
- * the walker ever acts on it; anything naming an effort, a build, a client, or
- * a product is a Project — and removes the ones that fell on the wrong side,
- * plus any Memory that merely restates one that is being kept.
+ * Replays the Memory Patch log into the current Memory set and empties it of
+ * three things: everything the retired Interview wrote, since those Memories
+ * are the artifact of a mechanism ADR 0014 replaces and the walker starts
+ * clean; everything that fell on the wrong side of the line ADR 0014 draws —
+ * a Memory is true whether or not the walker ever acts on it, and anything
+ * naming an effort, a build, a client, or a product is a Project; and any
+ * survivor that merely restates another survivor.
  *
  * Removal appends an inverse patch, exactly as revertMemoryPatch does
  * (lib/memory/patches.ts). The log is never rewritten, so the Changes timeline
@@ -183,7 +185,10 @@ for (const [userId, userPatches] of byUser) {
   const memories = materializeMemories(userPatches);
   console.log(`\n${userId} — ${userPatches.length} patches, ${memories.length} live Memories`);
 
-  const routed = await routeMemories(memories);
+  const interviewed = memories.filter((memory) => memory.source === "interview");
+  const learned = memories.filter((memory) => memory.source !== "interview");
+
+  const routed = await routeMemories(learned);
   const kept = routed.filter((entry) => entry.route.kind === "memory");
   const projects = routed.filter((entry) => entry.route.kind === "project");
   const duplicates = await findDuplicates(kept.map((entry) => entry.memory));
@@ -191,6 +196,11 @@ for (const [userId, userPatches] of byUser) {
   console.log(`\n  Projects to propose (${new Set(projects.map((p) => p.route.name)).size} distinct):`);
   for (const name of new Set(projects.map((entry) => entry.route.name))) {
     console.log(`    ${name}`);
+  }
+
+  console.log("\n  Removing as written by the retired Interview:");
+  for (const memory of interviewed) {
+    console.log(`    (${memory.category}) ${memory.content.slice(0, 80)}`);
   }
 
   console.log("\n  Removing as project-shaped:");
@@ -210,6 +220,9 @@ for (const [userId, userPatches] of byUser) {
   }
 
   if (dryRun) continue;
+  for (const memory of interviewed) {
+    await removeMemory(userId, memory, "adr-0014-retired-interview");
+  }
   for (const entry of projects) {
     await removeMemory(userId, entry.memory, "adr-0014-project-shaped");
   }
@@ -217,7 +230,7 @@ for (const [userId, userPatches] of byUser) {
     await removeMemory(userId, entry.memory, "adr-0014-duplicate");
   }
   console.log(
-    `\n  Appended ${projects.length + duplicates.size} remove patches.`,
+    `\n  Appended ${interviewed.length + projects.length + duplicates.size} remove patches.`,
   );
 }
 
