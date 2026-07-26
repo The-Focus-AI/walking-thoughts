@@ -130,6 +130,8 @@ export type GatewayGeneration = {
   ask: string | null;
   /** A Project name the model matched from the walker's own list. */
   project: string | null;
+  /** A name for an effort absent from that list; becomes a Proposed Project. */
+  propose: string | null;
   sources: EnrichmentSource[];
   research: ResearchStep[];
 };

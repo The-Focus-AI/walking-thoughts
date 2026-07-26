@@ -2411,6 +2411,27 @@ footer {
   text-transform: uppercase;
 }
 
+/*
+ * The evidence behind a Proposed Project: the walker's own Threads, listed
+ * the way the survey log lists them. Machine-titled, so upright.
+ */
+.interview-proposal-threads {
+  margin: 0.6rem 0 0;
+  padding: 0 0 0 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.interview-proposal-threads a {
+  color: inherit;
+}
+
+.interview-proposal-threads a:hover {
+  color: var(--text);
+}
+
 /* The walker's answer is the natural feature: italic serif, nothing else. */
 .interview-answer {
   margin: 0;
@@ -2834,6 +2855,35 @@ footer {
 
 .thread-copy-markdown:hover {
   border-color: var(--moss);
+}
+
+/* --- Artifacts: the report published as a page ---------------------------- */
+
+/* An anchor sitting among the toolbar's buttons has to match them exactly. */
+.thread-open-report {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/*
+ * The page is a Thread's finished report, so the link reads in the machine's
+ * sky rather than the walker's moss — the same voice as the Annotation it
+ * was published from.
+ */
+.thread-row-artifact {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--machine);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.thread-row-artifact:hover {
+  border-bottom-color: var(--machine);
 }
 
 .thread-capture-hero {

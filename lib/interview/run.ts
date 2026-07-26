@@ -1,157 +1,112 @@
-import { enrichmentSystemAndModel, getGatewayClient } from "@/lib/enrichment/gateway";
-import type { GatewayClient } from "@/lib/enrichment/types";
-import { applyMemoryPatch } from "@/lib/memory/patches";
+import type { MemoryPatch, WalkerMemory, WalkerMemoryRepository } from "@/lib/memory/types";
 import { getWalkerMemoryRepository } from "@/lib/memory/repository";
-import type {
-  MemoryPatch,
-  WalkerMemory,
-  WalkerMemoryRepository,
-} from "@/lib/memory/types";
-import { extractMemoriesFromAnswer } from "./extract";
-import { nextInterviewQuestion } from "./questions";
-import { getInterviewRepository } from "./repository";
-import type { InterviewRepository, InterviewTurn } from "./types";
+import { getThreadRepository } from "@/lib/sync/repository";
+import type { ProjectProposal, ThreadRepository } from "@/lib/sync/types";
+
+/**
+ * How many Threads an effort must gather before the Interview raises it.
+ *
+ * Tunable, not a fact of the model. Against the first production corpus a
+ * threshold of 1 would have made 13 Projects, ten of them holding a single
+ * Thread — a second, worse copy of the Thread list. Three yields exactly the
+ * efforts a walker would name by hand.
+ */
+export const PROJECT_PROPOSAL_THRESHOLD = 3;
 
 export type InterviewState = {
-  turns: InterviewTurn[];
+  /**
+   * Proposed Projects that have gathered enough Threads to be worth asking
+   * about, most evidence first. Empty until something recurs.
+   */
+  proposals: ProjectProposal[];
   memories: WalkerMemory[];
   /** Full Memory Patch log, for the Changes timeline. */
   patches: MemoryPatch[];
-  /** No open question remains and nothing further will be asked. */
+  /** Nothing has recurred often enough to ask about. */
   complete: boolean;
 };
 
+export type InterviewVerdict =
+  | { projectId: string; confirm: true; name?: string }
+  | { projectId: string; confirm: false };
+
 export type InterviewDependencies = {
-  interviews?: InterviewRepository;
   memories?: WalkerMemoryRepository;
-  gateway?: GatewayClient;
-  model?: string;
+  threads?: ThreadRepository;
   environment?: Record<string, string | undefined>;
-  now?: () => string;
-  createId?: () => string;
+  threshold?: number;
 };
 
-type ResolvedDependencies = Required<
-  Pick<InterviewDependencies, "interviews" | "memories" | "gateway" | "model" | "now" | "createId">
->;
+type ResolvedDependencies = {
+  memories: WalkerMemoryRepository;
+  threads: ThreadRepository;
+  threshold: number;
+};
 
 function resolve(deps: InterviewDependencies): ResolvedDependencies {
   const environment = deps.environment ?? process.env;
   return {
-    interviews:
-      deps.interviews ?? getInterviewRepository(environment as NodeJS.ProcessEnv),
     memories:
       deps.memories ?? getWalkerMemoryRepository(environment as NodeJS.ProcessEnv),
-    gateway: deps.gateway ?? getGatewayClient(environment),
-    model: deps.model ?? enrichmentSystemAndModel(environment).model,
-    now: deps.now ?? (() => new Date().toISOString()),
-    createId: deps.createId ?? (() => crypto.randomUUID()),
+    threads: deps.threads ?? getThreadRepository(environment as NodeJS.ProcessEnv),
+    threshold: deps.threshold ?? PROJECT_PROPOSAL_THRESHOLD,
   };
 }
 
-function openTurn(turns: InterviewTurn[]): InterviewTurn | undefined {
-  return turns.find((turn) => turn.answer === null && !turn.skipped);
+async function collect(
+  userId: string,
+  resolved: ResolvedDependencies,
+): Promise<InterviewState> {
+  const [proposals, memories, patches] = await Promise.all([
+    resolved.threads.listProposedProjects(userId),
+    resolved.memories.listMemories(userId),
+    resolved.memories.listPatches(userId),
+  ]);
+  const ready = proposals.filter(
+    (proposal) => proposal.threadCount >= resolved.threshold,
+  );
+  return {
+    proposals: ready,
+    memories,
+    patches,
+    complete: ready.length === 0,
+  };
 }
 
 /**
- * Read-only Interview state: the transcript, the Memories, and whether the
- * Interview still has (or could have) an open question.
+ * What the Interview has to say right now: the Proposed Projects that have
+ * recurred often enough to be worth a question, and the walker profile behind
+ * the Changes timeline. A walker with nothing recurring gets an empty state,
+ * which is the honest answer rather than a questionnaire.
  */
 export async function readInterviewState(
   userId: string,
   deps: InterviewDependencies = {},
 ): Promise<InterviewState> {
-  const resolved = resolve(deps);
-  const [turns, memories, patches] = await Promise.all([
-    resolved.interviews.listTurns(userId),
-    resolved.memories.listMemories(userId),
-    resolved.memories.listPatches(userId),
-  ]);
-  return { turns, memories, patches, complete: false };
+  return collect(userId, resolve(deps));
 }
 
 /**
- * Advances the Interview one step: records the walker's answer (or skip) to
- * the open question, saves the Memories it teaches, then asks the next
- * question. Calling it with no answer simply ensures a question is open —
- * that is how the Interview starts.
+ * Records the walker's verdict on one Proposed Project. Confirming makes it a
+ * Project, optionally under a better name — the name was coined from a single
+ * early Thread, so renaming is the main repair path, not a nicety.
+ *
+ * Confirming deliberately does **not** file the Threads that accrued: knowing
+ * what a pile is called is not the same as having read it, so every Thread
+ * keeps its unsettled guess and Reviewed keeps meaning "I read this".
  */
 export async function advanceInterview(
   userId: string,
-  input: { answer?: string; skip?: boolean },
+  verdict: InterviewVerdict,
   deps: InterviewDependencies = {},
 ): Promise<InterviewState> {
   const resolved = resolve(deps);
-  const { interviews, memories, gateway, model, now, createId } = resolved;
-
-  let turns = await interviews.listTurns(userId);
-  const open = openTurn(turns);
-  const answer = input.answer?.trim() ?? "";
-
-  if (open && input.skip) {
-    await interviews.resolveTurn(userId, open.id, {
-      answer: null,
-      skipped: true,
-      memoryIds: [],
-      answeredAt: now(),
-    });
-  } else if (open && answer.length > 0) {
-    const existing = await memories.listMemories(userId);
-    const extracted = await extractMemoriesFromAnswer({
-      question: open.question,
-      category: open.category,
-      answer,
-      existingMemories: existing,
-      gateway,
-      model,
-    });
-    const memoryIds: string[] = [];
-    for (const memory of extracted) {
-      const applied = await applyMemoryPatch(
-        memories,
-        userId,
-        {
-          op: "add",
-          category: memory.category,
-          content: memory.content,
-          source: "interview",
-          sourceId: open.id,
-        },
-        { now, createId },
-      );
-      if (applied.ok) memoryIds.push(applied.patch.memoryId);
-    }
-    await interviews.resolveTurn(userId, open.id, {
-      answer,
-      skipped: false,
-      memoryIds,
-      answeredAt: now(),
-    });
-  }
-
-  turns = await interviews.listTurns(userId);
-  const knownMemories = await memories.listMemories(userId);
-  const patches = await memories.listPatches(userId);
-  let complete = false;
-  if (!openTurn(turns)) {
-    const next = await nextInterviewQuestion({
-      turns,
-      memories: knownMemories,
-      gateway,
-      model,
-    });
-    if (next) {
-      await interviews.addTurn(userId, {
-        id: createId(),
-        question: next.question,
-        category: next.category,
-        askedAt: now(),
-      });
-      turns = await interviews.listTurns(userId);
-    } else {
-      complete = true;
-    }
-  }
-
-  return { turns, memories: knownMemories, patches, complete };
+  await resolved.threads.settleProject(
+    userId,
+    verdict.projectId,
+    verdict.confirm
+      ? { state: "confirmed", name: verdict.name }
+      : { state: "rejected" },
+  );
+  return collect(userId, resolved);
 }

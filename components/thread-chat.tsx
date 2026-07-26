@@ -6,6 +6,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
 import { statusLabel } from "@/components/thread-entries";
+import {
+  artifactHref,
+  artifactsByThread,
+  loadArtifacts,
+  publishArtifact,
+  readCachedArtifacts,
+} from "@/lib/artifacts/client";
+import type { ArtifactSummary } from "@/lib/artifacts/types";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
@@ -291,6 +299,8 @@ export function ThreadChat({
   const [reviewBusy, setReviewBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+  const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
+  const [publishing, setPublishing] = useState(false);
   const router = useRouter();
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -305,6 +315,11 @@ export function ThreadChat({
     setThread(view.thread);
     setCaptures(view.captures);
     setEnrichments(nextEnrichments);
+    // The retained list first so the page is reachable offline, then the
+    // server's answer — a report enriched moments ago publishes itself.
+    setArtifact(artifactsByThread(readCachedArtifacts()).get(threadId) ?? null);
+    const published = artifactsByThread(await loadArtifacts()).get(threadId);
+    if (published) setArtifact(published);
   }, [threadId]);
 
   useEffect(() => {
@@ -506,6 +521,24 @@ export function ThreadChat({
     copyResetRef.current = window.setTimeout(() => setCopied("idle"), 2500);
   }
 
+  /**
+   * A report publishes itself as it is enriched. This is the deliberate
+   * desk act for a Thread the queue judged too slight for a page, or one
+   * whose page was never written because the gateway was down.
+   */
+  async function publishReport() {
+    if (publishing) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      const published = await publishArtifact(threadId);
+      if (published) setArtifact(published);
+      else setError("Could not publish this report");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   async function send() {
     if (busy || (!draft.trim() && media.length === 0)) return;
     setBusy(true);
@@ -594,6 +627,29 @@ export function ThreadChat({
               title="Move each Capture into its own Thread and research it again"
             >
               {splitting ? "Splitting…" : "Split into Threads"}
+            </button>
+          ) : null}
+          {artifact ? (
+            <a
+              className="thread-copy-markdown thread-open-report"
+              href={artifactHref(artifact.id)}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="thread-open-report"
+              title={artifact.standfirst ?? "Read the published report"}
+            >
+              Open report
+            </a>
+          ) : !embedded && enrichments.length > 0 ? (
+            <button
+              type="button"
+              className="thread-copy-markdown"
+              data-testid="thread-publish-report"
+              onClick={() => void publishReport()}
+              disabled={publishing || !online}
+              title="Lay this Thread's newest Enrichment out as a page"
+            >
+              {publishing ? "Publishing…" : "Publish report"}
             </button>
           ) : null}
           <button

@@ -2,6 +2,8 @@ import { titleFromText } from "@/lib/local-capture/thread-destination";
 import { asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
+  ProjectProposal,
+  ProjectState,
   PurgeExpiredResult,
   PurgeTarget,
   ServerThread,
@@ -30,7 +32,13 @@ type StoredThread = {
   projectId?: string | null;
 };
 
-type StoredProject = { id: string; userId: string; name: string; createdAt: string };
+type StoredProject = {
+  id: string;
+  userId: string;
+  name: string;
+  state: ProjectState;
+  createdAt: string;
+};
 
 type MemoryState = {
   captures: Map<string, StoredCapture>;
@@ -220,6 +228,45 @@ export function createMemoryThreadRepository(
   namespace = "default",
 ): ThreadRepository {
   const state = () => stateFor(namespace);
+
+  /**
+   * One row per name. A name that already exists keeps the state it has, so
+   * proposing something the walker confirmed or rejected never resurrects it.
+   */
+  const upsertProject = async (
+    userId: string,
+    name: string,
+    initial: ProjectState,
+  ) => {
+    const db = state();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("project_name_required");
+    const existing = [...db.projects.values()].find(
+      (project) => project.userId === userId && project.name === trimmed,
+    );
+    if (existing) {
+      return {
+        id: existing.id,
+        name: existing.name,
+        state: existing.state,
+        createdAt: existing.createdAt,
+      };
+    }
+    const project: StoredProject = {
+      id: crypto.randomUUID(),
+      userId,
+      name: trimmed,
+      state: initial,
+      createdAt: new Date().toISOString(),
+    };
+    db.projects.set(`${userId}:${project.id}`, project);
+    return {
+      id: project.id,
+      name: project.name,
+      state: project.state,
+      createdAt: project.createdAt,
+    };
+  };
 
   return {
     async upsertCaptures(userId, captures) {
@@ -472,36 +519,92 @@ export function createMemoryThreadRepository(
 
     async listProjects(userId) {
       return [...state().projects.values()]
-        .filter((project) => project.userId === userId)
-        .map(({ id, name, createdAt }) => ({ id, name, createdAt }))
+        .filter(
+          (project) =>
+            project.userId === userId && project.state === "confirmed",
+        )
+        .map(({ id, name, state: projectState, createdAt }) => ({
+          id,
+          name,
+          state: projectState,
+          createdAt,
+        }))
         .sort((a, b) => (a.name < b.name ? -1 : 1));
     },
 
     async createProject(userId, name) {
+      return upsertProject(userId, name, "confirmed");
+    },
+
+    async proposeProject(userId, name) {
+      return upsertProject(userId, name, "proposed");
+    },
+
+    async listProposedProjects(userId): Promise<ProjectProposal[]> {
       const db = state();
-      const trimmed = name.trim();
-      if (!trimmed) throw new Error("project_name_required");
-      const existing = [...db.projects.values()].find(
-        (project) => project.userId === userId && project.name === trimmed,
+      const threads = [...db.threads.values()].filter(
+        (thread) => thread.userId === userId,
       );
-      if (existing) {
-        return {
-          id: existing.id,
-          name: existing.name,
-          createdAt: existing.createdAt,
-        };
+      return [...db.projects.values()]
+        .filter(
+          (project) =>
+            project.userId === userId && project.state === "proposed",
+        )
+        .map((project) => {
+          const accrued = threads.filter(
+            (thread) => thread.projectId === project.id,
+          );
+          return {
+            id: project.id,
+            name: project.name,
+            state: project.state,
+            createdAt: project.createdAt,
+            threadCount: accrued.length,
+            threads: accrued.map((thread) => ({
+              id: thread.id,
+              title: thread.title,
+            })),
+          };
+        })
+        .sort((a, b) => b.threadCount - a.threadCount);
+    },
+
+    async listRejectedProjectNames(userId) {
+      return [...state().projects.values()]
+        .filter(
+          (project) => project.userId === userId && project.state === "rejected",
+        )
+        .map((project) => project.name)
+        .sort();
+    },
+
+    async settleProject(userId, projectId, verdict) {
+      const db = state();
+      const key = `${userId}:${projectId}`;
+      const existing = db.projects.get(key);
+      if (!existing) return null;
+      const name =
+        verdict.state === "confirmed" && verdict.name?.trim()
+          ? verdict.name.trim()
+          : existing.name;
+      const settled: StoredProject = { ...existing, name, state: verdict.state };
+      db.projects.set(key, settled);
+
+      // A rejected guess leaves no residue: release the Threads it collected,
+      // except the ones the walker had already filed there.
+      if (verdict.state === "rejected") {
+        for (const [threadKey, thread] of db.threads) {
+          if (thread.userId !== userId) continue;
+          if (thread.projectId !== projectId) continue;
+          if (thread.reviewedAt) continue;
+          db.threads.set(threadKey, { ...thread, projectId: null });
+        }
       }
-      const project: StoredProject = {
-        id: crypto.randomUUID(),
-        userId,
-        name: trimmed,
-        createdAt: new Date().toISOString(),
-      };
-      db.projects.set(`${userId}:${project.id}`, project);
       return {
-        id: project.id,
-        name: project.name,
-        createdAt: project.createdAt,
+        id: settled.id,
+        name: settled.name,
+        state: settled.state,
+        createdAt: settled.createdAt,
       };
     },
 

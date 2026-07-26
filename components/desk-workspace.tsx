@@ -5,6 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
+import {
+  artifactHref,
+  artifactsByThread,
+  loadArtifacts,
+  readCachedArtifacts,
+} from "@/lib/artifacts/client";
+import type { ArtifactSummary } from "@/lib/artifacts/types";
 import { SyncRuntime } from "@/components/sync-runtime";
 import { SyncStatusPill } from "@/components/sync-status-pill";
 import { ThreadChat } from "@/components/thread-chat";
@@ -82,6 +89,7 @@ function ThreadRow({
   selected,
   projects,
   showDay,
+  artifact,
   onFiled,
   onProjectCreated,
 }: {
@@ -89,6 +97,8 @@ function ThreadRow({
   selected: boolean;
   projects: Project[];
   showDay?: boolean;
+  /** The published page for this Thread, when its report earned one. */
+  artifact?: ArtifactSummary;
   onFiled: () => void;
   onProjectCreated: (project: Project) => void;
 }) {
@@ -126,6 +136,18 @@ function ThreadRow({
         </span>
       </Link>
       <div className="thread-row-side">
+        {artifact ? (
+          <a
+            className="thread-row-artifact"
+            href={artifactHref(artifact.id)}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="thread-artifact-link"
+            title={artifact.standfirst ?? "Read the published report"}
+          >
+            Report
+          </a>
+        ) : null}
         {view.thread.projectName ? (
           <span
             className={
@@ -205,6 +227,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
+  const [artifacts, setArtifacts] = useState<Map<string, ArtifactSummary>>(
+    () => new Map(),
+  );
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -229,6 +254,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       if (generation !== loadGeneration.current) return;
       setThreads(localViews);
       setLoaded(true);
+      // Published pages paint from the retained list first, so a Thread that
+      // has a report says so before the network answers, and offline.
+      setArtifacts(artifactsByThread(readCachedArtifacts()));
 
       // Only ask the server about Threads whose answer can still change: the
       // one being read, and any still working. A settled Thread's Enrichments
@@ -251,6 +279,10 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       );
       if (generation !== loadGeneration.current) return;
       setThreads(refreshed);
+
+      const published = await loadArtifacts();
+      if (generation !== loadGeneration.current) return;
+      setArtifacts(artifactsByThread(published));
     } catch {
       if (generation !== loadGeneration.current) return;
       setError("Could not load Threads");
@@ -475,6 +507,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   showDay
                   selected={view.thread.id === selectedThreadId}
                   projects={projects}
+                  artifact={artifacts.get(view.thread.id)}
                   onFiled={() => void load()}
                   onProjectCreated={onProjectCreated}
                 />
@@ -590,6 +623,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                       view={view}
                       selected={false}
                       projects={projects}
+                      artifact={artifacts.get(view.thread.id)}
                       onFiled={() => void load()}
                       onProjectCreated={onProjectCreated}
                     />
