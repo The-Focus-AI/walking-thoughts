@@ -73,15 +73,20 @@ export async function loadArtifacts(): Promise<ArtifactSummary[]> {
   }
 }
 
-/** Publish this Thread's newest Enrichment as a page, on the walker's word. */
+/**
+ * Publish this Thread's newest Enrichment as a page, on the walker's word.
+ * With `republish`, the page is written again over the one already stored —
+ * how a report published under an older layout gets rebuilt.
+ */
 export async function publishArtifact(
   threadId: string,
+  options: { republish?: boolean } = {},
 ): Promise<ArtifactSummary | null> {
   try {
     const response = await trackedFetch("/api/artifacts/publish", {
       method: "POST",
       headers: { ...headers(), "content-type": "application/json" },
-      body: JSON.stringify({ threadId }),
+      body: JSON.stringify({ threadId, republish: options.republish ?? false }),
     });
     if (!response.ok) return null;
     const body = (await response.json()) as { artifact?: ArtifactSummary };

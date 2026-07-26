@@ -156,6 +156,11 @@ export type GatewayGenerateInput = {
   /** When true, ask the model for a short Thread title. */
   requestTitle: boolean;
   media: GatewayMediaPart[];
+  /**
+   * Output budget. Left unset the provider default applies (4,096 for
+   * Anthropic), which is short for anything that spends tokens on markup.
+   */
+  maxOutputTokens?: number;
   /** Research tools (web_search, read_page) offered to the model. */
   search?: ResearchClient;
   /** memory_patch tool offered to the model to revise the walker profile. */

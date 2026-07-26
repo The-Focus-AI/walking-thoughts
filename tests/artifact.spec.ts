@@ -19,7 +19,10 @@ import {
   createMemoryArtifactRepository,
   resetMemoryArtifactRepository,
 } from "@/lib/artifacts/memory-repository";
+import { checkArtifactCompleteness } from "@/lib/artifacts/completeness";
 import {
+  ARTIFACT_MAX_OUTPUT_TOKENS,
+  ARTIFACT_RETRY_INSTRUCTION,
   DEFAULT_ARTIFACT_PUBLISH_INSTRUCTION,
   buildPublishPrompt,
   parseArtifactGeneration,
@@ -57,6 +60,27 @@ function longReport(marker: string, length: number): string {
   // Exactly `length` characters after trimming — the eligibility boundary
   // is measured on the trimmed report.
   return `${filled.slice(0, length - 1)}.`;
+}
+
+function enrichmentFixture(
+  overrides: Partial<ThreadEnrichment> = {},
+): ThreadEnrichment {
+  return {
+    id: "enrichment:job-1",
+    threadId: "thread-1",
+    text: "A report.",
+    model: "anthropic/claude-sonnet-5",
+    basisRevision: 1,
+    basisEntryIds: ["cap-1"],
+    targetCaptureIds: ["cap-1"],
+    createdAt: "2026-07-24T10:00:00.000Z",
+    title: "Where the patio stone came from",
+    kind: "question",
+    topics: ["bluestone"],
+    ask: null,
+    sources: [],
+    ...overrides,
+  };
 }
 
 function artifactFixture(
@@ -308,6 +332,206 @@ test("a short answer stays a Thread entry, and a long unclassified one is a repo
 
 /* --- Publishing ------------------------------------------------------------ */
 
+/* --- The page carries the report, or it is not published ------------------ */
+
+test("a page thinner than its report fails the completeness check", () => {
+  const report = longReport("Q", 2_000);
+
+  // A tidy summary of a 2,000-character report is the failure that shipped.
+  const summary = checkArtifactCompleteness({
+    body: `<p class="artifact-lede">${longReport("S", 600)}</p>`,
+    report,
+  });
+  expect(summary.ok).toBe(false);
+  expect(summary.ratio).toBeLessThan(0.5);
+
+  // Markup is not substance: tags and classes do not count toward length.
+  const padded = checkArtifactCompleteness({
+    body: `<section class="artifact-section"><h2>Heading</h2>${"<p></p>".repeat(200)}</section>`,
+    report,
+  });
+  expect(padded.ok).toBe(false);
+
+  // A page that carries the report, with headings and a facts list on top,
+  // lands above it — and is never rejected for being thorough.
+  const full = checkArtifactCompleteness({
+    body: `<p class="artifact-lede">${report}</p><dl class="artifact-key"><dt>Formation</dt><dd>Devonian</dd></dl>`,
+    report,
+  });
+  expect(full.ok).toBe(true);
+  expect(full.ratio).toBeGreaterThan(1);
+});
+
+test("a thin first pass is asked again, with the failure named", async () => {
+  const repository = createMemoryArtifactRepository(NS);
+  const report = longReport("Q", 2_000);
+  const systems: string[] = [];
+
+  const gateway = createFakeGatewayClient(async (input) => {
+    systems.push(input.system);
+    return systems.length === 1
+      ? { text: `<p class="artifact-lede">${longReport("S", 400)}</p>` }
+      : { text: `<p class="artifact-lede">${report}</p>` };
+  });
+
+  const result = await publishThreadArtifact({
+    userId: "user_a",
+    threadTitle: "Where the patio stone came from",
+    enrichment: enrichmentFixture({ text: report }),
+    captureWords: ["where did we get the stones for the patio?"],
+    repository,
+    gateway,
+  });
+
+  expect(systems).toHaveLength(2);
+  expect(systems[0]).not.toContain(ARTIFACT_RETRY_INSTRUCTION);
+  expect(systems[1]).toContain(ARTIFACT_RETRY_INSTRUCTION);
+  expect(result.outcome).toBe("retried");
+  expect(result.completeness.ok).toBe(true);
+  expect(result.artifact.body).toContain("The stone came from a quarry");
+});
+
+test("when both passes lose the report, the page becomes the report", async () => {
+  const repository = createMemoryArtifactRepository(NS);
+  const report = [
+    "**Bluestone.** Quarried two valleys over, in the Kaaterskill drainage.",
+    "",
+    "## What the stone is",
+    "",
+    "- Feldspathic greywacke sandstone",
+    "- Splits along bedding planes",
+    "",
+    "See [the survey](https://example.org/bluestone) for the map of pits.",
+    "",
+    longReport("Q", 1_200),
+  ].join("\n");
+
+  const result = await publishThreadArtifact({
+    userId: "user_a",
+    threadTitle: "Where the patio stone came from",
+    enrichment: enrichmentFixture({ text: report }),
+    captureWords: [],
+    repository,
+    // A press that will not stop summarizing.
+    gateway: createFakeGatewayClient(async () => ({
+      text: '<p class="artifact-lede">Bluestone, quarried locally.</p>',
+    })),
+  });
+
+  expect(result.outcome).toBe("report_fallback");
+  // The report itself, laid out on the sheet — headings, lists, links, bold.
+  expect(result.artifact.body).toContain("<h2>What the stone is</h2>");
+  expect(result.artifact.body).toContain(
+    "<li>Feldspathic greywacke sandstone</li>",
+  );
+  expect(result.artifact.body).toContain(
+    '<a href="https://example.org/bluestone"',
+  );
+  expect(result.artifact.body).toContain("<strong>Bluestone.</strong>");
+  expect(result.completeness.ok).toBe(true);
+});
+
+test("the press is given the whole Thread, not just the newest report", () => {
+  const prompt = buildPublishPrompt({
+    threadTitle: "Which camera for the trail",
+    kind: "question",
+    report: "The RX100 is the one.",
+    captureWords: ["what camera should I carry?"],
+    sources: [],
+    priorReports: ["An earlier pass compared three bodies."],
+    research: [
+      {
+        action: "search",
+        provider: "brave",
+        query: "compact camera hiking 2026",
+        resultCount: 8,
+        at: "2026-07-24T10:00:00.000Z",
+      },
+      {
+        action: "read",
+        provider: "brave",
+        url: "https://example.org/rx100",
+        title: "RX100 field review",
+        at: "2026-07-24T10:01:00.000Z",
+      },
+    ],
+    ask: "How much weight are you willing to carry?",
+  });
+
+  expect(prompt).toContain("An earlier pass compared three bodies.");
+  expect(prompt).toContain('searched "compact camera hiking 2026" (8 results)');
+  expect(prompt).toContain("read RX100 field review — https://example.org/rx100");
+  expect(prompt).toContain("How much weight are you willing to carry?");
+});
+
+test("the brief leads with carrying the report, not with markup", () => {
+  const instruction = DEFAULT_ARTIFACT_PUBLISH_INSTRUCTION;
+  const completeness = instruction.indexOf("fullest form");
+  const markup = instruction.indexOf("Return HTML only");
+
+  // The first version buried fidelity under the tag list and published
+  // summaries. Content comes first now.
+  expect(completeness).toBeGreaterThan(-1);
+  expect(completeness).toBeLessThan(markup);
+  expect(instruction).toContain("never a summary");
+  expect(instruction).toContain("longer than the report, not shorter");
+});
+
+test("the publish pass asks for room a report laid out as a page needs", async () => {
+  let budget: number | undefined;
+  await publishThreadArtifact({
+    userId: "user_a",
+    threadTitle: "Trail notes",
+    enrichment: enrichmentFixture({ text: longReport("Q", 900) }),
+    captureWords: [],
+    repository: createMemoryArtifactRepository(NS),
+    gateway: createFakeGatewayClient(async (input) => {
+      budget = input.maxOutputTokens;
+      return { text: `<p>${longReport("Q", 900)}</p>` };
+    }),
+  });
+
+  expect(budget).toBe(ARTIFACT_MAX_OUTPUT_TOKENS);
+  // Well clear of the SDK's 4,096 Anthropic default, which truncated pages.
+  expect(ARTIFACT_MAX_OUTPUT_TOKENS).toBeGreaterThan(8_000);
+});
+
+test("republishing writes over the page already stored", async () => {
+  const repository = createMemoryArtifactRepository(NS);
+  const report = longReport("Q", 900);
+  const enrichment = enrichmentFixture({ text: report });
+  let pass = 0;
+
+  const publish = (republish: boolean) =>
+    publishThreadArtifact({
+      userId: "user_a",
+      threadTitle: "Where the patio stone came from",
+      enrichment,
+      captureWords: [],
+      repository,
+      republish,
+      gateway: createFakeGatewayClient(async () => {
+        pass += 1;
+        return { text: `<p class="artifact-lede">Pass ${pass}. ${report}</p>` };
+      }),
+    });
+
+  const first = await publish(false);
+  expect(first.artifact.body).toContain("Pass 1.");
+
+  // Without republish, the stored page stands and the gateway is not called.
+  const again = await publish(false);
+  expect(again.created).toBe(false);
+  expect(again.artifact.body).toContain("Pass 1.");
+  expect(pass).toBe(1);
+
+  const rebuilt = await publish(true);
+  expect(rebuilt.artifact.body).toContain("Pass 2.");
+  expect(await repository.listThreadArtifacts("user_a", "thread-1")).toHaveLength(
+    1,
+  );
+});
+
 test("publishing twice returns the page already stored", async () => {
   const repository = createMemoryArtifactRepository(NS);
   const enrichment: ThreadEnrichment = {
@@ -329,8 +553,9 @@ test("publishing twice returns the page already stored", async () => {
   let calls = 0;
   const gateway = createFakeGatewayClient(async () => {
     calls += 1;
+    // A page that carries its report, so nothing here trips the retry.
     return {
-      text: 'STANDFIRST: Bluestone.\n\n<p class="artifact-lede">Bluestone.</p>',
+      text: `STANDFIRST: Bluestone.\n\n<p class="artifact-lede">${enrichment.text}</p>`,
     };
   });
   const input = {
@@ -384,6 +609,12 @@ test("Enrichment publishes the report as a page in the same pass", async () => {
           "STANDFIRST: The yard two valleys over still cuts it.",
           "",
           '<p class="artifact-lede">Bluestone, quarried locally.</p>',
+          // The page carries the report it publishes, so it stands as
+          // written rather than falling back to the report itself.
+          `<section class="artifact-section"><h2>What the stone is</h2><p>${longReport(
+            "Q",
+            900,
+          )}</p></section>`,
         ].join("\n"),
       };
     }),

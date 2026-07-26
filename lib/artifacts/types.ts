@@ -35,11 +35,13 @@ export type ArtifactRepository = {
   /**
    * Store a published page. Artifact ids are derived from the Enrichment, so
    * publishing the same report twice returns the stored page and reports
-   * `created: false` rather than duplicating it.
+   * `created: false` rather than duplicating it — unless `replace` is set,
+   * which is how a walker rebuilds a page whose layout has since improved.
    */
   saveArtifact(
     userId: string,
     artifact: ThreadArtifact,
+    options?: { replace?: boolean },
   ): Promise<{ artifact: ThreadArtifact; created: boolean }>;
   getArtifact(userId: string, artifactId: string): Promise<ThreadArtifact | null>;
   listArtifacts(userId: string): Promise<ArtifactSummary[]>;

@@ -75,11 +75,25 @@ export function createNeonArtifactRepository(
     `) as ArtifactRow[];
 
   return {
-    async saveArtifact(userId, artifact) {
+    async saveArtifact(userId, artifact, options) {
       await ensure();
       const existing = await selectColumns(userId, artifact.id);
-      if (existing[0]) {
+      if (existing[0] && !options?.replace) {
         return { artifact: mapArtifact(existing[0]), created: false };
+      }
+      if (existing[0]) {
+        await sql`
+          UPDATE artifacts
+          SET title = ${artifact.title},
+              standfirst = ${artifact.standfirst},
+              kind = ${artifact.kind},
+              body = ${artifact.body},
+              sources = ${JSON.stringify(artifact.sources)},
+              model = ${artifact.model},
+              created_at = ${artifact.createdAt}
+          WHERE user_id = ${userId} AND id = ${artifact.id}
+        `;
+        return { artifact, created: false };
       }
       await sql`
         INSERT INTO artifacts (

@@ -27,6 +27,12 @@ export type DaySheet = {
   needsWord: DaySheetThread[];
   /** Threads the day left the walker to do. */
   toDo: DaySheetThread[];
+  /**
+   * Threads whose report is published and unread — the reason to sit down.
+   * A day's other Threads are glanced at; these are the ones with a page
+   * waiting. Empty unless the caller says which Threads have one.
+   */
+  toRead: DaySheetThread[];
   /** Threads no Enrichment has classified yet — usually still enriching. */
   unclassified: number;
   reviewed: number;
@@ -36,6 +42,12 @@ export function summarizeDay(input: {
   threads: LocalThread[];
   captures: LocalCapture[];
   dayKey: string;
+  /**
+   * Threads with a published Artifact. Passed in rather than read here so
+   * the sheet stays a pure function of local state — the desk knows which
+   * Threads have a page, this only counts them.
+   */
+  threadsWithReports?: ReadonlySet<string>;
 }): DaySheet {
   const dayCaptures = input.captures.filter(
     (capture) => calendarDayKey(new Date(capture.createdAt)) === input.dayKey,
@@ -72,6 +84,12 @@ export function summarizeDay(input: {
     })),
     needsWord: threads.filter((thread) => thread.ask).map(describe),
     toDo: threads.filter((thread) => thread.kind === "task").map(describe),
+    toRead: threads
+      .filter(
+        (thread) =>
+          !thread.reviewedAt && input.threadsWithReports?.has(thread.id),
+      )
+      .map(describe),
     unclassified: threads.filter((thread) => !thread.kind).length,
     reviewed: threads.filter((thread) => thread.reviewedAt).length,
   };
