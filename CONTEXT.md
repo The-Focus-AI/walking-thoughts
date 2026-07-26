@@ -20,8 +20,12 @@ _Avoid_: Sync, processing, response
 One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The unit of work at the desk — Threads are reached through the day they were walked, not through a flat list.
 _Avoid_: Session, entry, log, feed
 
+**Kind**:
+What a Thread turns out to be — question, idea, task, observation, place, media, or noise. A property the Enrichment reads off the Thread, not a thing in its own right: an idea is a Thread that is an idea, never a record of its own.
+_Avoid_: Type, class, bucket, label
+
 **Project**:
-A named bucket the walker files Threads into — an effort, a client, a build. A Thread belongs to at most one. The Enrichment may guess a Project, but only from the list the walker has already made, and its guess is never final: filing at the desk settles it.
+A named bucket the walker files Threads into — an effort, a client, a build. A Thread belongs to at most one, whatever its Kind. The Enrichment may guess a Project, but only from the list the walker has already made, and its guess is never final: filing at the desk settles it.
 _Avoid_: Folder, tag, category, workspace
 
 **Filing**:
