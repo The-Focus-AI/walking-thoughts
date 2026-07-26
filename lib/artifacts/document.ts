@@ -133,8 +133,13 @@ export const ARTIFACT_RESPONSE_HEADERS: Record<string, string> = {
     "img-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",
-    "frame-ancestors 'none'",
+    // The desk reads a report in a lightbox without leaving the day, so the
+    // app's own origin may frame it. Nothing else may.
+    "frame-ancestors 'self'",
   ].join("; "),
+  // Paired with frame-ancestors for browsers that still weigh this, and to
+  // override the app-wide DENY that would otherwise blank the lightbox.
+  "x-frame-options": "SAMEORIGIN",
   "referrer-policy": "no-referrer",
   "x-robots-tag": "noindex, nofollow",
 };

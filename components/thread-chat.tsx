@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
+import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import { statusLabel } from "@/components/thread-entries";
 import {
   artifactHref,
@@ -301,6 +302,9 @@ export function ThreadChat({
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
   const [publishing, setPublishing] = useState(false);
+  /** The report being read over the Thread; desk only. */
+  const [reading, setReading] = useState<ArtifactSummary | null>(null);
+  const atTheDesk = useDeskViewport();
   const router = useRouter();
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -633,10 +637,17 @@ export function ThreadChat({
             <a
               className="thread-copy-markdown thread-open-report"
               href={artifactHref(artifact.id)}
-              target="_blank"
+              target={atTheDesk ? undefined : "_blank"}
               rel="noreferrer"
               data-testid="thread-open-report"
               title={artifact.standfirst ?? "Read the published report"}
+              onClick={(event) => {
+                // At the desk the report reads over the Thread; on the phone
+                // the href stands and the page opens on its own.
+                if (!atTheDesk || event.metaKey || event.ctrlKey) return;
+                event.preventDefault();
+                setReading(artifact);
+              }}
             >
               Open report
             </a>
@@ -826,6 +837,13 @@ export function ThreadChat({
           </button>
         </div>
       </footer>
+
+      {reading ? (
+        <ArtifactLightbox
+          artifact={reading}
+          onClose={() => setReading(null)}
+        />
+      ) : null}
     </div>
   );
 }

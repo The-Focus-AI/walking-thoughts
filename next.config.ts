@@ -20,6 +20,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // A published report is read in a lightbox on the desk, so this one
+        // surface is framable by this origin. Its own response carries the
+        // matching `frame-ancestors 'self'`; nothing else is relaxed.
+        source: "/artifacts/:path*",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
+      {
         source: "/sw.js",
         headers: [
           {

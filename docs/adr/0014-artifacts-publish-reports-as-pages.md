@@ -48,6 +48,31 @@ with their contents, and admitting only `http(s)`/`mailto` hrefs. The
 route sets an independent `default-src 'none'` CSP with inline styles and
 same-origin fonts, so neither layer is trusted alone.
 
+**A report waiting is what a day amounts to.** Threads with an unread
+report sort first inside the day and carry the Annotation's own mark —
+a 2px sky left rule over a 7% sky tint — rather than a badge, per
+DESIGN.md's rule that weight comes from a tinted fill and not from chips
+inside the sheet. Clay still outranks sky: a stuck Thread reads as stuck
+whether or not it also has a page. Filing takes the mark off; the page
+stays. The row prints the report's standfirst so the walker knows whether
+to open it without opening it, the day sheet gains a **To read**
+instrument, and the day list says "2 reports to read" ahead of the
+vaguer "2 waiting" — but behind "1 needs a word", because a Thread stuck
+on a question outranks one merely unread.
+
+**At the desk the report opens over the day, not in a new tab.** The
+desktop is the processing room, so above the 960px split-view breakpoint
+the Artifact reads in a lightbox; the phone is the field instrument,
+where a report framed in a 412px column is worse than the page, so there
+the link navigates. The lightbox frames the page rather than inlining it:
+an Artifact's markup and the app's stylesheet never share a document, and
+the frame is sandboxed on top of its CSP — `allow-same-origin` only so
+the sheet's self-hosted display font resolves, `allow-popups` so source
+citations still open, and no `allow-scripts` in either layer. That is why
+`frame-ancestors` is `'self'` rather than `'none'`, with a matching
+`X-Frame-Options: SAMEORIGIN` on this one path to override the app-wide
+`DENY`.
+
 ## Consequences
 
 - New `artifacts` table, keyed by `user_id`, with the artifact id derived
@@ -55,6 +80,11 @@ same-origin fonts, so neither layer is trusted alone.
   page already stored rather than a second one.
 - The desk asks `/api/artifacts` once per load, not once per Thread, and
   retains the list, so a Thread that has a page still says so offline.
+  That request runs beside the per-Thread Enrichment refresh rather than
+  after it: which Threads have a report is the first thing a day needs,
+  and must not queue behind a slow Enrichment fetch.
+- `summarizeDay` takes the Threads with a page as an argument rather than
+  reading them, so the day sheet stays a pure function of local state.
 - Reports cost a second gateway call. Only Enrichments that were reports
   pay it, and only once each.
 - The page is private: `noindex`, `no-store`, no referrer, and behind the
