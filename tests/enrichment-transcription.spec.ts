@@ -99,24 +99,66 @@ test("a held audio Capture is transcribed before a model that cannot hear it", a
   });
 });
 
-test("a model that reads audio still receives the original recording", async () => {
-  const { threads, enrichment, blobs } = await seedAudioCapture("user_audio");
+test("a Capture holding both a photo and a recording sends the photo and speaks the rest", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const enrichment = createMemoryEnrichmentRepository(NS, threads);
+  const blobs = createMemoryBlobStore(NS);
   const calls: GatewayGenerateInput[] = [];
 
-  const result = await processPendingEnrichments("user_audio", enrichment, {
+  await threads.upsertCaptures("user_both", [
+    {
+      id: "cap-both",
+      text: "",
+      createdAt: "2026-07-25T09:00:00.000Z",
+      location: null,
+      threadId: null,
+      sequence: 1,
+      idempotencyKey: "cap-both",
+      attachments: [
+        {
+          id: "att-photo",
+          kind: "image",
+          mimeType: "image/jpeg",
+          fileName: "larch.jpg",
+        },
+        {
+          id: "att-said",
+          kind: "audio",
+          mimeType: "audio/webm",
+          fileName: "audio-2.webm",
+        },
+      ],
+    },
+  ]);
+  for (const [attachmentId, mimeType] of [
+    ["att-photo", "image/jpeg"],
+    ["att-said", "audio/webm"],
+  ]) {
+    await blobs.put({
+      userId: "user_both",
+      attachmentId,
+      mimeType,
+      bytes: new Uint8Array([7, 7]),
+      operationId: `op-${attachmentId}`,
+    });
+  }
+
+  const result = await processPendingEnrichments("user_both", enrichment, {
     gateway: createFakeGatewayClient(async (input) => {
       calls.push(input);
-      return { text: "Heard it.", model: input.model };
+      return { text: "A European larch.", model: input.model };
     }),
     transcriber: createFakeTranscriptionClient(() => SPOKEN, "test-stt"),
     blobStore: blobs,
-    environment: { AI_GATEWAY_MODEL: "google/gemini-2.5-flash" },
+    environment: { AI_GATEWAY_MODEL: "anthropic/claude-sonnet-5" },
     threadRepository: threads,
     pushSender: null,
   });
 
   expect(result.results[0]?.status).toBe("complete");
-  expect(calls[0]?.media.map((part) => part.kind)).toEqual(["audio"]);
+  // The photograph travels as bytes because Sonnet reads images; the
+  // recording travels as words because no gateway model reads audio.
+  expect(calls[0]?.media.map((part) => part.kind)).toEqual(["image"]);
   expect(calls[0]?.prompt).toContain(SPOKEN);
 });
 

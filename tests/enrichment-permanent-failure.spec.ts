@@ -90,26 +90,26 @@ test("media the model cannot read stops retrying, and a capable model picks it u
 
   await blobs.put({
     userId: "user_b",
-    attachmentId: "att-video",
-    mimeType: "video/mp4",
+    attachmentId: "att-photo",
+    mimeType: "image/jpeg",
     bytes: new Uint8Array([1, 2, 3]),
-    operationId: "op-video",
+    operationId: "op-photo",
   });
   await threads.upsertCaptures("user_b", [
     {
-      id: "cap-video",
+      id: "cap-photo",
       text: "",
       createdAt: "2026-07-20T16:12:00.000Z",
       location: null,
       threadId: null,
       sequence: 1,
-      idempotencyKey: "cap-video",
+      idempotencyKey: "cap-photo",
       attachments: [
         {
-          id: "att-video",
-          kind: "video",
-          mimeType: "video/mp4",
-          fileName: "walk.mp4",
+          id: "att-photo",
+          kind: "image",
+          mimeType: "image/jpeg",
+          fileName: "walk.jpg",
         },
       ],
     },
@@ -121,14 +121,16 @@ test("media the model cannot read stops retrying, and a capable model picks it u
     threadRepository: threads,
     pushSender: null,
   };
-  // Sonnet reads images, not video.
+  // Image is the only capability axis the gateway still varies on: 82 of its
+  // 204 language models read text and nothing else, and none read audio or
+  // video at all (capabilities.ts).
   const textOnly = {
     ...options,
-    environment: { AI_GATEWAY_MODEL: "anthropic/claude-sonnet-5" },
+    environment: { AI_GATEWAY_MODEL: "poolside/laguna-s-2.1" },
   };
 
   const first = await processPendingEnrichments("user_b", enrichment, textOnly);
-  expect(first.results[0]?.reason).toContain("unsupported_media_video");
+  expect(first.results[0]?.reason).toContain("unsupported_media_image");
   expect(first.results[0]?.retryable).toBe(false);
 
   const failedJob = first.jobs.find((job) => job.status === "failed")!;
@@ -146,10 +148,10 @@ test("media the model cannot read stops retrying, and a capable model picks it u
   expect(stalled?.status).toBe("failed");
   expect(stalled?.attempts).toBe(attemptsAfterFirst);
 
-  // Switching to a model that reads video is how the walker recovers it.
+  // Switching to a model that reads the photograph is how the walker recovers it.
   const capable = await processPendingEnrichments("user_b", enrichment, {
     ...options,
-    environment: { AI_GATEWAY_MODEL: "google/gemini-2.5-flash" },
+    environment: { AI_GATEWAY_MODEL: "anthropic/claude-sonnet-5" },
   });
   expect(capable.results.some((result) => result.status === "complete")).toBe(
     true,

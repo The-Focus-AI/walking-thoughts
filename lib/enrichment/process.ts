@@ -1,7 +1,6 @@
 import { publishThreadArtifact } from "@/lib/artifacts/build";
 import { earnsArtifact } from "@/lib/artifacts/eligibility";
 import type { ArtifactRepository } from "@/lib/artifacts/types";
-import type { MediaKind } from "@/lib/local-capture/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
 import { applyMemoryPatch } from "@/lib/memory/patches";
 import { EMPTY_PROFILE_HINT, renderWalkerProfile } from "@/lib/memory/profile";
@@ -13,7 +12,7 @@ import { getPushRepository } from "@/lib/push/repository";
 import { createWebPushSender } from "@/lib/push/send";
 import type { PushRepository, PushSender } from "@/lib/push/types";
 import type { Project, ThreadRepository } from "@/lib/sync/types";
-import { assertModelSupportsMedia, getModelCapabilities } from "./capabilities";
+import { assertModelSupportsMedia } from "./capabilities";
 import {
   isPermanentEnrichmentError,
   isTranscribableAudioFailure,
@@ -143,8 +142,10 @@ function pendingCaptureIds(thread: EnrichmentThreadSnapshot): string[] {
 /**
  * A job for this Thread that the queue is still waiting on. A permanent
  * failure under a *different* model does not block: swapping
- * AI_GATEWAY_MODEL to one that reads video is exactly how a walker recovers
- * a Capture the old model refused, and its job's model is frozen.
+ * AI_GATEWAY_MODEL to one that reads the attachment is how a walker recovers
+ * a Capture the old model refused, and its job's model is frozen. Image is
+ * the only axis this still rescues — no gateway model reads audio or video
+ * (capabilities.ts), which is why audio gets transcribed instead.
  */
 function hasOpenEnrichJob(
   jobs: EnrichmentJob[],
@@ -273,14 +274,12 @@ async function loadMediaParts(
   history: FrozenHistoryEntry[],
   targetCaptureIds: string[],
   blobStore: PrivateBlobStore,
-): Promise<{ media: GatewayMediaPart[]; kinds: MediaKind[] }> {
+): Promise<GatewayMediaPart[]> {
   const targetSet = new Set(targetCaptureIds);
   const media: GatewayMediaPart[] = [];
-  const kinds: MediaKind[] = [];
   for (const entry of history) {
     if (entry.kind !== "capture" || !targetSet.has(entry.id)) continue;
     for (const attachment of entry.attachments ?? []) {
-      kinds.push(attachment.kind);
       const object = await blobStore.get(userId, attachment.id);
       if (!object) {
         throw new Error(`missing_original_media_${attachment.id}`);
@@ -295,7 +294,7 @@ async function loadMediaParts(
       });
     }
   }
-  return { media, kinds };
+  return media;
 }
 
 /**
@@ -413,7 +412,7 @@ async function runJob(
             running.basisEntryIds.includes(entry.id),
           );
 
-    const { media, kinds } = await loadMediaParts(
+    const media = await loadMediaParts(
       userId,
       frozenHistory,
       running.targetCaptureIds,
@@ -421,23 +420,20 @@ async function runJob(
     );
 
     const transcripts = await transcribeAudioParts(media, transcriber);
-    // Audio that has already been transcribed no longer needs a model that
-    // decodes it — the words are in the prompt. Anything else (video, images)
-    // still has to be readable, and stops the job when it is not.
+    // A transcribed recording travels as words, not bytes: no gateway model
+    // reads audio (capabilities.ts), so sending the file too would only fail
+    // the job. Everything else — the photograph, the video — still has to be
+    // readable by this model, and stops the job when it is not.
     const transcribed = new Set(
       transcripts.map((transcript) => transcript.attachmentId),
     );
-    const modelReadsAudio = getModelCapabilities(running.model).audio;
-    const readableMedia = modelReadsAudio
-      ? media
-      : media.filter(
-          (part) =>
-            part.kind !== "audio" || !transcribed.has(part.attachmentId),
-        );
-    const readableKinds = modelReadsAudio
-      ? kinds
-      : readableMedia.map((part) => part.kind);
-    const capability = assertModelSupportsMedia(running.model, readableKinds);
+    const readableMedia = media.filter(
+      (part) => part.kind !== "audio" || !transcribed.has(part.attachmentId),
+    );
+    const capability = assertModelSupportsMedia(
+      running.model,
+      readableMedia.map((part) => part.kind),
+    );
     if (!capability.ok) {
       await repository.markJobFailed(userId, running.id, capability.reason);
       await maybeNotify(userId, push, {

@@ -88,7 +88,7 @@ description = "Global gateway model id for new Enrichments (e.g. anthropic/claud
 provider = "op"
 value = "AI_TRANSCRIPTION_MODEL"
 if_missing = "ignore"
-description = "Gateway speech-to-text model for audio Captures (e.g. openai/gpt-4o-mini-transcribe)"
+description = "Gateway speech-to-text model for audio Captures (e.g. openai/gpt-realtime-whisper)"
 
 [secrets.FIRECRAWL_API_KEY]
 provider = "op"

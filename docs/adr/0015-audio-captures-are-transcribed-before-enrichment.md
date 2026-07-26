@@ -10,17 +10,26 @@ capabilities rather than pretending). Only a model swap could recover it.
 
 So the enrichment job runs speech-to-text first, through its own gateway
 transcription model (`AI_TRANSCRIPTION_MODEL`, default
-`openai/gpt-4o-mini-transcribe`, via the AI SDK's `transcribe`). The words go
+`openai/gpt-realtime-whisper`, via the AI SDK's `transcribe`). The words go
 into the prompt under the Capture they belong to, and audio the transcriber
 already handled is dropped from the media parts when the Enrichment model
-cannot decode it. A model that *does* read audio still receives the original
-recording alongside the transcript.
+cannot decode it. A model that *does* read audio would still receive the
+original recording alongside the transcript.
 
-We considered pointing `AI_GATEWAY_MODEL` at an audio-capable model instead
-(Gemini reads audio and video), and rejected it: that makes hearing a walker
-speak depend on one global model choice, and it leaves nothing durable behind.
-Transcribing separately keeps model choice free and produces an artifact worth
-keeping.
+We considered pointing `AI_GATEWAY_MODEL` at an audio-capable model instead,
+and found there is no such model to point at. The gateway publishes
+`modalities.input` per model at `/v1/models`: on 2026-07-26 all 204 of its
+language models accept text, 122 accept image, 94 accept pdf, and none accept
+audio or video. This table's own claim that `openai/gpt-5` and
+`google/gemini-2.5-flash` read audio was simply wrong. Transcription is not the
+convenient route to a report for a spoken Capture — it is the only one.
+
+The gateway offers five transcription models. We default to the newest,
+`openai/gpt-realtime-whisper` (released 2026-05-07, $0.000284/sec ≈ $0.17 for
+a full ten-minute hold), over `xai/grok-stt` (2026-03-16, a tenth the price)
+because a misheard proper noun costs more than the audio does: the system
+instruction forbids guessing at a garbled name, so a bad transcript turns a
+report into a question back to the walker.
 
 ## Consequences
 
@@ -30,6 +39,10 @@ keeping.
 - A transcription outage fails the job as `transcription_unavailable_<id>`,
   which is retryable — a held thought is never silently reduced to a filename.
 - Audio Captures cost two model calls: one to hear, one to think.
+- Which model heard a Capture is recorded on its transcript, so switching
+  `AI_TRANSCRIPTION_MODEL` later leaves the record of what produced each one.
+- Video Captures remain unenrichable: nothing on the gateway reads them, and
+  unlike audio they have no transcription equivalent yet.
 - The transcription model is a second gateway dependency to configure; without
   gateway credentials the fake transcriber keeps local dev and tests offline,
   the same seam the Enrichment gateway uses.

@@ -182,9 +182,12 @@ Steps 1 and 2 of the order below are implemented:
   `retryable` honestly instead of always `true`.
 - **Unsupported media is recoverable.** A job's model is frozen at queue time,
   so a permanently-failed job under an *old* model no longer blocks the
-  Thread: pointing `AI_GATEWAY_MODEL` at a model that reads video queues a
-  fresh, model-scoped job. Every other Thread keeps its stable idempotency
-  key, so changing models never re-enriches work that already succeeded.
+  Thread: pointing `AI_GATEWAY_MODEL` at a model that reads the attachment
+  queues a fresh, model-scoped job. Every other Thread keeps its stable
+  idempotency key, so changing models never re-enriches work that already
+  succeeded. Image is the only axis this rescues — checked 2026-07-26, no
+  gateway language model reads audio or video, so audio is transcribed before
+  the model sees it (ADR 0015) and a video Capture has no model to switch to.
 - **Classification contract.** The model now opens each Enrichment with
   `TITLE` / `KIND` / `TOPICS` header lines; `parseGatewayText` splits them off
   the body, ignores an invented kind, and slugs topics. `kind` and `topics`

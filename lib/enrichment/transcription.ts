@@ -1,14 +1,18 @@
 import { experimental_transcribe as transcribeAudio } from "ai";
 
 /**
- * Transcription is its own gateway call because the Enrichment model is not
- * required to decode audio: the default `anthropic/claude-sonnet-5` reads text
- * and images only (see capabilities.ts). A held-button audio Capture would
- * otherwise land in needs_attention forever. Running speech-to-text first
- * turns the recording into words every model can read — and gives the walker
- * their own words back at the desk.
+ * Transcription is its own gateway call because no Enrichment model can decode
+ * audio. Not "the one we run" — checked against the gateway's own model list on
+ * 2026-07-26, all 204 language models accept text, image, and pdf, and nothing
+ * else (see capabilities.ts). A held-button audio Capture has exactly one route
+ * to a report: speech-to-text first. It also gives the walker their own words
+ * back at the desk, which sending bytes to a model never would.
+ *
+ * The gateway lists five transcription models; this is the newest. `xai/grok-stt`
+ * is a tenth the price per second if cost ever matters more than accuracy — one
+ * env var, and the model that heard a Capture is recorded on its transcript.
  */
-export const DEFAULT_TRANSCRIPTION_MODEL = "openai/gpt-4o-mini-transcribe";
+export const DEFAULT_TRANSCRIPTION_MODEL = "openai/gpt-realtime-whisper";
 
 export type TranscriptionRequest = {
   attachmentId: string;
