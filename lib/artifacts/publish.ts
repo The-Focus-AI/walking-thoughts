@@ -55,8 +55,15 @@ export const DEFAULT_ARTIFACT_PUBLISH_INSTRUCTION = [
 export const ARTIFACT_RETRY_INSTRUCTION =
   "Your previous attempt at this page dropped material from the report and came back shorter than it. That is the one outcome this job cannot have. Work through the report from top to bottom and account for every finding, figure, name, option, caveat, and citation in it before you finish. Do not summarize, do not compress, and do not decide something is too minor to keep.";
 
-/** Room to lay a report out as a page; markup spends tokens prose does not. */
-export const ARTIFACT_MAX_OUTPUT_TOKENS = 16_000;
+/**
+ * Room to lay a report out as a page; markup spends tokens prose does not,
+ * and a page that carries its whole report and then organizes it is long.
+ *
+ * Inside the 128K output ceiling of the models this app runs on (Sonnet 5,
+ * Opus 5, the 4.6–4.8 family). Haiku caps at 64K — a deployment that points
+ * AI_GATEWAY_MODEL at one needs this lowered to match.
+ */
+export const ARTIFACT_MAX_OUTPUT_TOKENS = 100_000;
 
 export function getArtifactPublishInstruction(
   environment: Record<string, string | undefined> = process.env,

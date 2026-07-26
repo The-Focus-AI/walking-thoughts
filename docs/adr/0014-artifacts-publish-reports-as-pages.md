@@ -57,7 +57,8 @@ entirely markup rules with one buried line about fidelity, so it read as
 can apply ("if a detail appears in the report and not on your page, the
 page has failed"), with the tag list demoted to the end. Nothing set
 `maxOutputTokens`, so the SDK's 4,096 Anthropic default truncated long
-pages — publishing asks for 16,000. The press saw only the newest
+pages — publishing asks for 100,000, inside the 128K output ceiling of
+the models this app runs on. The press saw only the newest
 Enrichment, so it now gets the Thread's earlier reports, the research
 trace (dead ends included), and the open question. And nothing checked the
 result: `checkArtifactCompleteness` compares the page's readable length to

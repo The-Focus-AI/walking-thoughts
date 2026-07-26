@@ -262,6 +262,11 @@ function createAiSdkGatewayClient(): GatewayClient {
         // for one laid out as a page, where markup spends tokens the reader
         // never sees. A truncated Artifact came back thinner than the
         // Enrichment it published.
+        //
+        // This is a non-streaming call, so a budget large enough to run for
+        // minutes can outlast the request. Publishing accepts that: a timed
+        // out publish leaves the Enrichment complete and the page one
+        // Rebuild away.
         ...(input.maxOutputTokens
           ? { maxOutputTokens: input.maxOutputTokens }
           : {}),
