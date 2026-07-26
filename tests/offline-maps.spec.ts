@@ -22,6 +22,10 @@ test("shell readiness pill opens the dedicated Offline Region section", async ({
 test("Offline page can finish installing the Offline Region pack", async ({
   page,
 }) => {
+  // The pack comes over the network, and the wait below allows 60s for it —
+  // which the default 30s test timeout cut short, failing the test on a slow
+  // fetch rather than a broken one.
+  test.setTimeout(90_000);
   await page.goto("/offline-maps");
   await expect(page.getByTestId("offline-maps-page")).toBeVisible();
 

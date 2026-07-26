@@ -20,9 +20,10 @@ We considered pointing `AI_GATEWAY_MODEL` at an audio-capable model instead,
 and found there is no such model to point at. The gateway publishes
 `modalities.input` per model at `/v1/models`: on 2026-07-26 all 204 of its
 language models accept text, 122 accept image, 94 accept pdf, and none accept
-audio or video. This table's own claim that `openai/gpt-5` and
-`google/gemini-2.5-flash` read audio was simply wrong. Transcription is not the
-convenient route to a report for a spoken Capture — it is the only one.
+audio or video. Two of that table's own entries claimed to read audio, and both
+were wrong — 2025-era models, since dropped along with everything else released
+before 2026. Transcription is not the convenient route to a report for a spoken
+Capture; it is the only one.
 
 The gateway offers five transcription models. We default to the newest,
 `openai/gpt-realtime-whisper` (released 2026-05-07, $0.000284/sec ≈ $0.17 for
