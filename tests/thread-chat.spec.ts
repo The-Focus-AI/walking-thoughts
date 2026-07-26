@@ -167,6 +167,44 @@ test.describe("Thread chat", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
+  test("an audio Capture's transcript is read back above the Annotation", async ({
+    page,
+  }) => {
+    const threadId = await seedThread(page, "Recorded on the ridge");
+    await page.evaluate((id) => {
+      localStorage.setItem(
+        `wt-thread-enrichments:${id}`,
+        JSON.stringify([
+          {
+            id: `enrich-${id}`,
+            threadId: id,
+            basisRevision: 1,
+            basisEntryIds: [],
+            targetCaptureIds: [],
+            text: "The larch is European; it turns gold in October.",
+            model: "test-model",
+            createdAt: new Date().toISOString(),
+            sources: [],
+            transcripts: [
+              {
+                attachmentId: "att-held",
+                captureId: "cap-held",
+                fileName: "audio-1.webm",
+                text: "The larch by the second gate is turning gold already",
+                model: "test-stt",
+              },
+            ],
+          },
+        ]),
+      );
+    }, threadId);
+    await page.goto(`/threads/${threadId}`);
+
+    const transcripts = page.getByTestId("enrichment-transcripts");
+    await expect(transcripts).toContainText("turning gold already");
+    await expect(transcripts).toContainText("test-stt");
+  });
+
   test("tapping a Thread row opens the Thread review page", async ({
     page,
   }) => {

@@ -87,7 +87,7 @@ export const REVIEW_THREAD: ProtoThread = {
       ],
       enrichment: {
         id: "e1",
-        model: "gateway/gemini-2.5-flash",
+        model: "gateway/gemini-3.6-flash",
         createdAt: "2026-07-19T16:40:00.000Z",
         markdown: [
           "## Why the wall runs into the water",
@@ -132,7 +132,7 @@ export const REVIEW_THREAD: ProtoThread = {
       ],
       enrichment: {
         id: "e2",
-        model: "gateway/gemini-2.5-flash",
+        model: "gateway/gemini-3.6-flash",
         createdAt: "2026-07-19T16:41:00.000Z",
         markdown: [
           "**Interrupted fern** (*Claytosmunda claytoniana*) — the fertile pinnae \"interrupt\" the middle of the frond, which matches the dark segments in your photo.",

@@ -42,6 +42,17 @@ import {
 } from "@/lib/sync/cycle";
 import { syncRollup } from "@/lib/sync/rollup";
 
+/**
+ * Below this, a press on the mic is a tap: recording stays on until the walker
+ * stops it, and the clip is staged for review. Hold longer and the button is a
+ * push-to-talk key — releasing it stops and Captures in one motion, which is
+ * the whole point of holding it.
+ */
+const HOLD_TO_RECORD_MS = 250;
+
+/** A hold under a second is a slip of the thumb, not a thought. Discard it. */
+const MIN_HELD_RECORDING_MS = 1000;
+
 function formatRecordingClock(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -71,6 +82,8 @@ export function CaptureComposer() {
   const [recordingKind, setRecordingKind] = useState<"audio" | "video" | null>(
     null,
   );
+  /** True while the mic is being held down — release Captures immediately. */
+  const [holding, setHolding] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const [online, setOnline] = useState(
@@ -85,6 +98,17 @@ export function CaptureComposer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const recordAbortRef = useRef<AbortController | null>(null);
+  /** When the current press began; null once it has been released. */
+  const pressStartRef = useRef<number | null>(null);
+  /** Set at release: this recording Captures itself instead of staging. */
+  const sendOnStopRef = useRef(false);
+  // The hold ends in a different render than it began; commit the composer as
+  // it stands at release, not as it stood when the thumb went down.
+  const latestRef = useRef({ draft, pendingAttachments });
+
+  useEffect(() => {
+    latestRef.current = { draft, pendingAttachments };
+  }, [draft, pendingAttachments]);
 
   async function refreshLists() {
     const store = getCaptureStore();
@@ -230,6 +254,7 @@ export function CaptureComposer() {
   function commitWithAttachments(
     text: string,
     attachmentsSnapshot: AttachmentInput[],
+    confirmation = "Saved locally — its own Thread",
   ) {
     const draftSnapshot = draft;
     if ((!text && attachmentsSnapshot.length === 0) || isPending) return;
@@ -245,7 +270,7 @@ export function CaptureComposer() {
           destination: { type: "new_thread" },
           attachments: attachmentsSnapshot,
         });
-        setSaveConfirmation("Saved locally — its own Thread");
+        setSaveConfirmation(confirmation);
       } catch {
         setError("Could not save Capture");
         const preserved = await store.getDraft().catch(() => draftSnapshot);
@@ -276,7 +301,12 @@ export function CaptureComposer() {
     commitWithAttachments(draft.trim(), pendingAttachments);
   }
 
-  /** Record into a reviewable draft — never auto-commit under poor connectivity. */
+  /**
+   * Record into a reviewable draft — never auto-commit under poor
+   * connectivity. The one exception is a deliberate press-and-hold on the mic,
+   * where releasing the button *is* the walker saying "that's the thought,
+   * send it": see releaseRecordButton.
+   */
   async function stageRecording(kind: "audio" | "video") {
     if (recordingKind) return;
     setError(null);
@@ -294,15 +324,31 @@ export function CaptureComposer() {
         maxMs: kind === "audio" ? AUDIO_LIMIT_MS : VIDEO_LIMIT_MS,
       });
       if (result.bytes.size === 0) return;
-      setPendingAttachments((current) => [
-        ...current,
-        {
-          kind: result.kind,
-          mimeType: result.mimeType,
-          fileName: result.fileName,
-          bytes: result.bytes,
-        },
-      ]);
+      const attachment: AttachmentInput = {
+        kind: result.kind,
+        mimeType: result.mimeType,
+        fileName: result.fileName,
+        bytes: result.bytes,
+      };
+
+      if (sendOnStopRef.current) {
+        if (result.durationMs < MIN_HELD_RECORDING_MS) {
+          setSaveConfirmation("Too short — hold the mic while you talk");
+          return;
+        }
+        const { draft: heldDraft, pendingAttachments: heldMedia } =
+          latestRef.current;
+        commitWithAttachments(
+          heldDraft.trim(),
+          [...heldMedia, attachment],
+          result.hitLimit
+            ? "Audio hit the 10-minute limit — Captured, transcript follows"
+            : "Captured — the transcript arrives with the Annotation",
+        );
+        return;
+      }
+
+      setPendingAttachments((current) => [...current, attachment]);
       if (result.hitLimit) {
         setSaveConfirmation(
           kind === "audio"
@@ -318,6 +364,9 @@ export function CaptureComposer() {
       window.clearInterval(tick);
       setRecordingKind(null);
       setRecordingMs(0);
+      setHolding(false);
+      sendOnStopRef.current = false;
+      pressStartRef.current = null;
       recordAbortRef.current = null;
     }
   }
@@ -328,6 +377,35 @@ export function CaptureComposer() {
       return;
     }
     void stageRecording(kind);
+  }
+
+  /** Thumb down on the mic: start at once, and start counting the hold. */
+  function pressRecordButton() {
+    // The ref, not the state: a second press can land before React re-renders.
+    if (recordingKind || recordAbortRef.current) {
+      // A second tap on an already-running hands-free recording stops it.
+      recordAbortRef.current?.abort();
+      return;
+    }
+    pressStartRef.current = Date.now();
+    sendOnStopRef.current = false;
+    setHolding(true);
+    void stageRecording("audio");
+  }
+
+  /**
+   * Thumb up. A held button sends what was said; a quick tap leaves the
+   * recording running hands-free, so a long thought does not need a thumb on
+   * the phone for all of it.
+   */
+  function releaseRecordButton() {
+    const startedAt = pressStartRef.current;
+    pressStartRef.current = null;
+    if (startedAt === null) return;
+    setHolding(false);
+    if (Date.now() - startedAt < HOLD_TO_RECORD_MS) return;
+    sendOnStopRef.current = true;
+    recordAbortRef.current?.abort();
   }
 
   const gps = readAvailableLocation();
@@ -375,6 +453,7 @@ export function CaptureComposer() {
           >
             <span>
               Recording {recordingKind} · {formatRecordingClock(recordingMs)}
+              {holding ? " · release to Capture" : null}
             </span>
             <button
               type="button"
@@ -412,12 +491,32 @@ export function CaptureComposer() {
           >
             <button
               type="button"
-              className="capture-icon-btn"
+              className="capture-icon-btn capture-hold-btn"
               aria-label="Record audio"
               aria-pressed={recordingKind === "audio"}
-              title="Record audio (max 10 min)"
+              title="Hold to record and Capture · tap to record hands-free (max 10 min)"
               disabled={!ready || isPending || recordingKind === "video"}
-              onClick={() => toggleRecording("audio")}
+              onPointerDown={(event) => {
+                // Keep the release on this button even if the thumb drifts.
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                pressRecordButton();
+              }}
+              onPointerUp={releaseRecordButton}
+              onPointerCancel={() => {
+                pressStartRef.current = null;
+                setHolding(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.repeat) return;
+                if (event.key !== " " && event.key !== "Enter") return;
+                event.preventDefault();
+                pressRecordButton();
+              }}
+              onKeyUp={(event) => {
+                if (event.key !== " " && event.key !== "Enter") return;
+                event.preventDefault();
+                releaseRecordButton();
+              }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="9" y="3" width="6" height="11" rx="3" />
@@ -500,6 +599,8 @@ export function CaptureComposer() {
           />
         </div>
         <p className="capture-context" role="status">
+          <span>Hold the mic to talk · release Captures it</span>
+          <span aria-hidden="true">·</span>
           <span>Each Capture starts its own Thread</span>
           <span aria-hidden="true">·</span>
           <span>GPS {gps ? "on" : "off"}</span>

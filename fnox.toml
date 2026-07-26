@@ -84,6 +84,12 @@ value = "AI_GATEWAY_MODEL"
 if_missing = "ignore"
 description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-5)"
 
+[secrets.AI_TRANSCRIPTION_MODEL]
+provider = "op"
+value = "AI_TRANSCRIPTION_MODEL"
+if_missing = "ignore"
+description = "Gateway speech-to-text model for audio Captures (e.g. openai/gpt-realtime-whisper)"
+
 [secrets.FIRECRAWL_API_KEY]
 provider = "op"
 value = "FIRECRAWL_API_KEY"

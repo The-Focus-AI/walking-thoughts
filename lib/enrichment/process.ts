@@ -1,7 +1,6 @@
 import { publishThreadArtifact } from "@/lib/artifacts/build";
 import { earnsArtifact } from "@/lib/artifacts/eligibility";
 import type { ArtifactRepository } from "@/lib/artifacts/types";
-import type { MediaKind } from "@/lib/local-capture/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
 import { applyMemoryPatch } from "@/lib/memory/patches";
 import { EMPTY_PROFILE_HINT, renderWalkerProfile } from "@/lib/memory/profile";
@@ -16,6 +15,7 @@ import type { Project, ThreadRepository } from "@/lib/sync/types";
 import { assertModelSupportsMedia } from "./capabilities";
 import {
   isPermanentEnrichmentError,
+  isTranscribableAudioFailure,
   MAX_ENRICHMENT_ATTEMPTS,
 } from "./failures";
 import { enrichmentSystemAndModel, getGatewayClient } from "./gateway";
@@ -31,6 +31,10 @@ import {
 } from "./research";
 import type { WebSearchClient } from "./search";
 import { buildEnrichmentPrompt } from "./system-instruction";
+import {
+  getTranscriptionClient,
+  type TranscriptionClient,
+} from "./transcription";
 import type {
   EnrichmentBatchResponse,
   EnrichmentCaptureResult,
@@ -38,6 +42,7 @@ import type {
   EnrichmentMemoryPatch,
   EnrichmentRepository,
   EnrichmentThreadSnapshot,
+  EnrichmentTranscript,
   FrozenHistoryEntry,
   GatewayClient,
   GatewayMediaPart,
@@ -75,6 +80,8 @@ async function maybePublishArtifact(
     history: FrozenHistoryEntry[];
     targetCaptureIds: string[];
     model: string;
+    /** Spoken Captures: the transcript is the walker's own words. */
+    transcripts: EnrichmentTranscript[];
   },
 ): Promise<void> {
   if (!artifacts) return;
@@ -91,7 +98,13 @@ async function maybePublishArtifact(
       threadTitle: input.threadTitle,
       enrichment: input.enrichment,
       captureWords: walkerEntries
-        .map((entry) => entry.text.trim())
+        .flatMap((entry) => [
+          entry.text,
+          ...input.transcripts
+            .filter((transcript) => transcript.captureId === entry.id)
+            .map((transcript) => transcript.text),
+        ])
+        .map((text) => text.trim())
         .filter((text) => text.length > 0),
       // Everything the Thread already worked out. A Thread the walker
       // replied to has its answers spread across several reports, and the
@@ -136,8 +149,10 @@ function pendingCaptureIds(thread: EnrichmentThreadSnapshot): string[] {
 /**
  * A job for this Thread that the queue is still waiting on. A permanent
  * failure under a *different* model does not block: swapping
- * AI_GATEWAY_MODEL to one that reads video is exactly how a walker recovers
- * a Capture the old model refused, and its job's model is frozen.
+ * AI_GATEWAY_MODEL to one that reads the attachment is how a walker recovers
+ * a Capture the old model refused, and its job's model is frozen. Image is
+ * the only axis this still rescues — no gateway model reads audio or video
+ * (capabilities.ts), which is why audio gets transcribed instead.
  */
 function hasOpenEnrichJob(
   jobs: EnrichmentJob[],
@@ -149,7 +164,16 @@ function hasOpenEnrichJob(
       job.threadId === threadId &&
       (job.status === "queued" ||
         job.status === "running" ||
-        (job.status === "failed" && !isStaleModelFailure(job, model))),
+        (job.status === "failed" &&
+          !isStaleModelFailure(job, model) &&
+          !isStaleAudioFailure(job))),
+  );
+}
+
+/** Audio the pipeline refused before it could transcribe (ADR 0015). */
+function isStaleAudioFailure(job: EnrichmentJob): boolean {
+  return (
+    job.status === "failed" && isTranscribableAudioFailure(job.error ?? "")
   );
 }
 
@@ -211,9 +235,16 @@ async function queueJobsForThreads(
     const retryingUnderNewModel = openJobs.some(
       (job) => job.threadId === thread.id && isStaleModelFailure(job, model),
     );
+    // Same idea for audio refused before transcription existed: one fresh job,
+    // keyed so it never re-runs after it succeeds.
+    const retryingWithTranscription = openJobs.some(
+      (job) => job.threadId === thread.id && isStaleAudioFailure(job),
+    );
     const idempotencyKey = retryingUnderNewModel
       ? `enrich:${thread.id}:r${thread.revision}:${model}`
-      : `enrich:${thread.id}:r${thread.revision}`;
+      : retryingWithTranscription
+        ? `enrich:${thread.id}:r${thread.revision}:stt`
+        : `enrich:${thread.id}:r${thread.revision}`;
     const existing = await repository.getOrCreateJob(userId, {
       id: createJobId(),
       idempotencyKey,
@@ -250,20 +281,19 @@ async function loadMediaParts(
   history: FrozenHistoryEntry[],
   targetCaptureIds: string[],
   blobStore: PrivateBlobStore,
-): Promise<{ media: GatewayMediaPart[]; kinds: MediaKind[] }> {
+): Promise<GatewayMediaPart[]> {
   const targetSet = new Set(targetCaptureIds);
   const media: GatewayMediaPart[] = [];
-  const kinds: MediaKind[] = [];
   for (const entry of history) {
     if (entry.kind !== "capture" || !targetSet.has(entry.id)) continue;
     for (const attachment of entry.attachments ?? []) {
-      kinds.push(attachment.kind);
       const object = await blobStore.get(userId, attachment.id);
       if (!object) {
         throw new Error(`missing_original_media_${attachment.id}`);
       }
       media.push({
         attachmentId: attachment.id,
+        captureId: entry.id,
         kind: attachment.kind,
         mimeType: attachment.mimeType,
         fileName: attachment.fileName,
@@ -271,7 +301,43 @@ async function loadMediaParts(
       });
     }
   }
-  return { media, kinds };
+  return media;
+}
+
+/**
+ * Speech-to-text for every audio attachment, before the Enrichment model sees
+ * anything. A held-button audio Capture is words the walker spoke; turning it
+ * into text here means a text-and-image model can still write the report, and
+ * the walker gets a verbatim record either way. A transcription outage fails
+ * the job retryably rather than silently dropping what was said.
+ */
+async function transcribeAudioParts(
+  media: GatewayMediaPart[],
+  transcriber: TranscriptionClient,
+): Promise<EnrichmentTranscript[]> {
+  const transcripts: EnrichmentTranscript[] = [];
+  for (const part of media) {
+    if (part.kind !== "audio") continue;
+    let result;
+    try {
+      result = await transcriber.transcribe({
+        attachmentId: part.attachmentId,
+        mimeType: part.mimeType,
+        fileName: part.fileName,
+        bytes: part.bytes,
+      });
+    } catch {
+      throw new Error(`transcription_unavailable_${part.attachmentId}`);
+    }
+    transcripts.push({
+      attachmentId: part.attachmentId,
+      captureId: part.captureId ?? "",
+      fileName: part.fileName,
+      text: result.text.trim(),
+      model: result.model,
+    });
+  }
+  return transcripts;
 }
 
 async function resolvePlaces(
@@ -300,6 +366,7 @@ async function runJob(
   threadsById: Map<string, EnrichmentThreadSnapshot>,
   system: string,
   blobStore: PrivateBlobStore,
+  transcriber: TranscriptionClient,
   placeResolver: NearbyPlaceResolver,
   search: ResearchClient | undefined,
   memoryRepository: WalkerMemoryRepository,
@@ -352,13 +419,28 @@ async function runJob(
             running.basisEntryIds.includes(entry.id),
           );
 
-    const { media, kinds } = await loadMediaParts(
+    const media = await loadMediaParts(
       userId,
       frozenHistory,
       running.targetCaptureIds,
       blobStore,
     );
-    const capability = assertModelSupportsMedia(running.model, kinds);
+
+    const transcripts = await transcribeAudioParts(media, transcriber);
+    // A transcribed recording travels as words, not bytes: no gateway model
+    // reads audio (capabilities.ts), so sending the file too would only fail
+    // the job. Everything else — the photograph, the video — still has to be
+    // readable by this model, and stops the job when it is not.
+    const transcribed = new Set(
+      transcripts.map((transcript) => transcript.attachmentId),
+    );
+    const readableMedia = media.filter(
+      (part) => part.kind !== "audio" || !transcribed.has(part.attachmentId),
+    );
+    const capability = assertModelSupportsMedia(
+      running.model,
+      readableMedia.map((part) => part.kind),
+    );
     if (!capability.ok) {
       await repository.markJobFailed(userId, running.id, capability.reason);
       await maybeNotify(userId, push, {
@@ -440,13 +522,14 @@ async function runJob(
       projects: projects.map((project) => project.name),
       proposedProjects: proposals.map((proposal) => proposal.name),
       rejectedProjects: rejectedProjectNames,
+      transcripts,
     });
     const generation = await gateway.generate({
       model: running.model,
       system,
       prompt,
       requestTitle,
-      media,
+      media: readableMedia,
       search,
       memory: memoryTool,
     });
@@ -489,6 +572,7 @@ async function runJob(
       sources: generation.sources,
       research: generation.research,
       memoryPatches: appliedPatches,
+      transcripts,
     });
 
     // File the Thread into the guessed Project — but only while it is still
@@ -512,6 +596,7 @@ async function runJob(
         history: frozenHistory,
         targetCaptureIds: running.targetCaptureIds,
         model: running.model,
+        transcripts,
       });
       await maybeNotify(userId, push, {
         kind: "complete",
@@ -558,6 +643,7 @@ export async function processPendingEnrichments(
     environment?: Record<string, string | undefined>;
     threadRepository?: ThreadRepository;
     blobStore?: PrivateBlobStore;
+    transcriber?: TranscriptionClient;
     placeResolver?: NearbyPlaceResolver;
     search?: WebSearchClient | ResearchClient;
     memoryRepository?: WalkerMemoryRepository;
@@ -579,6 +665,7 @@ export async function processPendingEnrichments(
   const blobStore =
     options.blobStore ??
     getPrivateBlobStore(environment as NodeJS.ProcessEnv);
+  const transcriber = options.transcriber ?? getTranscriptionClient(environment);
   const placeResolver =
     options.placeResolver ?? getNearbyPlaceResolver(environment);
   const search = options.search
@@ -639,6 +726,7 @@ export async function processPendingEnrichments(
       threadsById,
       system,
       blobStore,
+      transcriber,
       placeResolver,
       search,
       memoryRepository,

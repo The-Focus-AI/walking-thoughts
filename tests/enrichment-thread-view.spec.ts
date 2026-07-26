@@ -44,7 +44,10 @@ test("loadThreadEnrichments preserves a non-empty cache when the network returns
 
   try {
     const loaded = await loadThreadEnrichments(threadId);
-    expect(loaded).toEqual(cached);
+    // Normalized on read: cached payloads predate `transcripts`.
+    expect(loaded).toEqual(
+      cached.map((enrichment) => ({ ...enrichment, transcripts: [] })),
+    );
   } finally {
     globalThis.fetch = originalFetch;
     Object.defineProperty(globalThis, "localStorage", {

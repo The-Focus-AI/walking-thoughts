@@ -6,7 +6,7 @@
 export const DATA_HANDLING_TITLE = "How synchronized data is handled";
 
 export const DATA_HANDLING_BODY =
-  "When you sync, Capture text and media leave this device and are processed through Vercel AI Gateway by the selected model provider. Walking Thoughts does not claim end-to-end encryption for synchronized content.";
+  "When you sync, Capture text and media leave this device and are processed through Vercel AI Gateway by the selected model provider. Recorded audio is sent to a speech-to-text model there first, and its transcript is retained with the Thread. Walking Thoughts does not claim end-to-end encryption for synchronized content.";
 
 export const FOREGROUND_SYNC_IDLE =
   "Foreground sync when open and online (background is best effort)";

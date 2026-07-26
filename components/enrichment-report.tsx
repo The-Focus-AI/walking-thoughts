@@ -5,6 +5,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
   EnrichmentMemoryPatch,
+  EnrichmentTranscript,
   ResearchStep,
   ThreadEnrichment,
 } from "@/lib/enrichment/types";
@@ -69,6 +70,38 @@ function ResearchTrace({ steps }: { steps: ResearchStep[] }) {
   );
 }
 
+/**
+ * What the walker actually said, above the report written from it. A held
+ * mic-button Capture has no text of its own, so this is the only place the
+ * words survive — verbatim, credited to the model that heard them.
+ */
+function SpokenTranscripts({
+  transcripts,
+}: {
+  transcripts: EnrichmentTranscript[];
+}) {
+  const spoken = transcripts.filter(
+    (transcript) => transcript.text.trim().length > 0,
+  );
+  if (spoken.length === 0) return null;
+  return (
+    <div className="enrichment-transcripts" data-testid="enrichment-transcripts">
+      {spoken.map((transcript) => (
+        <blockquote
+          key={transcript.attachmentId}
+          className="enrichment-transcript"
+          aria-label={`Transcript of ${transcript.fileName}`}
+        >
+          <p>{transcript.text}</p>
+          <footer>
+            Heard · <span className="enrichment-model">{transcript.model}</span>
+          </footer>
+        </blockquote>
+      ))}
+    </div>
+  );
+}
+
 function memoryPatchSummary(patches: EnrichmentMemoryPatch[]): string {
   const counts: Record<EnrichmentMemoryPatch["op"], number> = {
     add: 0,
@@ -125,6 +158,7 @@ export function EnrichmentReport({
         </time>
         <span className="enrichment-model">{enrichment.model}</span>
       </header>
+      <SpokenTranscripts transcripts={enrichment.transcripts ?? []} />
       <EnrichmentMarkdown text={enrichment.text} />
       {enrichment.sources.length > 0 ? (
         <ul className="enrichment-source-chips" aria-label="Sources">
