@@ -35,13 +35,15 @@ export function createMemoryArtifactRepository(
   const own = (userId: string) => (key: string) => key.startsWith(`${userId}:`);
 
   return {
-    async saveArtifact(userId, artifact) {
+    async saveArtifact(userId, artifact, options) {
       const db = state();
       const key = `${userId}:${artifact.id}`;
       const existing = db.artifacts.get(key);
-      if (existing) return { artifact: existing, created: false };
+      if (existing && !options?.replace) {
+        return { artifact: existing, created: false };
+      }
       db.artifacts.set(key, artifact);
-      return { artifact, created: true };
+      return { artifact, created: !existing };
     },
 
     async getArtifact(userId, artifactId) {

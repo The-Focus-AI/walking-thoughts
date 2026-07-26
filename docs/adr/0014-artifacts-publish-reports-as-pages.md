@@ -48,6 +48,28 @@ with their contents, and admitting only `http(s)`/`mailto` hrefs. The
 route sets an independent `default-src 'none'` CSP with inline styles and
 same-origin fonts, so neither layer is trusted alone.
 
+**A page is never thinner than the report it publishes.** The first
+release got this backwards in production: pages came back as tidy
+summaries, and the walker lost detail by opening the nicer-looking thing.
+Four things caused it, and all four are fixed. The brief was almost
+entirely markup rules with one buried line about fidelity, so it read as
+"reformat compactly" — completeness leads now, stated as a test the model
+can apply ("if a detail appears in the report and not on your page, the
+page has failed"), with the tag list demoted to the end. Nothing set
+`maxOutputTokens`, so the SDK's 4,096 Anthropic default truncated long
+pages — publishing asks for 16,000. The press saw only the newest
+Enrichment, so it now gets the Thread's earlier reports, the research
+trace (dead ends included), and the open question. And nothing checked the
+result: `checkArtifactCompleteness` compares the page's readable length to
+the report's, and a page under 90% is asked again with the failure named.
+
+**If both passes lose the report, the walker gets the report.** A page
+that still comes back thin falls back to the Enrichment's own markdown,
+converted and laid out on the sheet. Length is a blunt proxy for
+substance, but it catches the failure that actually happened and never
+rejects a page for being too thorough — and the fallback means the worst
+case is the Thread's own words on a survey sheet, not a summary of them.
+
 **A report waiting is what a day amounts to.** Threads with an unread
 report sort first inside the day and carry the Annotation's own mark —
 a 2px sky left rule over a 7% sky tint — rather than a badge, per
@@ -85,8 +107,12 @@ citations still open, and no `allow-scripts` in either layer. That is why
   and must not queue behind a slow Enrichment fetch.
 - `summarizeDay` takes the Threads with a page as an argument rather than
   reading them, so the day sheet stays a pure function of local state.
-- Reports cost a second gateway call. Only Enrichments that were reports
-  pay it, and only once each.
+- Reports cost a second gateway call, and a thin first pass costs a third.
+  Only Enrichments that were reports pay it, and only once each — the
+  retry is the price of not publishing a summary.
+- Pages published under an older brief keep it until rebuilt.
+  `saveArtifact` takes a `replace` option and `POST /api/artifacts/publish`
+  takes `republish`, surfaced as **Rebuild** in the Thread toolbar.
 - The page is private: `noindex`, `no-store`, no referrer, and behind the
   same fail-closed Clerk boundary as every other Thread surface. It is a
   desk reading surface, not a share link — DESIGN.md's rule against

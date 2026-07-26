@@ -240,6 +240,18 @@ body {
 
 .sheet-body a { color: var(--identity); text-underline-offset: 2px; }
 
+/*
+ * A quotation that is not the walker's own words — from a source, or from a
+ * report being laid out verbatim. Ruled and upright: the italic serif next
+ * door belongs to the walker alone.
+ */
+.sheet-body blockquote:not(.capture-words) {
+  margin: 0 0 1rem;
+  padding: 0.15rem 0 0.15rem 0.9rem;
+  border-left: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+
 .sheet-body table {
   width: 100%;
   margin: 0 0 1rem;

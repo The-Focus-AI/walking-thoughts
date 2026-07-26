@@ -530,12 +530,12 @@ export function ThreadChat({
    * desk act for a Thread the queue judged too slight for a page, or one
    * whose page was never written because the gateway was down.
    */
-  async function publishReport() {
+  async function publishReport(republish = false) {
     if (publishing) return;
     setPublishing(true);
     setError(null);
     try {
-      const published = await publishArtifact(threadId);
+      const published = await publishArtifact(threadId, { republish });
       if (published) setArtifact(published);
       else setError("Could not publish this report");
     } finally {
@@ -651,7 +651,20 @@ export function ThreadChat({
             >
               Open report
             </a>
-          ) : !embedded && enrichments.length > 0 ? (
+          ) : null}
+          {artifact && !embedded ? (
+            <button
+              type="button"
+              className="thread-copy-markdown"
+              data-testid="thread-republish-report"
+              onClick={() => void publishReport(true)}
+              disabled={publishing || !online}
+              title="Write this page again from the Thread's research"
+            >
+              {publishing ? "Publishing…" : "Rebuild"}
+            </button>
+          ) : null}
+          {!artifact && !embedded && enrichments.length > 0 ? (
             <button
               type="button"
               className="thread-copy-markdown"

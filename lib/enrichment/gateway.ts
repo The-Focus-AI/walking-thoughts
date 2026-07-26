@@ -258,6 +258,13 @@ function createAiSdkGatewayClient(): GatewayClient {
         model: input.model,
         system: input.system,
         messages: [{ role: "user", content }],
+        // The SDK's Anthropic default is 4,096 — enough for a report, not
+        // for one laid out as a page, where markup spends tokens the reader
+        // never sees. A truncated Artifact came back thinner than the
+        // Enrichment it published.
+        ...(input.maxOutputTokens
+          ? { maxOutputTokens: input.maxOutputTokens }
+          : {}),
         ...(hasTools
           ? { tools, stopWhen: stepCountIs(RESEARCH_STEP_LIMIT) }
           : {}),

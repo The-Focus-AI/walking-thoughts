@@ -19,9 +19,14 @@ export async function POST(request: Request) {
   if ("error" in access) return access.error;
 
   let threadId = "";
+  let republish = false;
   try {
-    const body = (await request.json()) as { threadId?: string };
+    const body = (await request.json()) as {
+      threadId?: string;
+      republish?: boolean;
+    };
     threadId = body.threadId?.trim() ?? "";
+    republish = Boolean(body.republish);
   } catch {
     // Handled by the check below.
   }
@@ -48,7 +53,7 @@ export async function POST(request: Request) {
 
   const covered = new Set(newest.targetCaptureIds);
   try {
-    const { artifact, created } = await publishThreadArtifact({
+    const { artifact, created, outcome } = await publishThreadArtifact({
       userId: access.userId,
       threadTitle: thread.title,
       enrichment: newest,
@@ -56,11 +61,20 @@ export async function POST(request: Request) {
         .filter((capture) => covered.has(capture.id))
         .map((capture) => capture.text.trim())
         .filter((text) => text.length > 0),
+      priorReports: enrichments
+        .slice(0, -1)
+        .map((entry) => entry.text.trim())
+        .filter((text) => text.length > 0),
       walkedAt: thread.captures[0]?.createdAt ?? null,
       repository: getArtifactRepository(),
       gateway: getGatewayClient(),
+      republish,
     });
-    return Response.json({ artifact: toArtifactSummary(artifact), created });
+    return Response.json({
+      artifact: toArtifactSummary(artifact),
+      created,
+      outcome,
+    });
   } catch {
     return Response.json({ error: "publish_failed" }, { status: 502 });
   }
