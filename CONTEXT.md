@@ -16,6 +16,10 @@ _Avoid_: Chat, conversation, folder, inbox
 An AI-generated Thread entry based on that Thread's complete history at a recorded point, retaining which gateway model produced it. Examples include identification, explanation, transcription lookup, or research.
 _Avoid_: Sync, processing, response
 
+**Artifact**:
+One Enrichment published as a page: the report laid out as a survey sheet, browsable on its own URL, kept whole. Only Enrichments that were reports earn one — a question researched or an idea sharpened — and the queue publishes them as it enriches, so the page is waiting at the desk. The Enrichment stays the Thread entry; the Artifact is the readable form of it.
+_Avoid_: Document, export, share link, post
+
 **Day**:
 One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The unit of work at the desk — Threads are reached through the day they were walked, not through a flat list.
 _Avoid_: Session, entry, log, feed
