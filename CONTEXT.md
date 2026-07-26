@@ -28,6 +28,10 @@ _Avoid_: Type, class, bucket, label
 A named bucket the walker files Threads into — an effort, a client, a build. A Thread belongs to at most one, whatever its Kind. The Enrichment may guess a Project, but only from the list the walker has already made, and its guess is never final: filing at the desk settles it.
 _Avoid_: Folder, tag, category, workspace
 
+**Proposed Project**:
+A name the Enrichment has floated for an effort it keeps seeing, carried in the prompt beside the walker's real Projects so a later Thread joins it rather than coining a rival name for the same thing. It accrues Threads in silence and becomes a Project only when the walker names it in the Interview.
+_Avoid_: Candidate, suggestion, draft project, cluster
+
 **Filing**:
 What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
 _Avoid_: Triage, sorting, processing
@@ -37,7 +41,7 @@ A Thread state set when the walker has processed it back at the desk. Threads st
 _Avoid_: Archived, done, read
 
 **Memory**:
-One durable fact about the walker (who they are, where they walk, what they know, what draws their attention) injected into every Enrichment as a walker profile. Learned in the Interview or by an Enrichment as it works, and materialized from the Memory Patch log rather than stored directly.
+One durable fact about the walker — true whether or not they ever act on it — injected into every Enrichment as a walker profile: who they are, where they walk, what they know, what draws their attention. Anything naming an effort, a build, a client, or a product is a Project instead. Learned by an Enrichment as it works, and materialized from the Memory Patch log rather than stored directly.
 _Avoid_: Preference, setting, profile field
 
 **Memory Patch**:
@@ -45,7 +49,7 @@ One append-only entry in the log that is the primary record of what the system b
 _Avoid_: Edit, migration, sync
 
 **Interview**:
-A short guided conversation where Walking Thoughts asks the walker questions — seed questions first, then follow-ups grounded in earlier answers — and distills each answer into Memories that tailor future Enrichments.
+The one conversation that sees across Threads. Walking Thoughts brings a Proposed Project that has recurred often enough to be real, shows the Threads it rests on, and asks the walker whether it is a Project and what they call it. It writes Projects, never Memories, and has nothing to say until Threads accrue.
 _Avoid_: Onboarding, survey, questionnaire
 
 **Offline Region**:
