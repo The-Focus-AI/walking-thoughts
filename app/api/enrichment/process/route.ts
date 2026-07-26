@@ -1,3 +1,4 @@
+import { getArtifactRepository } from "@/lib/artifacts/repository";
 import { processPendingEnrichments } from "@/lib/enrichment/process";
 import { getEnrichmentRepository } from "@/lib/enrichment/repository";
 import { requireSyncAccess } from "@/lib/sync/access";
@@ -22,7 +23,12 @@ export async function POST(request: Request) {
   const response = await processPendingEnrichments(
     access.userId,
     repository,
-    { retryFailed, threadRepository },
+    {
+      retryFailed,
+      threadRepository,
+      // A report that came back is published as a page in the same pass.
+      artifactRepository: getArtifactRepository(),
+    },
   );
   return Response.json(response);
 }

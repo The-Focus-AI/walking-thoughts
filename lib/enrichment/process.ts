@@ -1,3 +1,6 @@
+import { publishThreadArtifact } from "@/lib/artifacts/build";
+import { earnsArtifact } from "@/lib/artifacts/eligibility";
+import type { ArtifactRepository } from "@/lib/artifacts/types";
 import type { MediaKind } from "@/lib/local-capture/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
 import { applyMemoryPatch } from "@/lib/memory/patches";
@@ -39,12 +42,66 @@ import type {
   GatewayClient,
   GatewayMediaPart,
   MemoryToolClient,
+  ThreadEnrichment,
 } from "./types";
 
 type PushHooks = {
   repository: PushRepository;
   sender: PushSender | null;
 };
+
+/**
+ * Publishing an Artifact is a second gateway pass over a finished report, so
+ * it carries its own client: a caller may enrich with one seam and publish
+ * with another, and a test that stubs the Enrichment gateway does not
+ * silently answer the publish call too.
+ */
+type ArtifactHooks = {
+  repository: ArtifactRepository;
+  gateway: GatewayClient;
+};
+
+/**
+ * Publish the report as a page, if it is a report. A failure here never
+ * fails the Enrichment — the Thread already holds the walker's answer, and
+ * the page is the readable form of it, not the answer itself.
+ */
+async function maybePublishArtifact(
+  userId: string,
+  artifacts: ArtifactHooks | undefined,
+  input: {
+    threadTitle: string;
+    enrichment: ThreadEnrichment;
+    history: FrozenHistoryEntry[];
+    targetCaptureIds: string[];
+    model: string;
+  },
+): Promise<void> {
+  if (!artifacts) return;
+  if (!earnsArtifact({ kind: input.enrichment.kind, text: input.enrichment.text })) {
+    return;
+  }
+  const targets = new Set(input.targetCaptureIds);
+  const walkerEntries = input.history.filter(
+    (entry) => entry.kind === "capture" && targets.has(entry.id),
+  );
+  try {
+    await publishThreadArtifact({
+      userId,
+      threadTitle: input.threadTitle,
+      enrichment: input.enrichment,
+      captureWords: walkerEntries
+        .map((entry) => entry.text.trim())
+        .filter((text) => text.length > 0),
+      walkedAt: walkerEntries[0]?.createdAt ?? null,
+      repository: artifacts.repository,
+      gateway: artifacts.gateway,
+      model: input.model,
+    });
+  } catch {
+    // The report stands; the page can be published again from the desk.
+  }
+}
 
 async function maybeNotify(
   userId: string,
@@ -244,6 +301,7 @@ async function runJob(
   rejectedProjectNames: string[],
   threadRepository: ThreadRepository | undefined,
   push?: PushHooks,
+  artifacts?: ArtifactHooks,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
     return job.targetCaptureIds.map((id) => ({
@@ -441,6 +499,13 @@ async function runJob(
     }
 
     if (completed.created) {
+      await maybePublishArtifact(userId, artifacts, {
+        threadTitle: thread.title,
+        enrichment: completed.enrichment,
+        history: frozenHistory,
+        targetCaptureIds: running.targetCaptureIds,
+        model: running.model,
+      });
       await maybeNotify(userId, push, {
         kind: "complete",
         jobId: running.id,
@@ -491,6 +556,14 @@ export async function processPendingEnrichments(
     memoryRepository?: WalkerMemoryRepository;
     pushRepository?: PushRepository;
     pushSender?: PushSender | null;
+    /**
+     * Where published Artifacts land. Supplied explicitly rather than
+     * defaulted: publishing spends a second gateway call and writes a page,
+     * so a caller that only wants Enrichment gets exactly that.
+     */
+    artifactRepository?: ArtifactRepository;
+    /** Gateway for the publish pass; defaults to the configured client. */
+    artifactGateway?: GatewayClient;
   } = {},
 ): Promise<EnrichmentBatchResponse> {
   const environment = options.environment ?? process.env;
@@ -513,6 +586,12 @@ export async function processPendingEnrichments(
       : options.pushSender;
   const push: PushHooks | undefined = pushSender
     ? { repository: pushRepository, sender: pushSender }
+    : undefined;
+  const artifacts: ArtifactHooks | undefined = options.artifactRepository
+    ? {
+        repository: options.artifactRepository,
+        gateway: options.artifactGateway ?? getGatewayClient(environment),
+      }
     : undefined;
 
   const memoryRepository =
@@ -561,6 +640,7 @@ export async function processPendingEnrichments(
       rejectedProjectNames,
       options.threadRepository,
       push,
+      artifacts,
     );
     results.push(...jobResults);
   }
