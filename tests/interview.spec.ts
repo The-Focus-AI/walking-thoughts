@@ -1,192 +1,218 @@
 import { expect, test } from "@playwright/test";
-import { createFakeGatewayClient } from "@/lib/enrichment/gateway";
-import { parseMemoryLines } from "@/lib/interview/extract";
 import {
-  createMemoryInterviewRepository,
-  resetMemoryInterviewRepository,
-} from "@/lib/interview/memory-repository";
-import {
-  MAX_INTERVIEW_TURNS,
-  SEED_QUESTIONS,
-  parseFollowUpQuestion,
-} from "@/lib/interview/questions";
-import { advanceInterview, readInterviewState } from "@/lib/interview/run";
+  advanceInterview,
+  PROJECT_PROPOSAL_THRESHOLD,
+  readInterviewState,
+} from "@/lib/interview/run";
 import {
   createMemoryWalkerMemoryRepository,
   resetMemoryWalkerMemoryRepository,
 } from "@/lib/memory/memory-repository";
+import {
+  createMemoryThreadRepository,
+  resetMemoryThreadRepository,
+} from "@/lib/sync/memory-repository";
+import type { ThreadRepository } from "@/lib/sync/types";
 
 const NS = "interview-tests";
+const USER = "walker-1";
 
-let idCounter = 0;
-
-function dependencies(gatewayText?: (system: string) => string) {
-  idCounter = 0;
+function dependencies() {
   return {
-    interviews: createMemoryInterviewRepository(NS),
     memories: createMemoryWalkerMemoryRepository(NS),
-    gateway: createFakeGatewayClient(async (input) => ({
-      text: gatewayText ? gatewayText(input.system) : "no memory lines here",
-    })),
-    model: "test-model",
-    now: () => "2026-07-23T10:00:00.000Z",
-    createId: () => `id-${++idCounter}`,
+    threads: createMemoryThreadRepository(NS),
   };
 }
 
+/** Land `count` Captures, each on its own Thread, filed into `projectId`. */
+async function accrue(
+  threads: ThreadRepository,
+  projectId: string,
+  count: number,
+  prefix = "thread",
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const id = `${prefix}-${projectId}-${index}`;
+    await threads.upsertCaptures(USER, [
+      {
+        id: `capture-${id}`,
+        threadId: id,
+        text: `Capture ${index}`,
+        createdAt: new Date(Date.UTC(2026, 6, 1 + index)).toISOString(),
+        location: null,
+        sequence: index,
+        idempotencyKey: `key-${id}`,
+      },
+    ]);
+    await threads.fileThread(USER, id, { projectId, reviewedAt: null });
+    ids.push(id);
+  }
+  return ids;
+}
+
 test.beforeEach(() => {
-  resetMemoryInterviewRepository(NS);
   resetMemoryWalkerMemoryRepository(NS);
+  resetMemoryThreadRepository(NS);
 });
 
-test("parseMemoryLines keeps valid categories, caps at five, ignores junk", () => {
-  const parsed = parseMemoryLines(
-    [
-      "Some preamble the model added",
-      "MEMORY[interest]: Loves birding",
-      "MEMORY[unknown]: Should be dropped",
-      "MEMORY[place]:   Walks in the Columbia Gorge  ",
-      "MEMORY[expertise]: Knows conifers well",
-      "MEMORY[identity]: A retired teacher",
-      "MEMORY[preference]: Prefers deep dives",
-      "MEMORY[interest]: A sixth fact past the cap",
-    ].join("\n"),
-  );
-  expect(parsed).toHaveLength(5);
-  expect(parsed[0]).toEqual({ category: "interest", content: "Loves birding" });
-  expect(parsed[1]).toEqual({
-    category: "place",
-    content: "Walks in the Columbia Gorge",
-  });
-});
-
-test("parseFollowUpQuestion reads QUESTION lines and rejects everything else", () => {
-  expect(
-    parseFollowUpQuestion("QUESTION[interest]: Which raptors so far?"),
-  ).toEqual({ category: "interest", question: "Which raptors so far?" });
-  expect(parseFollowUpQuestion("DONE")).toBeNull();
-  expect(parseFollowUpQuestion("QUESTION[nope]: bad category")).toBeNull();
-});
-
-test("the Interview opens with the first seed question", async () => {
+test("a walker with nothing recurring is asked nothing", async () => {
   const deps = dependencies();
-  const state = await advanceInterview("user_a", {}, deps);
+  const state = await readInterviewState(USER, deps);
 
-  expect(state.turns).toHaveLength(1);
-  expect(state.turns[0].question).toBe(SEED_QUESTIONS[0].question);
-  expect(state.turns[0].answer).toBeNull();
-  expect(state.complete).toBe(false);
-});
-
-test("answering extracts Memories via the gateway and asks the next seed", async () => {
-  const deps = dependencies((system) =>
-    system.includes("distill")
-      ? "MEMORY[identity]: A field biologist who walks daily\nMEMORY[interest]: Tracks owl territories"
-      : "no question",
-  );
-  await advanceInterview("user_a", {}, deps);
-  const state = await advanceInterview(
-    "user_a",
-    { answer: "I'm a field biologist, out every day tracking owls." },
-    deps,
-  );
-
-  expect(state.memories.map((memory) => memory.content)).toEqual([
-    "A field biologist who walks daily",
-    "Tracks owl territories",
-  ]);
-  expect(state.memories.every((memory) => memory.source === "interview")).toBe(
-    true,
-  );
-
-  const answered = state.turns[0];
-  expect(answered.answer).toContain("field biologist");
-  expect(answered.memoryIds).toHaveLength(2);
-  // Memories point back to the turn that taught them.
-  expect(state.memories.every((memory) => memory.sourceId === answered.id)).toBe(
-    true,
-  );
-
-  const open = state.turns.find((turn) => turn.answer === null);
-  expect(open?.question).toBe(SEED_QUESTIONS[1].question);
-});
-
-test("an answer the model can't distill is kept whole under the question's category", async () => {
-  const deps = dependencies(() => "no structured output at all");
-  await advanceInterview("user_a", {}, deps);
-  const state = await advanceInterview(
-    "user_a",
-    { answer: "Mostly the woods behind my house." },
-    deps,
-  );
-
-  expect(state.memories).toHaveLength(1);
-  expect(state.memories[0].content).toBe("Mostly the woods behind my house.");
-  expect(state.memories[0].category).toBe(SEED_QUESTIONS[0].category);
-});
-
-test("skipping resolves the turn without learning anything", async () => {
-  const deps = dependencies();
-  await advanceInterview("user_a", {}, deps);
-  const state = await advanceInterview("user_a", { skip: true }, deps);
-
-  expect(state.memories).toHaveLength(0);
-  expect(state.turns[0].skipped).toBe(true);
-  const open = state.turns.find((turn) => turn.answer === null && !turn.skipped);
-  expect(open?.question).toBe(SEED_QUESTIONS[1].question);
-});
-
-test("after the seeds, gateway follow-ups continue until DONE completes the Interview", async () => {
-  const deps = dependencies((system) =>
-    system.includes("distill")
-      ? "NONE"
-      : "QUESTION[interest]: Which trail surprised you most this year?",
-  );
-
-  let state = await advanceInterview("user_a", {}, deps);
-  for (let i = 0; i < SEED_QUESTIONS.length; i += 1) {
-    state = await advanceInterview("user_a", { answer: `Answer ${i}` }, deps);
-  }
-  const followUp = state.turns.find((turn) => turn.answer === null);
-  expect(followUp?.question).toBe(
-    "Which trail surprised you most this year?",
-  );
-
-  const doneDeps = {
-    ...deps,
-    gateway: createFakeGatewayClient(async (input) => ({
-      text: input.system.includes("distill") ? "NONE" : "DONE",
-    })),
-  };
-  const finished = await advanceInterview(
-    "user_a",
-    { answer: "The ridge loop" },
-    doneDeps,
-  );
-  expect(finished.complete).toBe(true);
-  expect(
-    finished.turns.filter((turn) => turn.answer === null && !turn.skipped),
-  ).toHaveLength(0);
-});
-
-test("the Interview never exceeds the turn cap", async () => {
-  const deps = dependencies((system) =>
-    system.includes("distill")
-      ? "NONE"
-      : "QUESTION[interest]: Another follow-up?",
-  );
-  let state = await advanceInterview("user_a", {}, deps);
-  for (let i = 0; i < MAX_INTERVIEW_TURNS + 3; i += 1) {
-    state = await advanceInterview("user_a", { answer: `Answer ${i}` }, deps);
-  }
-  expect(state.turns.length).toBeLessThanOrEqual(MAX_INTERVIEW_TURNS);
+  expect(state.proposals).toEqual([]);
   expect(state.complete).toBe(true);
 });
 
-test("readInterviewState is read-only", async () => {
+test("a proposal below the threshold stays silent", async () => {
   const deps = dependencies();
-  const before = await readInterviewState("user_a", deps);
-  expect(before.turns).toHaveLength(0);
-  const after = await readInterviewState("user_a", deps);
-  expect(after.turns).toHaveLength(0);
+  const proposal = await deps.threads.proposeProject(USER, "Token Pool");
+  await accrue(deps.threads, proposal.id, PROJECT_PROPOSAL_THRESHOLD - 1);
+
+  const state = await readInterviewState(USER, deps);
+
+  expect(state.proposals).toEqual([]);
+  expect(state.complete).toBe(true);
+});
+
+test("the proposal with the most Threads is raised first, with its Threads", async () => {
+  const deps = dependencies();
+  const small = await deps.threads.proposeProject(USER, "focus.ai");
+  const large = await deps.threads.proposeProject(USER, "Token Pool");
+  await accrue(deps.threads, small.id, PROJECT_PROPOSAL_THRESHOLD, "s");
+  await accrue(deps.threads, large.id, PROJECT_PROPOSAL_THRESHOLD + 3, "l");
+
+  const state = await readInterviewState(USER, deps);
+
+  expect(state.complete).toBe(false);
+  expect(state.proposals.map((proposal) => proposal.name)).toEqual([
+    "Token Pool",
+    "focus.ai",
+  ]);
+  expect(state.proposals[0].threadCount).toBe(PROJECT_PROPOSAL_THRESHOLD + 3);
+  expect(state.proposals[0].threads).toHaveLength(
+    PROJECT_PROPOSAL_THRESHOLD + 3,
+  );
+});
+
+test("confirming makes it a Project and leaves every Thread unreviewed", async () => {
+  const deps = dependencies();
+  const proposal = await deps.threads.proposeProject(USER, "Token Pool");
+  const threadIds = await accrue(
+    deps.threads,
+    proposal.id,
+    PROJECT_PROPOSAL_THRESHOLD,
+  );
+
+  const state = await advanceInterview(
+    USER,
+    { projectId: proposal.id, confirm: true },
+    deps,
+  );
+
+  expect(state.proposals).toEqual([]);
+  const projects = await deps.threads.listProjects(USER);
+  expect(projects.map((project) => project.name)).toEqual(["Token Pool"]);
+
+  // Knowing what the pile is called is not the same as having read it.
+  const threads = await deps.threads.listThreads(USER);
+  for (const id of threadIds) {
+    const thread = threads.find((candidate) => candidate.id === id);
+    expect(thread?.reviewedAt ?? null).toBeNull();
+    expect(thread?.projectId).toBe(proposal.id);
+  }
+});
+
+test("confirming can rename a name coined from one early Thread", async () => {
+  const deps = dependencies();
+  const proposal = await deps.threads.proposeProject(
+    USER,
+    "Per-user token billing",
+  );
+  await accrue(deps.threads, proposal.id, PROJECT_PROPOSAL_THRESHOLD);
+
+  await advanceInterview(
+    USER,
+    { projectId: proposal.id, confirm: true, name: "Token Pool" },
+    deps,
+  );
+
+  const projects = await deps.threads.listProjects(USER);
+  expect(projects.map((project) => project.name)).toEqual(["Token Pool"]);
+});
+
+test("rejecting releases unreviewed Threads and keeps the walker's own filing", async () => {
+  const deps = dependencies();
+  const proposal = await deps.threads.proposeProject(USER, "Trail maps");
+  const threadIds = await accrue(
+    deps.threads,
+    proposal.id,
+    PROJECT_PROPOSAL_THRESHOLD,
+  );
+  // The walker filed one of them there deliberately.
+  await deps.threads.fileThread(USER, threadIds[0], {
+    projectId: proposal.id,
+    reviewedAt: "2026-07-26T10:00:00.000Z",
+  });
+
+  await advanceInterview(USER, { projectId: proposal.id, confirm: false }, deps);
+
+  const threads = await deps.threads.listThreads(USER);
+  expect(
+    threads.find((thread) => thread.id === threadIds[0])?.projectId,
+  ).toBe(proposal.id);
+  for (const id of threadIds.slice(1)) {
+    expect(threads.find((thread) => thread.id === id)?.projectId ?? null).toBeNull();
+  }
+});
+
+test("a rejected proposal is never raised again, and is never re-proposed", async () => {
+  const deps = dependencies();
+  const proposal = await deps.threads.proposeProject(USER, "Trail maps");
+  await accrue(deps.threads, proposal.id, PROJECT_PROPOSAL_THRESHOLD);
+
+  const after = await advanceInterview(
+    USER,
+    { projectId: proposal.id, confirm: false },
+    deps,
+  );
+  expect(after.proposals).toEqual([]);
+  expect(after.complete).toBe(true);
+
+  // Re-proposing the same name returns the rejected row rather than a new one.
+  const again = await deps.threads.proposeProject(USER, "Trail maps");
+  expect(again.id).toBe(proposal.id);
+  expect(again.state).toBe("rejected");
+  expect(await deps.threads.listProposedProjects(USER)).toEqual([]);
+  expect(await deps.threads.listRejectedProjectNames(USER)).toEqual([
+    "Trail maps",
+  ]);
+});
+
+test("a Proposed Project never reads as one of the walker's Projects", async () => {
+  const deps = dependencies();
+  await deps.threads.proposeProject(USER, "Token Pool");
+  await deps.threads.createProject(USER, "Cornwall Market");
+
+  const projects = await deps.threads.listProjects(USER);
+
+  expect(projects.map((project) => project.name)).toEqual(["Cornwall Market"]);
+  expect(projects.every((project) => project.state === "confirmed")).toBe(true);
+});
+
+test("the Interview writes Projects and never a Memory Patch", async () => {
+  const deps = dependencies();
+  const proposal = await deps.threads.proposeProject(USER, "Token Pool");
+  await accrue(deps.threads, proposal.id, PROJECT_PROPOSAL_THRESHOLD);
+
+  await advanceInterview(
+    USER,
+    { projectId: proposal.id, confirm: true, name: "Token Pool" },
+    deps,
+  );
+  const rejected = await deps.threads.proposeProject(USER, "Trail maps");
+  await advanceInterview(USER, { projectId: rejected.id, confirm: false }, deps);
+
+  expect(await deps.memories.listPatches(USER)).toEqual([]);
+  expect(await deps.memories.listMemories(USER)).toEqual([]);
 });

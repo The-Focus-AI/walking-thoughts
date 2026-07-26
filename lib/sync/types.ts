@@ -49,11 +49,25 @@ export type SyncBatchResponse = {
   failures: SyncFailure[];
 };
 
+/**
+ * `proposed` is a Proposed Project — a name an Enrichment floated for an
+ * effort it keeps seeing. It becomes `confirmed` only when the walker names
+ * it in the Interview, and `rejected` so the Interview stops asking.
+ */
+export type ProjectState = "proposed" | "confirmed" | "rejected";
+
 /** A named bucket the walker files Threads into: an effort, a client, a build. */
 export type Project = {
   id: string;
   name: string;
+  state: ProjectState;
   createdAt: string;
+};
+
+/** A Proposed Project with the Threads that have accrued to it. */
+export type ProjectProposal = Project & {
+  threadCount: number;
+  threads: Array<{ id: string; title: string }>;
 };
 
 export type ServerThread = {
@@ -190,9 +204,32 @@ export type ThreadRepository = {
       reviewedAt: string | null;
     },
   ): Promise<ServerThread | null>;
+  /**
+   * The walker's Projects — `confirmed` only. Desk surfaces call this one;
+   * a Proposed Project must never read as a decision the walker made.
+   */
   listProjects(userId: string): Promise<Project[]>;
   /** Idempotent by name — filing the same new Project twice makes one. */
   createProject(userId: string, name: string): Promise<Project>;
+  /** Proposed Projects with the Threads that have accrued to them. */
+  listProposedProjects(userId: string): Promise<ProjectProposal[]>;
+  /** Names the walker has already rejected, so the model stops proposing them. */
+  listRejectedProjectNames(userId: string): Promise<string[]>;
+  /**
+   * Coin a Proposed Project. Idempotent by name, and never resurrects a name
+   * the walker already confirmed or rejected — that row is returned as-is.
+   */
+  proposeProject(userId: string, name: string): Promise<Project>;
+  /**
+   * The walker's verdict in the Interview. Confirming may rename; rejecting
+   * releases the unreviewed Threads that had accrued to it, so a wrong guess
+   * leaves no residue in the queue. Threads the walker already filed keep it.
+   */
+  settleProject(
+    userId: string,
+    projectId: string,
+    verdict: { state: "confirmed"; name?: string } | { state: "rejected" },
+  ): Promise<Project | null>;
   updateThreadTitle?(
     userId: string,
     threadId: string,

@@ -6,13 +6,13 @@ import { AccountExport } from "@/components/account-export";
 import { AppNav } from "@/components/app-nav";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { ScaleBar } from "@/components/sheet";
-import type { InterviewTurn } from "@/lib/interview/types";
 import { revertedPatchIds } from "@/lib/memory/patches";
 import { fetchWithTimeout, MODEL_TIMEOUT_MS } from "@/lib/net/timeout";
 import type { MemoryPatch, WalkerMemory } from "@/lib/memory/types";
+import type { ProjectProposal } from "@/lib/sync/types";
 
 type InterviewStatePayload = {
-  turns: InterviewTurn[];
+  proposals: ProjectProposal[];
   memories: WalkerMemory[];
   patches: MemoryPatch[];
   complete: boolean;
@@ -52,24 +52,31 @@ function PatchSource({ patch }: { patch: MemoryPatch }) {
 }
 
 /**
- * One Interview question: the machine asks in its Annotation voice — sky
- * rule, mono head — and the walker's answer prints in italic serif. The
- * you-italic / machine-upright rule is absolute (DESIGN.md).
+ * The one question no Thread can answer, asked in the machine's Annotation
+ * voice — sky rule, mono head. The evidence is the walker's own walks, so
+ * the Threads print as the survey log prints them (DESIGN.md).
  */
-function TurnQuestion({
-  turn,
-  index,
-}: {
-  turn: InterviewTurn;
-  index: number;
-}) {
+function ProposalQuestion({ proposal }: { proposal: ProjectProposal }) {
   return (
     <div className="interview-question">
       <header className="interview-question-head">
-        <span>Question {index + 1}</span>
-        <span>{turn.category}</span>
+        <span>Recurring</span>
+        <span>
+          {proposal.threadCount}{" "}
+          {proposal.threadCount === 1 ? "Thread" : "Threads"}
+        </span>
       </header>
-      <p>{turn.question}</p>
+      <p>
+        {proposal.threadCount} Threads keep circling the same thing. Is that a
+        Project, and is this what you call it?
+      </p>
+      <ul className="interview-proposal-threads">
+        {proposal.threads.map((thread) => (
+          <li key={thread.id}>
+            <Link href={`/threads/${thread.id}`}>{thread.title}</Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -144,23 +151,22 @@ function PatchLedger({
 }
 
 /**
- * The Interview sheet — a desk surface (DESIGN.md): Walking Thoughts asks,
- * the walker answers, and each answer distills into Memories that tailor
- * every Enrichment. What the survey believes about its one reader stays
- * printed on this page, line by revertible line.
+ * The Interview sheet — a desk surface (DESIGN.md). It is the one place that
+ * sees across Threads, so it asks the one question no Thread can: this keeps
+ * coming back, what do you call it? What the survey believes about its one
+ * reader stays printed below, line by revertible line.
  */
 export function InterviewPanel() {
-  const [turns, setTurns] = useState<InterviewTurn[]>([]);
+  const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [memories, setMemories] = useState<WalkerMemory[]>([]);
   const [patches, setPatches] = useState<MemoryPatch[]>([]);
   const [complete, setComplete] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [started, setStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const applyState = useCallback((state: InterviewStatePayload) => {
-    setTurns(state.turns);
+    setProposals(state.proposals ?? []);
     setMemories(state.memories);
     setPatches(state.patches ?? []);
     setComplete(state.complete);
@@ -190,7 +196,6 @@ export function InterviewPanel() {
         const state = (await response.json()) as InterviewStatePayload;
         if (!active) return;
         applyState(state);
-        setStarted(state.turns.length > 0);
       } catch {
         if (active) {
           setError(
@@ -205,7 +210,7 @@ export function InterviewPanel() {
   }, [applyState]);
 
   const post = useCallback(
-    async (body: { answer?: string; skip?: boolean }) => {
+    async (body: { projectId: string; confirm: boolean; name?: string }) => {
       setBusy(true);
       setError(null);
       try {
@@ -223,7 +228,6 @@ export function InterviewPanel() {
         );
         if (!response.ok) throw new Error(String(response.status));
         applyState((await response.json()) as InterviewStatePayload);
-        setStarted(true);
         setDraft("");
       } catch {
         setError(
@@ -265,8 +269,7 @@ export function InterviewPanel() {
     }
   }
 
-  const openTurn = turns.find((turn) => turn.answer === null && !turn.skipped);
-  const settledTurns = turns.filter((turn) => turn !== openTurn);
+  const open = proposals[0] ?? null;
 
   return (
     <main className="interview-sheet" data-testid="interview-panel">
@@ -275,44 +278,35 @@ export function InterviewPanel() {
           <p className="eyebrow">Provisional Survey</p>
           <h1>You</h1>
           <p>
-            Walking Thoughts asks; your answers become Memories that tailor
-            every Enrichment. Everything it believes about you is printed
-            below, and any line can be reverted.
+            Enrichments learn you from your own Captures. When the same effort
+            keeps coming back across walks, Walking Thoughts asks what to call
+            it. Everything it believes is printed below, and any line can be
+            reverted.
           </p>
         </div>
       </header>
 
       <section className="interview-section" aria-label="Interview">
         <h2 className="interview-section-title">Interview</h2>
-        {settledTurns.map((turn, index) => (
-          <div key={turn.id} className="interview-turn">
-            <TurnQuestion turn={turn} index={index} />
-            {turn.skipped ? (
-              <p className="interview-skipped">Skipped</p>
-            ) : (
-              <p className="interview-answer">{turn.answer}</p>
-            )}
-          </div>
-        ))}
 
-        {openTurn ? (
+        {open ? (
           <div className="interview-turn" data-testid="interview-question">
-            <TurnQuestion turn={openTurn} index={settledTurns.length} />
+            <ProposalQuestion proposal={open} />
             <label className="capture-label" htmlFor="interview-answer">
-              Your answer
+              Project name
             </label>
-            <textarea
+            <input
               id="interview-answer"
               className="interview-input"
-              rows={3}
-              value={draft}
-              placeholder="In your own words."
+              value={draft || open.name}
               onChange={(event) => setDraft(event.target.value)}
               disabled={busy}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  if (draft.trim()) void post({ answer: draft.trim() });
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                const name = (draft || open.name).trim();
+                if (name) {
+                  void post({ projectId: open.id, confirm: true, name });
                 }
               }}
             />
@@ -320,68 +314,48 @@ export function InterviewPanel() {
               <button
                 type="button"
                 className="interview-secondary"
-                onClick={() => void post({ skip: true })}
+                data-testid="interview-reject"
+                onClick={() =>
+                  void post({ projectId: open.id, confirm: false })
+                }
                 disabled={busy}
               >
-                Skip
+                Not a Project
               </button>
               <button
                 type="button"
                 className="interview-send"
                 data-testid="interview-send"
-                onClick={() => void post({ answer: draft.trim() })}
-                disabled={busy || !draft.trim()}
+                onClick={() =>
+                  void post({
+                    projectId: open.id,
+                    confirm: true,
+                    name: (draft || open.name).trim(),
+                  })
+                }
+                disabled={busy || !(draft || open.name).trim()}
               >
-                Answer
+                It&rsquo;s a Project
               </button>
             </div>
             {busy ? (
               <p className="interview-status" role="status">
-                Distilling — turning your answer into Memories.
+                Filing — making it a Project.
               </p>
             ) : null}
           </div>
         ) : null}
 
-        {!started && !openTurn && !complete ? (
-          <div className="interview-turn">
-            <p className="interview-empty">
-              A few questions about who you are, where you walk, and what you
-              already know. Enrichments use the answers to skip your basics
-              and dig where you would dig.
-            </p>
-            <div className="interview-actions">
-              <button
-                type="button"
-                className="interview-send"
-                data-testid="interview-start"
-                onClick={() => void post({})}
-                disabled={busy}
-              >
-                Begin the Interview
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {started && !openTurn && !complete ? (
-          <div className="interview-actions">
-            <button
-              type="button"
-              className="interview-secondary"
-              data-testid="interview-start"
-              onClick={() => void post({})}
-              disabled={busy}
-            >
-              Next question
-            </button>
-          </div>
+        {proposals.length > 1 ? (
+          <p className="interview-empty">
+            {proposals.length - 1} more waiting after this one.
+          </p>
         ) : null}
 
         {complete ? (
           <p className="interview-empty" data-testid="interview-complete">
-            Nothing left to ask for now. The Interview resumes when there is
-            something new worth asking; Enrichments keep learning meanwhile.
+            Nothing to ask yet. Walking Thoughts asks once the same effort has
+            come back across a few walks; Enrichments keep learning meanwhile.
           </p>
         ) : null}
       </section>

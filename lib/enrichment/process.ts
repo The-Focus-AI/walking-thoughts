@@ -240,6 +240,8 @@ async function runJob(
   search: ResearchClient | undefined,
   memoryRepository: WalkerMemoryRepository,
   projects: Project[],
+  proposals: Project[],
+  rejectedProjectNames: string[],
   threadRepository: ThreadRepository | undefined,
   push?: PushHooks,
 ): Promise<EnrichmentCaptureResult[]> {
@@ -371,6 +373,8 @@ async function runJob(
       placesByCaptureId,
       walkerProfile: walkerProfile ?? EMPTY_PROFILE_HINT,
       projects: projects.map((project) => project.name),
+      proposedProjects: proposals.map((proposal) => proposal.name),
+      rejectedProjects: rejectedProjectNames,
     });
     const generation = await gateway.generate({
       model: running.model,
@@ -381,12 +385,34 @@ async function runJob(
       search,
       memory: memoryTool,
     });
-    const guessedProject = generation.project
-      ? (projects.find(
-          (project) =>
-            project.name.toLowerCase() === generation.project!.toLowerCase(),
-        ) ?? null)
-      : null;
+    // PROJECT may name anything already known, confirmed or merely proposed —
+    // joining a proposal is how one effort stops fragmenting into four names.
+    // An invented name is dropped, as it always has been.
+    const known = [...projects, ...proposals];
+    const matched = (name: string | null) =>
+      name
+        ? (known.find(
+            (project) => project.name.toLowerCase() === name.toLowerCase(),
+          ) ?? null)
+        : null;
+
+    let guessedProject = matched(generation.project);
+    // PROPOSE coins a new one, but only for a name nothing already covers —
+    // a PROPOSE that names something known is just a PROJECT said clumsily.
+    if (!guessedProject && generation.propose && threadRepository) {
+      // A PROPOSE that names something already known is a PROJECT said
+      // clumsily — join it rather than coining a case-variant twin.
+      const coined =
+        matched(generation.propose) ??
+        (await threadRepository
+          .proposeProject(userId, generation.propose)
+          // A proposal store that is unavailable costs the proposal, never
+          // the report: the walker's words are already written.
+          .catch(() => null));
+      // Re-proposing a name the walker rejected returns that row untouched;
+      // filing into it would put the guess straight back in the queue.
+      guessedProject = coined?.state === "rejected" ? null : coined;
+    }
 
     const completed = await repository.completeJob(userId, running.id, {
       text: generation.text,
@@ -492,9 +518,16 @@ export async function processPendingEnrichments(
   const memoryRepository =
     options.memoryRepository ??
     getWalkerMemoryRepository(environment as NodeJS.ProcessEnv);
-  // The model may only file into Projects the walker has already made.
+  // The model files into a Project the walker made or a Proposed Project an
+  // earlier Enrichment coined; a name it invents outright is still dropped.
   const projects = options.threadRepository
     ? await options.threadRepository.listProjects(userId)
+    : [];
+  const proposals = options.threadRepository
+    ? await options.threadRepository.listProposedProjects(userId)
+    : [];
+  const rejectedProjectNames = options.threadRepository
+    ? await options.threadRepository.listRejectedProjectNames(userId)
     : [];
 
   if (options.retryFailed) {
@@ -524,6 +557,8 @@ export async function processPendingEnrichments(
       search,
       memoryRepository,
       projects,
+      proposals,
+      rejectedProjectNames,
       options.threadRepository,
       push,
     );
