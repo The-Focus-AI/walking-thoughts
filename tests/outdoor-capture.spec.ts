@@ -74,6 +74,50 @@ test("compact capture dock records audio via tap-to-toggle and stages for review
   await expect(page.getByText(/Network offline|Network online/)).toBeVisible();
 });
 
+test("holding the mic records and Captures the audio on release", async ({
+  page,
+}) => {
+  await installFakeRecorder(page);
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture actions")).toBeVisible();
+
+  const mic = page.getByRole("button", { name: "Record audio" });
+  await mic.hover();
+  await page.mouse.down();
+  await expect(page.getByTestId("recording-banner")).toContainText(
+    "release to Capture",
+  );
+  // Long enough to count as a held thought rather than a slipped thumb.
+  await page.waitForTimeout(1500);
+  await page.mouse.up();
+
+  // No second press: releasing the button is the Capture.
+  await expect.poll(() => captureCount(page)).toBe(1);
+  await expect(page.getByTestId("capture-tally")).toContainText(
+    "1 Capture today",
+  );
+  await expect(page.getByLabel("Selected media")).toHaveCount(0);
+  await expect(page.getByTestId("recording-banner")).toHaveCount(0);
+});
+
+test("a slipped thumb on the mic Captures nothing", async ({ page }) => {
+  await installFakeRecorder(page);
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture actions")).toBeVisible();
+
+  await page.getByRole("button", { name: "Record audio" }).hover();
+  await page.mouse.down();
+  // Past the tap threshold, well short of a thought.
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+
+  await expect(
+    page.getByText("Too short — hold the mic while you talk"),
+  ).toBeVisible();
+  await expect.poll(() => captureCount(page)).toBe(0);
+  await expect(page.getByLabel("Selected media")).toHaveCount(0);
+});
+
 test("video record stages a preview draft instead of auto-committing", async ({
   page,
 }) => {

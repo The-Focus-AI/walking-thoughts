@@ -1548,6 +1548,14 @@ h1 {
   background: rgba(0, 0, 0, 0.22);
 }
 
+/* Push-to-talk: a long press must record, not select text or open a menu. */
+.capture-card .capture-hold-btn {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .capture-card .capture-icon-btn svg {
   width: 1.35rem;
   height: 1.35rem;
@@ -2925,6 +2933,34 @@ footer {
 .enrichment-report-pending p {
   margin: 0;
   color: var(--muted);
+}
+
+/* What the walker said, in their own voice, above the machine's reply. */
+.enrichment-transcripts {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.enrichment-transcript {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--line);
+  color: var(--ink);
+}
+
+.enrichment-transcript p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.enrichment-transcript footer {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .enrichment-markdown {

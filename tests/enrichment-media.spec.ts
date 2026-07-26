@@ -32,31 +32,33 @@ test("unsupported media needs attention without calling the gateway or switching
   const blobs = createMemoryBlobStore(NS);
   let gatewayCalls = 0;
 
+  // Audio is transcribed before the gateway runs (see
+  // enrichment-transcription.spec.ts); video has no such escape hatch.
   await threads.upsertCaptures("user_a", [
     {
-      id: "cap-audio",
-      text: "Owl call recording",
+      id: "cap-owl-video",
+      text: "Owl in the larch",
       createdAt: "2026-07-18T12:00:00.000Z",
       location: null,
       threadId: null,
       sequence: 1,
-      idempotencyKey: "cap-audio",
+      idempotencyKey: "cap-owl-video",
       attachments: [
         {
-          id: "att-audio",
-          kind: "audio",
-          mimeType: "audio/webm",
-          fileName: "owl.webm",
+          id: "att-owl-video",
+          kind: "video",
+          mimeType: "video/mp4",
+          fileName: "owl.mp4",
         },
       ],
     },
   ]);
   await blobs.put({
     userId: "user_a",
-    attachmentId: "att-audio",
-    mimeType: "audio/webm",
+    attachmentId: "att-owl-video",
+    mimeType: "video/mp4",
     bytes: new Uint8Array([1, 2, 3]),
-    operationId: "op-audio",
+    operationId: "op-owl-video",
   });
 
   const result = await processPendingEnrichments("user_a", enrichment, {
@@ -73,7 +75,7 @@ test("unsupported media needs attention without calling the gateway or switching
 
   expect(gatewayCalls).toBe(0);
   expect(result.results[0]?.status).toBe("needs_attention");
-  expect(result.results[0]?.reason).toContain("unsupported_media_audio");
+  expect(result.results[0]?.reason).toContain("unsupported_media_video");
 });
 
 test("image Enrichment passes original bytes, place context, and retained sources", async () => {

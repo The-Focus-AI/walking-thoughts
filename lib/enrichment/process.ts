@@ -10,9 +10,10 @@ import { getPushRepository } from "@/lib/push/repository";
 import { createWebPushSender } from "@/lib/push/send";
 import type { PushRepository, PushSender } from "@/lib/push/types";
 import type { Project, ThreadRepository } from "@/lib/sync/types";
-import { assertModelSupportsMedia } from "./capabilities";
+import { assertModelSupportsMedia, getModelCapabilities } from "./capabilities";
 import {
   isPermanentEnrichmentError,
+  isTranscribableAudioFailure,
   MAX_ENRICHMENT_ATTEMPTS,
 } from "./failures";
 import { enrichmentSystemAndModel, getGatewayClient } from "./gateway";
@@ -28,6 +29,10 @@ import {
 } from "./research";
 import type { WebSearchClient } from "./search";
 import { buildEnrichmentPrompt } from "./system-instruction";
+import {
+  getTranscriptionClient,
+  type TranscriptionClient,
+} from "./transcription";
 import type {
   EnrichmentBatchResponse,
   EnrichmentCaptureResult,
@@ -35,6 +40,7 @@ import type {
   EnrichmentMemoryPatch,
   EnrichmentRepository,
   EnrichmentThreadSnapshot,
+  EnrichmentTranscript,
   FrozenHistoryEntry,
   GatewayClient,
   GatewayMediaPart,
@@ -85,7 +91,16 @@ function hasOpenEnrichJob(
       job.threadId === threadId &&
       (job.status === "queued" ||
         job.status === "running" ||
-        (job.status === "failed" && !isStaleModelFailure(job, model))),
+        (job.status === "failed" &&
+          !isStaleModelFailure(job, model) &&
+          !isStaleAudioFailure(job))),
+  );
+}
+
+/** Audio the pipeline refused before it could transcribe (ADR 0014). */
+function isStaleAudioFailure(job: EnrichmentJob): boolean {
+  return (
+    job.status === "failed" && isTranscribableAudioFailure(job.error ?? "")
   );
 }
 
@@ -147,9 +162,16 @@ async function queueJobsForThreads(
     const retryingUnderNewModel = openJobs.some(
       (job) => job.threadId === thread.id && isStaleModelFailure(job, model),
     );
+    // Same idea for audio refused before transcription existed: one fresh job,
+    // keyed so it never re-runs after it succeeds.
+    const retryingWithTranscription = openJobs.some(
+      (job) => job.threadId === thread.id && isStaleAudioFailure(job),
+    );
     const idempotencyKey = retryingUnderNewModel
       ? `enrich:${thread.id}:r${thread.revision}:${model}`
-      : `enrich:${thread.id}:r${thread.revision}`;
+      : retryingWithTranscription
+        ? `enrich:${thread.id}:r${thread.revision}:stt`
+        : `enrich:${thread.id}:r${thread.revision}`;
     const existing = await repository.getOrCreateJob(userId, {
       id: createJobId(),
       idempotencyKey,
@@ -200,6 +222,7 @@ async function loadMediaParts(
       }
       media.push({
         attachmentId: attachment.id,
+        captureId: entry.id,
         kind: attachment.kind,
         mimeType: attachment.mimeType,
         fileName: attachment.fileName,
@@ -208,6 +231,42 @@ async function loadMediaParts(
     }
   }
   return { media, kinds };
+}
+
+/**
+ * Speech-to-text for every audio attachment, before the Enrichment model sees
+ * anything. A held-button audio Capture is words the walker spoke; turning it
+ * into text here means a text-and-image model can still write the report, and
+ * the walker gets a verbatim record either way. A transcription outage fails
+ * the job retryably rather than silently dropping what was said.
+ */
+async function transcribeAudioParts(
+  media: GatewayMediaPart[],
+  transcriber: TranscriptionClient,
+): Promise<EnrichmentTranscript[]> {
+  const transcripts: EnrichmentTranscript[] = [];
+  for (const part of media) {
+    if (part.kind !== "audio") continue;
+    let result;
+    try {
+      result = await transcriber.transcribe({
+        attachmentId: part.attachmentId,
+        mimeType: part.mimeType,
+        fileName: part.fileName,
+        bytes: part.bytes,
+      });
+    } catch {
+      throw new Error(`transcription_unavailable_${part.attachmentId}`);
+    }
+    transcripts.push({
+      attachmentId: part.attachmentId,
+      captureId: part.captureId ?? "",
+      fileName: part.fileName,
+      text: result.text.trim(),
+      model: result.model,
+    });
+  }
+  return transcripts;
 }
 
 async function resolvePlaces(
@@ -236,6 +295,7 @@ async function runJob(
   threadsById: Map<string, EnrichmentThreadSnapshot>,
   system: string,
   blobStore: PrivateBlobStore,
+  transcriber: TranscriptionClient,
   placeResolver: NearbyPlaceResolver,
   search: ResearchClient | undefined,
   memoryRepository: WalkerMemoryRepository,
@@ -291,7 +351,25 @@ async function runJob(
       running.targetCaptureIds,
       blobStore,
     );
-    const capability = assertModelSupportsMedia(running.model, kinds);
+
+    const transcripts = await transcribeAudioParts(media, transcriber);
+    // Audio that has already been transcribed no longer needs a model that
+    // decodes it — the words are in the prompt. Anything else (video, images)
+    // still has to be readable, and stops the job when it is not.
+    const transcribed = new Set(
+      transcripts.map((transcript) => transcript.attachmentId),
+    );
+    const modelReadsAudio = getModelCapabilities(running.model).audio;
+    const readableMedia = modelReadsAudio
+      ? media
+      : media.filter(
+          (part) =>
+            part.kind !== "audio" || !transcribed.has(part.attachmentId),
+        );
+    const readableKinds = modelReadsAudio
+      ? kinds
+      : readableMedia.map((part) => part.kind);
+    const capability = assertModelSupportsMedia(running.model, readableKinds);
     if (!capability.ok) {
       await repository.markJobFailed(userId, running.id, capability.reason);
       await maybeNotify(userId, push, {
@@ -371,13 +449,14 @@ async function runJob(
       placesByCaptureId,
       walkerProfile: walkerProfile ?? EMPTY_PROFILE_HINT,
       projects: projects.map((project) => project.name),
+      transcripts,
     });
     const generation = await gateway.generate({
       model: running.model,
       system,
       prompt,
       requestTitle,
-      media,
+      media: readableMedia,
       search,
       memory: memoryTool,
     });
@@ -398,6 +477,7 @@ async function runJob(
       sources: generation.sources,
       research: generation.research,
       memoryPatches: appliedPatches,
+      transcripts,
     });
 
     // File the Thread into the guessed Project — but only while it is still
@@ -460,6 +540,7 @@ export async function processPendingEnrichments(
     environment?: Record<string, string | undefined>;
     threadRepository?: ThreadRepository;
     blobStore?: PrivateBlobStore;
+    transcriber?: TranscriptionClient;
     placeResolver?: NearbyPlaceResolver;
     search?: WebSearchClient | ResearchClient;
     memoryRepository?: WalkerMemoryRepository;
@@ -473,6 +554,7 @@ export async function processPendingEnrichments(
   const blobStore =
     options.blobStore ??
     getPrivateBlobStore(environment as NodeJS.ProcessEnv);
+  const transcriber = options.transcriber ?? getTranscriptionClient(environment);
   const placeResolver =
     options.placeResolver ?? getNearbyPlaceResolver(environment);
   const search = options.search
@@ -520,6 +602,7 @@ export async function processPendingEnrichments(
       threadsById,
       system,
       blobStore,
+      transcriber,
       placeResolver,
       search,
       memoryRepository,

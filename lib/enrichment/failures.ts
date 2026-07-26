@@ -15,8 +15,20 @@ const MISSING_MEDIA = /^missing_original_media_/;
  */
 const UNSUPPORTED_MEDIA = /^model_.+_unsupported_media_/;
 
+/**
+ * Audio-only refusals from before transcription existed (ADR 0014). They are
+ * still permanent *for that job* — its report was never written — but the
+ * Thread is enrichable again under any model now that speech-to-text runs
+ * first, so the queue offers it one fresh job.
+ */
+const TRANSCRIBABLE_AUDIO = /^model_.+_unsupported_media_audio$/;
+
 export function isPermanentEnrichmentError(reason: string): boolean {
   return MISSING_MEDIA.test(reason) || UNSUPPORTED_MEDIA.test(reason);
+}
+
+export function isTranscribableAudioFailure(reason: string): boolean {
+  return TRANSCRIBABLE_AUDIO.test(reason);
 }
 
 /**

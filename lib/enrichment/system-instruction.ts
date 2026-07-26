@@ -1,6 +1,11 @@
 import type { CaptureLocation } from "@/lib/local-capture/types";
 import type { NearbyPlace } from "./place";
-import { THREAD_KINDS, type FrozenHistoryEntry, type ThreadKind } from "./types";
+import {
+  THREAD_KINDS,
+  type EnrichmentTranscript,
+  type FrozenHistoryEntry,
+  type ThreadKind,
+} from "./types";
 
 /**
  * What each kind of Capture actually wants back. A walker does not capture
@@ -26,6 +31,7 @@ export const DEFAULT_ENRICHMENT_SYSTEM_INSTRUCTION = [
   "When you research — for a question, and sparingly for anything else — use web_search and read_page: search for candidate pages, read the most promising ones in full, and only cite pages you actually read.",
   "Write the Enrichment as compact markdown: short paragraphs, bold key facts, bullet lists where they help; cite sources inline by title and URL.",
   "Use original attached media when present; never invent transcriptions or extracted frames the app did not supply.",
+  "An audio Capture arrives as a supplied transcript: treat it as the walker speaking to you, quote it rather than paraphrasing when the words matter, and say so plainly when speech-to-text clearly garbled a name instead of guessing at what was meant.",
   "Distinguish sourced findings from your own interpretation, and state assumptions briefly.",
   "Never guess at a name you do not recognize. When a Capture turns on a person, client, project, place, or garbled word you cannot identify from the history, the walker profile, or research, say plainly that you do not know it, report only what you can honestly say, and ask one specific question — do not substitute a public subject that merely sounds similar.",
   "Leave the kind out when you genuinely cannot tell what the Thread is; an unclassified Thread with a question is worth more than a confident wrong one.",
@@ -64,7 +70,17 @@ export function buildEnrichmentPrompt(input: {
   walkerProfile?: string | null;
   /** The walker's Project names; the guess may only come from this list. */
   projects?: string[];
+  /** Speech-to-text for audio attachments, produced before this call. */
+  transcripts?: EnrichmentTranscript[];
 }): string {
+  const transcripts = input.transcripts ?? [];
+  const transcriptsByCaptureId = new Map<string, EnrichmentTranscript[]>();
+  for (const transcript of transcripts) {
+    const existing = transcriptsByCaptureId.get(transcript.captureId) ?? [];
+    existing.push(transcript);
+    transcriptsByCaptureId.set(transcript.captureId, existing);
+  }
+
   const historyBlock = input.history
     .map((entry) => {
       if (entry.kind === "enrichment") {
@@ -79,7 +95,16 @@ export function buildEnrichmentPrompt(input: {
               .map((attachment) => `${attachment.kind}:${attachment.fileName}`)
               .join(", ")}`
           : "";
-      return `- [capture ${entry.id}${when}; ${where}${media}] ${entry.text}`;
+      const line = `- [capture ${entry.id}${when}; ${where}${media}] ${entry.text}`;
+      // A recording that transcribed to nothing says so: silence is a fact
+      // about the Capture, not a reason to leave the model guessing.
+      const spoken = (transcriptsByCaptureId.get(entry.id) ?? []).map(
+        (transcript) =>
+          `  - [transcript of ${transcript.fileName}, by ${transcript.model}] ${
+            transcript.text.trim() || "(no speech detected)"
+          }`,
+      );
+      return [line, ...spoken].join("\n");
     })
     .join("\n");
   const targets = input.targetCaptureIds.join(", ");
@@ -104,6 +129,11 @@ export function buildEnrichmentPrompt(input: {
   ];
   if (input.walkerProfile) {
     sections.push(input.walkerProfile);
+  }
+  if (transcripts.length > 0) {
+    sections.push(
+      "Audio Captures are supplied as transcripts under the Capture they belong to. They are the walker's spoken words, machine-transcribed, so names and jargon may be misheard — never invent a transcript the app did not supply.",
+    );
   }
   sections.push(
     "Research with the web_search and read_page tools when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",

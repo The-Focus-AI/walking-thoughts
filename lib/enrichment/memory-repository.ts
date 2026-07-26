@@ -201,6 +201,7 @@ export function createMemoryEnrichmentRepository(
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
+          transcripts: enrichment.transcripts ?? [],
         };
         db.enrichments.set(`${userId}:${enrichmentId}`, stored);
         if (enrichment.title && threadRepository.updateThreadTitle) {

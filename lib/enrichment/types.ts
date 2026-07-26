@@ -50,6 +50,19 @@ export type EnrichmentJob = {
   error?: string;
 };
 
+/**
+ * What an audio attachment actually said, produced by a speech-to-text model
+ * before the Enrichment ran. Retained with the Enrichment so the walker reads
+ * their own words back, and which model heard them.
+ */
+export type EnrichmentTranscript = {
+  attachmentId: string;
+  captureId: string;
+  fileName: string;
+  text: string;
+  model: string;
+};
+
 /** One walker-profile change the model made while writing this Enrichment. */
 export type EnrichmentMemoryPatch = {
   patchId: string;
@@ -79,6 +92,8 @@ export type ThreadEnrichment = {
   research?: ResearchStep[];
   /** Walker-profile changes this Enrichment made via memory_patch. */
   memoryPatches?: EnrichmentMemoryPatch[];
+  /** Speech-to-text for the audio Captures this Enrichment was written from. */
+  transcripts?: EnrichmentTranscript[];
 };
 
 export type EnrichmentCaptureResult = {
@@ -98,6 +113,8 @@ export type EnrichmentBatchResponse = {
 
 export type GatewayMediaPart = {
   attachmentId: string;
+  /** The Capture this attachment hangs off, for per-Capture transcripts. */
+  captureId?: string;
   kind: MediaKind;
   mimeType: string;
   fileName: string;
@@ -212,6 +229,7 @@ export type EnrichmentRepository = {
       sources: EnrichmentSource[];
       research?: ResearchStep[];
       memoryPatches?: EnrichmentMemoryPatch[];
+      transcripts?: EnrichmentTranscript[];
     },
   ): Promise<{ job: EnrichmentJob; enrichment: ThreadEnrichment; created: boolean }>;
   requeueFailed(userId: string, jobId?: string): Promise<number>;
