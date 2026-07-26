@@ -123,3 +123,12 @@ citations still open, and no `allow-scripts` in either layer. That is why
 - The design tokens live in `lib/artifacts/design-system.ts` because a
   serverless function cannot read DESIGN.md at run time; a test parses
   DESIGN.md's front matter and fails if the two disagree.
+- Both publish seams say what they did. The completeness floor, the retry,
+  and the report fallback all change a page silently, and both seams
+  swallow their failures on purpose, so `lib/artifacts/log.ts` writes one
+  prefixed line per publish — `artifact.publish` with the outcome and the
+  completeness ratio, `artifact.publish.failed` with the reason and the
+  error. Hosted logs capture request paths, not response bodies, so the
+  `outcome` returned to the client answered nobody in production: without
+  these lines there is no way to tell a page that was laid out from one
+  that was salvaged, or to learn why the queue's pages went missing.

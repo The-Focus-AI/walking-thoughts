@@ -1,4 +1,5 @@
 import { publishThreadArtifact } from "@/lib/artifacts/build";
+import { logPublishFailure, logPublishOutcome } from "@/lib/artifacts/log";
 import { earnsArtifact } from "@/lib/artifacts/eligibility";
 import type { ArtifactRepository } from "@/lib/artifacts/types";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
@@ -93,7 +94,7 @@ async function maybePublishArtifact(
     (entry) => entry.kind === "capture" && targets.has(entry.id),
   );
   try {
-    await publishThreadArtifact({
+    const { created, outcome, completeness } = await publishThreadArtifact({
       userId,
       threadTitle: input.threadTitle,
       enrichment: input.enrichment,
@@ -118,8 +119,22 @@ async function maybePublishArtifact(
       gateway: artifacts.gateway,
       model: input.model,
     });
-  } catch {
-    // The report stands; the page can be published again from the desk.
+    logPublishOutcome({
+      source: "queue",
+      threadId: input.enrichment.threadId,
+      outcome,
+      created,
+      completeness,
+    });
+  } catch (error) {
+    // The report stands; the page can be published again from the desk. The
+    // reason still gets said, or nothing ever learns why the queue's pages
+    // went missing.
+    logPublishFailure({
+      source: "queue",
+      threadId: input.enrichment.threadId,
+      error,
+    });
   }
 }
 
