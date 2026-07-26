@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "@/components/app-nav";
+import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
 import {
   artifactHref,
@@ -90,6 +91,7 @@ function ThreadRow({
   projects,
   showDay,
   artifact,
+  onOpenReport,
   onFiled,
   onProjectCreated,
 }: {
@@ -99,6 +101,8 @@ function ThreadRow({
   showDay?: boolean;
   /** The published page for this Thread, when its report earned one. */
   artifact?: ArtifactSummary;
+  /** Set at the desk, where the report opens in place instead of a new tab. */
+  onOpenReport?: (artifact: ArtifactSummary) => void;
   onFiled: () => void;
   onProjectCreated: (project: Project) => void;
 }) {
@@ -115,6 +119,10 @@ function ThreadRow({
         "thread-row",
         selected ? "thread-row-selected" : "",
         view.thread.reviewedAt ? "thread-row-filed" : "",
+        // An unread report is the reason to sit down: the row takes the
+        // Annotation's own mark — sky left rule over a sky tint — until it
+        // is filed, and then reads as an ordinary row that has a page.
+        artifact && !view.thread.reviewedAt ? "thread-row-report" : "",
         status.tone === "attention" && !view.thread.reviewedAt
           ? "thread-row-attention"
           : "",
@@ -127,6 +135,16 @@ function ThreadRow({
         {words && words !== view.thread.title ? (
           <span className="thread-row-words">{words}</span>
         ) : null}
+        {/* What the report says it is about, so the walker knows whether to
+            open it without opening it. */}
+        {artifact?.standfirst ? (
+          <span
+            className="thread-row-standfirst"
+            data-testid="thread-standfirst"
+          >
+            {artifact.standfirst}
+          </span>
+        ) : null}
         <span className="thread-row-meta">
           {showDay ? `${dayTitle(view.dayKey)} · ` : ""}
           {view.enrichments.length}{" "}
@@ -138,14 +156,25 @@ function ThreadRow({
       <div className="thread-row-side">
         {artifact ? (
           <a
-            className="thread-row-artifact"
+            className={
+              view.thread.reviewedAt
+                ? "thread-row-artifact"
+                : "thread-row-artifact unread"
+            }
             href={artifactHref(artifact.id)}
-            target="_blank"
+            target={onOpenReport ? undefined : "_blank"}
             rel="noreferrer"
             data-testid="thread-artifact-link"
             title={artifact.standfirst ?? "Read the published report"}
+            onClick={(event) => {
+              // At the desk the report opens over the day; on the phone the
+              // href stands and the page opens on its own.
+              if (!onOpenReport || event.metaKey || event.ctrlKey) return;
+              event.preventDefault();
+              onOpenReport(artifact);
+            }}
           >
-            Report
+            Read report
           </a>
         ) : null}
         {view.thread.projectName ? (
@@ -230,6 +259,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const [artifacts, setArtifacts] = useState<Map<string, ArtifactSummary>>(
     () => new Map(),
   );
+  /** The report being read over the day; desk only. */
+  const [openReport, setOpenReport] = useState<ArtifactSummary | null>(null);
+  const atTheDesk = useDeskViewport();
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -258,6 +290,15 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       // has a report says so before the network answers, and offline.
       setArtifacts(artifactsByThread(readCachedArtifacts()));
 
+      // One request for the whole desk, and independent of the per-Thread
+      // Enrichment refresh below — which Threads have a report waiting is
+      // the first thing the day needs, and must not queue behind a slow or
+      // hanging Enrichment fetch.
+      void loadArtifacts().then((published) => {
+        if (generation !== loadGeneration.current) return;
+        setArtifacts(artifactsByThread(published));
+      });
+
       // Only ask the server about Threads whose answer can still change: the
       // one being read, and any still working. A settled Thread's Enrichments
       // are immutable, so refetching the whole corpus every sync cycle bought
@@ -279,10 +320,6 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       );
       if (generation !== loadGeneration.current) return;
       setThreads(refreshed);
-
-      const published = await loadArtifacts();
-      if (generation !== loadGeneration.current) return;
-      setArtifacts(artifactsByThread(published));
     } catch {
       if (generation !== loadGeneration.current) return;
       setError("Could not load Threads");
@@ -320,6 +357,12 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     );
   }, []);
 
+  /** Which Threads have a published page, for the day sheets to count. */
+  const reportThreadIds = useMemo(
+    () => new Set(artifacts.keys()),
+    [artifacts],
+  );
+
   /** Newest day first; Threads inside a day keep the store's own order. */
   const byDay = useMemo(() => {
     const groups = new Map<string, ThreadListView[]>();
@@ -355,15 +398,22 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     [threads, selectedDayKey],
   );
 
-  /** Unfiled work first: the reason to sit down is what is still open. */
+  /**
+   * Unfiled work first — the reason to sit down is what is still open — and
+   * within that, the Threads with a report waiting. Those are the ones the
+   * day actually left to read; the rest are glanced at and filed.
+   */
   const orderedDayThreads = useMemo(
     () =>
       [...dayThreads].sort((a, b) => {
         const aFiled = a.thread.reviewedAt ? 1 : 0;
         const bFiled = b.thread.reviewedAt ? 1 : 0;
-        return aFiled - bFiled;
+        if (aFiled !== bFiled) return aFiled - bFiled;
+        const aRead = artifacts.has(a.thread.id) ? 0 : 1;
+        const bRead = artifacts.has(b.thread.id) ? 0 : 1;
+        return aRead - bRead;
       }),
-    [dayThreads],
+    [dayThreads, artifacts],
   );
 
   /** Threads in display order (day by day) for swipe stepping. */
@@ -508,6 +558,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   selected={view.thread.id === selectedThreadId}
                   projects={projects}
                   artifact={artifacts.get(view.thread.id)}
+                  onOpenReport={atTheDesk ? setOpenReport : undefined}
                   onFiled={() => void load()}
                   onProjectCreated={onProjectCreated}
                 />
@@ -531,6 +582,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   dayKey,
                   threads: views.map((view) => view.thread),
                   captures: views.flatMap((view) => view.captures),
+                  threadsWithReports: reportThreadIds,
                 });
                 const waiting = sheet.threadCount - sheet.reviewed;
                 const stuck = views.some((view) =>
@@ -538,14 +590,21 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                     (capture) => capture.status === "needs_attention",
                   ),
                 );
+                // A day says the most specific true thing about itself: a
+                // Thread stuck on a question first, then reports waiting to
+                // be read, then work merely unfiled.
                 const state =
                   sheet.needsWord.length > 0
                     ? `${sheet.needsWord.length} need${
                         sheet.needsWord.length === 1 ? "s" : ""
                       } a word`
-                    : waiting > 0
-                      ? `${waiting} waiting`
-                      : "All filed";
+                    : sheet.toRead.length > 0
+                      ? `${sheet.toRead.length} report${
+                          sheet.toRead.length === 1 ? "" : "s"
+                        } to read`
+                      : waiting > 0
+                        ? `${waiting} waiting`
+                        : "All filed";
                 return (
                   <li
                     key={dayKey}
@@ -575,11 +634,19 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                           : ""}
                       </span>
                       <span
-                        className={
+                        className={[
+                          "desk-day-state",
                           waiting > 0 || sheet.needsWord.length > 0
-                            ? "desk-day-state desk-day-state-open"
-                            : "desk-day-state"
-                        }
+                            ? "desk-day-state-open"
+                            : "",
+                          // A day with reading waiting says so in the
+                          // machine's sky, the same voice as the reports.
+                          sheet.needsWord.length === 0 && sheet.toRead.length > 0
+                            ? "desk-day-state-reports"
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         {state}
                       </span>
@@ -624,6 +691,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                       selected={false}
                       projects={projects}
                       artifact={artifacts.get(view.thread.id)}
+                      onOpenReport={atTheDesk ? setOpenReport : undefined}
                       onFiled={() => void load()}
                       onProjectCreated={onProjectCreated}
                     />
@@ -638,6 +706,13 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
           </div>
         )}
       </div>
+
+      {openReport ? (
+        <ArtifactLightbox
+          artifact={openReport}
+          onClose={() => setOpenReport(null)}
+        />
+      ) : null}
 
       <AppNav />
     </main>

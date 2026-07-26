@@ -8,6 +8,7 @@ import {
   writeDayChat,
   type DayChatMessage,
 } from "@/lib/digest/chat-store";
+import { readCachedArtifacts } from "@/lib/artifacts/client";
 import { collectDayCorpus } from "@/lib/digest/corpus";
 import { summarizeDay, type DaySheet } from "@/lib/digest/day-sheet";
 import type { DayCorpusEntry, DayDigestResult } from "@/lib/digest/types";
@@ -136,6 +137,12 @@ function DaySheetPanel({ sheet }: { sheet: DaySheet }) {
             <dd>{sheet.photoCount}</dd>
           </div>
         ) : null}
+        {sheet.toRead.length > 0 ? (
+          <div data-testid="day-sheet-reports">
+            <dt>To read</dt>
+            <dd>{sheet.toRead.length}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Reviewed</dt>
           <dd>
@@ -209,7 +216,18 @@ export function DailyDigestPanel({
         store.listRecentThreads(),
       ]);
       if (!active) return;
-      setSheet(summarizeDay({ threads, captures, dayKey }));
+      setSheet(
+        summarizeDay({
+          threads,
+          captures,
+          dayKey,
+          // The retained list: the sheet paints offline, and the desk has
+          // already refreshed it from the server by the time a day opens.
+          threadsWithReports: new Set(
+            readCachedArtifacts().map((artifact) => artifact.threadId),
+          ),
+        }),
+      );
     };
     void load().catch(() => undefined);
     return () => {

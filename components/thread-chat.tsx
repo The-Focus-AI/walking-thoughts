@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
+import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import { statusLabel } from "@/components/thread-entries";
 import {
   artifactHref,
@@ -301,6 +302,9 @@ export function ThreadChat({
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
   const [publishing, setPublishing] = useState(false);
+  /** The report being read over the Thread; desk only. */
+  const [reading, setReading] = useState<ArtifactSummary | null>(null);
+  const atTheDesk = useDeskViewport();
   const router = useRouter();
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -526,12 +530,12 @@ export function ThreadChat({
    * desk act for a Thread the queue judged too slight for a page, or one
    * whose page was never written because the gateway was down.
    */
-  async function publishReport() {
+  async function publishReport(republish = false) {
     if (publishing) return;
     setPublishing(true);
     setError(null);
     try {
-      const published = await publishArtifact(threadId);
+      const published = await publishArtifact(threadId, { republish });
       if (published) setArtifact(published);
       else setError("Could not publish this report");
     } finally {
@@ -633,14 +637,34 @@ export function ThreadChat({
             <a
               className="thread-copy-markdown thread-open-report"
               href={artifactHref(artifact.id)}
-              target="_blank"
+              target={atTheDesk ? undefined : "_blank"}
               rel="noreferrer"
               data-testid="thread-open-report"
               title={artifact.standfirst ?? "Read the published report"}
+              onClick={(event) => {
+                // At the desk the report reads over the Thread; on the phone
+                // the href stands and the page opens on its own.
+                if (!atTheDesk || event.metaKey || event.ctrlKey) return;
+                event.preventDefault();
+                setReading(artifact);
+              }}
             >
               Open report
             </a>
-          ) : !embedded && enrichments.length > 0 ? (
+          ) : null}
+          {artifact && !embedded ? (
+            <button
+              type="button"
+              className="thread-copy-markdown"
+              data-testid="thread-republish-report"
+              onClick={() => void publishReport(true)}
+              disabled={publishing || !online}
+              title="Write this page again from the Thread's research"
+            >
+              {publishing ? "Publishing…" : "Rebuild"}
+            </button>
+          ) : null}
+          {!artifact && !embedded && enrichments.length > 0 ? (
             <button
               type="button"
               className="thread-copy-markdown"
@@ -826,6 +850,13 @@ export function ThreadChat({
           </button>
         </div>
       </footer>
+
+      {reading ? (
+        <ArtifactLightbox
+          artifact={reading}
+          onClose={() => setReading(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -93,6 +93,13 @@ async function maybePublishArtifact(
       captureWords: walkerEntries
         .map((entry) => entry.text.trim())
         .filter((text) => text.length > 0),
+      // Everything the Thread already worked out. A Thread the walker
+      // replied to has its answers spread across several reports, and the
+      // page is where they finally sit together.
+      priorReports: input.history
+        .filter((entry) => entry.kind === "enrichment")
+        .map((entry) => entry.text.trim())
+        .filter((text) => text.length > 0),
       walkedAt: walkerEntries[0]?.createdAt ?? null,
       repository: artifacts.repository,
       gateway: artifacts.gateway,

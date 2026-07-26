@@ -92,4 +92,37 @@ test("a day with no Captures summarizes to nothing", () => {
   expect(sheet.threadCount).toBe(0);
   expect(sheet.kinds).toEqual([]);
   expect(sheet.needsWord).toEqual([]);
+  expect(sheet.toRead).toEqual([]);
+});
+
+test("the day counts the reports still waiting to be read", () => {
+  const threads = [
+    thread({ id: "t-stone", title: "Where the patio stone came from" }),
+    thread({
+      id: "t-pool",
+      title: "Token pool",
+      reviewedAt: "2026-07-23T20:00:00.000Z",
+    }),
+    thread({ id: "t-call", title: "Call the yard", kind: "task" }),
+  ];
+  const captures = [
+    capture({ id: "t-stone", text: "where did we get the stones?" }),
+    capture({ id: "t-pool", text: "token back end idea" }),
+    capture({ id: "t-call", text: "call the yard" }),
+  ];
+
+  const sheet = summarizeDay({
+    dayKey: DAY,
+    threads,
+    captures,
+    // Both have a page; only the unfiled one is still waiting to be read.
+    threadsWithReports: new Set(["t-stone", "t-pool"]),
+  });
+
+  expect(sheet.toRead.map((entry) => entry.title)).toEqual([
+    "Where the patio stone came from",
+  ]);
+
+  // A desk that has not learned which Threads have a page says nothing.
+  expect(summarizeDay({ dayKey: DAY, threads, captures }).toRead).toEqual([]);
 });
