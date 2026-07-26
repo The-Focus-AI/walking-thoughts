@@ -1,4 +1,5 @@
 import { publishThreadArtifact } from "@/lib/artifacts/build";
+import { logPublishFailure, logPublishOutcome } from "@/lib/artifacts/log";
 import { getArtifactRepository } from "@/lib/artifacts/repository";
 import { toArtifactSummary } from "@/lib/artifacts/types";
 import { getGatewayClient } from "@/lib/enrichment/gateway";
@@ -53,29 +54,38 @@ export async function POST(request: Request) {
 
   const covered = new Set(newest.targetCaptureIds);
   try {
-    const { artifact, created, outcome } = await publishThreadArtifact({
-      userId: access.userId,
-      threadTitle: thread.title,
-      enrichment: newest,
-      captureWords: thread.captures
-        .filter((capture) => covered.has(capture.id))
-        .map((capture) => capture.text.trim())
-        .filter((text) => text.length > 0),
-      priorReports: enrichments
-        .slice(0, -1)
-        .map((entry) => entry.text.trim())
-        .filter((text) => text.length > 0),
-      walkedAt: thread.captures[0]?.createdAt ?? null,
-      repository: getArtifactRepository(),
-      gateway: getGatewayClient(),
-      republish,
+    const { artifact, created, outcome, completeness } =
+      await publishThreadArtifact({
+        userId: access.userId,
+        threadTitle: thread.title,
+        enrichment: newest,
+        captureWords: thread.captures
+          .filter((capture) => covered.has(capture.id))
+          .map((capture) => capture.text.trim())
+          .filter((text) => text.length > 0),
+        priorReports: enrichments
+          .slice(0, -1)
+          .map((entry) => entry.text.trim())
+          .filter((text) => text.length > 0),
+        walkedAt: thread.captures[0]?.createdAt ?? null,
+        repository: getArtifactRepository(),
+        gateway: getGatewayClient(),
+        republish,
+      });
+    logPublishOutcome({
+      source: "desk",
+      threadId,
+      outcome,
+      created,
+      completeness,
     });
     return Response.json({
       artifact: toArtifactSummary(artifact),
       created,
       outcome,
     });
-  } catch {
+  } catch (error) {
+    logPublishFailure({ source: "desk", threadId, error });
     return Response.json({ error: "publish_failed" }, { status: 502 });
   }
 }

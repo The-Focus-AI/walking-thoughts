@@ -20,6 +20,7 @@ import {
   resetMemoryArtifactRepository,
 } from "@/lib/artifacts/memory-repository";
 import { checkArtifactCompleteness } from "@/lib/artifacts/completeness";
+import { logPublishFailure, logPublishOutcome } from "@/lib/artifacts/log";
 import {
   ARTIFACT_MAX_OUTPUT_TOKENS,
   ARTIFACT_RETRY_INSTRUCTION,
@@ -752,4 +753,63 @@ test("one walker's page is not another walker's to read", async () => {
   expect(await repository.getArtifact("user_a", artifact.id)).not.toBeNull();
   expect(await repository.getArtifact("user_b", artifact.id)).toBeNull();
   expect(await repository.listArtifacts("user_b")).toEqual([]);
+});
+
+test("publishing says which way the page was arrived at", () => {
+  const lines: string[] = [];
+  const sink = {
+    log: (message: string) => lines.push(message),
+    error: (message: string) => lines.push(message),
+  };
+
+  logPublishOutcome(
+    {
+      source: "queue",
+      threadId: "thread-1",
+      outcome: "report_fallback",
+      created: true,
+      completeness: { ok: false, bodyLength: 120, reportLength: 400, ratio: 0.3 },
+    },
+    sink,
+  );
+
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toContain("artifact.publish ");
+  const payload = JSON.parse(lines[0].replace("artifact.publish ", ""));
+  expect(payload).toMatchObject({
+    source: "queue",
+    threadId: "thread-1",
+    outcome: "report_fallback",
+    created: true,
+    ratio: 0.3,
+    bodyLength: 120,
+    reportLength: 400,
+  });
+});
+
+test("a swallowed publish failure still says why", () => {
+  const lines: string[] = [];
+  const causes: unknown[] = [];
+  const sink = {
+    log: (message: string) => lines.push(message),
+    error: (message: string, cause?: unknown) => {
+      lines.push(message);
+      causes.push(cause);
+    },
+  };
+
+  logPublishFailure(
+    { source: "desk", threadId: "thread-2", error: new Error("gateway down") },
+    sink,
+  );
+
+  expect(lines).toHaveLength(1);
+  const payload = JSON.parse(lines[0].replace("artifact.publish.failed ", ""));
+  expect(payload).toMatchObject({
+    source: "desk",
+    threadId: "thread-2",
+    reason: "gateway down",
+  });
+  // The error itself rides along, so the stack survives the swallow.
+  expect(causes[0]).toBeInstanceOf(Error);
 });
