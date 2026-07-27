@@ -31,6 +31,24 @@ export function isTranscribableAudioFailure(reason: string): boolean {
   return TRANSCRIBABLE_AUDIO.test(reason);
 }
 
+const TRANSCRIPTION_UNAVAILABLE = "transcription_unavailable_";
+
+/**
+ * Audio that failed under a *different* transcription model. Retrying the job
+ * itself is futile — the model is named in the error and it failed every time
+ * — but the Thread is enrichable again once the walker points
+ * AI_TRANSCRIPTION_MODEL somewhere else, so the queue offers it one fresh job.
+ * A failure under the model currently configured is left alone: that is a real
+ * outage, and the ordinary retry is the right answer.
+ */
+export function isStaleTranscriptionFailure(
+  reason: string,
+  model: string,
+): boolean {
+  if (!reason.startsWith(TRANSCRIPTION_UNAVAILABLE)) return false;
+  return !reason.startsWith(`${TRANSCRIPTION_UNAVAILABLE}${model}_`);
+}
+
 /**
  * Backstop for failures no pattern anticipates. A transient outage deserves
  * retries; a job that has failed this many times is not coming back on its

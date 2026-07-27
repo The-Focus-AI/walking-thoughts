@@ -15,6 +15,7 @@ import type { Project, ThreadRepository } from "@/lib/sync/types";
 import { assertModelSupportsMedia } from "./capabilities";
 import {
   isPermanentEnrichmentError,
+  isStaleTranscriptionFailure,
   isTranscribableAudioFailure,
   MAX_ENRICHMENT_ATTEMPTS,
 } from "./failures";
@@ -158,6 +159,7 @@ function hasOpenEnrichJob(
   jobs: EnrichmentJob[],
   threadId: string,
   model: string,
+  transcriptionModel: string,
 ): boolean {
   return jobs.some(
     (job) =>
@@ -166,7 +168,8 @@ function hasOpenEnrichJob(
         job.status === "running" ||
         (job.status === "failed" &&
           !isStaleModelFailure(job, model) &&
-          !isStaleAudioFailure(job))),
+          !isStaleAudioFailure(job) &&
+          !isStaleTranscriptionFailure(job.error ?? "", transcriptionModel))),
   );
 }
 
@@ -217,6 +220,7 @@ async function queueJobsForThreads(
   userId: string,
   repository: EnrichmentRepository,
   model: string,
+  transcriptionModel: string,
 ): Promise<void> {
   const [threads, openJobs] = await Promise.all([
     repository.listPendingThreads(userId),
@@ -224,7 +228,8 @@ async function queueJobsForThreads(
   ]);
 
   for (const thread of threads) {
-    if (hasOpenEnrichJob(openJobs, thread.id, model)) continue;
+    if (hasOpenEnrichJob(openJobs, thread.id, model, transcriptionModel))
+      continue;
     const targetCaptureIds = pendingCaptureIds(thread);
     if (targetCaptureIds.length === 0) continue;
 
@@ -240,11 +245,21 @@ async function queueJobsForThreads(
     const retryingWithTranscription = openJobs.some(
       (job) => job.threadId === thread.id && isStaleAudioFailure(job),
     );
+    // And again for audio that a since-replaced transcription model could not
+    // hear: keyed by the model now configured, so the fresh job is offered
+    // once per change rather than on every cycle.
+    const retryingUnderNewTranscription = openJobs.some(
+      (job) =>
+        job.threadId === thread.id &&
+        isStaleTranscriptionFailure(job.error ?? "", transcriptionModel),
+    );
     const idempotencyKey = retryingUnderNewModel
       ? `enrich:${thread.id}:r${thread.revision}:${model}`
       : retryingWithTranscription
         ? `enrich:${thread.id}:r${thread.revision}:stt`
-        : `enrich:${thread.id}:r${thread.revision}`;
+        : retryingUnderNewTranscription
+          ? `enrich:${thread.id}:r${thread.revision}:stt:${transcriptionModel}`
+          : `enrich:${thread.id}:r${thread.revision}`;
     const existing = await repository.getOrCreateJob(userId, {
       id: createJobId(),
       idempotencyKey,
@@ -326,8 +341,19 @@ async function transcribeAudioParts(
         fileName: part.fileName,
         bytes: part.bytes,
       });
-    } catch {
-      throw new Error(`transcription_unavailable_${part.attachmentId}`);
+    } catch (cause) {
+      // Name the model in the failure: a wrong one (a realtime-only model
+      // asked to transcribe a file) fails every attempt identically, and
+      // without the name the job records only that audio did not become
+      // words. It also lets the queue offer the Thread a fresh job once the
+      // model changes, the way a permanent media refusal already does.
+      console.error(
+        `transcription failed via ${transcriber.model} for ${part.fileName}:`,
+        cause,
+      );
+      throw new Error(
+        `transcription_unavailable_${transcriber.model}_${part.attachmentId}`,
+      );
     }
     transcripts.push({
       attachmentId: part.attachmentId,
@@ -707,7 +733,7 @@ export async function processPendingEnrichments(
     await repository.requeueFailed(userId);
   }
 
-  await queueJobsForThreads(userId, repository, model);
+  await queueJobsForThreads(userId, repository, model, transcriber.model);
 
   const threads = await repository.listPendingThreads(userId);
   const threadsById = new Map(threads.map((thread) => [thread.id, thread]));
