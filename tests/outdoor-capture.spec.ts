@@ -151,6 +151,32 @@ test("video record stages a preview draft instead of auto-committing", async ({
   );
 });
 
+test("the context line carries one weather chip when a forecast is known", async ({
+  context,
+  page,
+}) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 41.95, longitude: -73.51 });
+  await page.route("**://api.open-meteo.com/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        current: {
+          temperature_2m: 54.2,
+          wind_speed_10m: 8.1,
+          wind_direction_10m: 315,
+          weather_code: 1,
+          time: "2026-07-27T10:00",
+        },
+        hourly: { time: [], precipitation_probability: [] },
+      }),
+    }),
+  );
+
+  await page.goto("/offline");
+  await expect(page.getByTestId("capture-weather")).toHaveText("54°F NW 8 MPH");
+});
+
 test("capture dock fits narrow phones without horizontal scrolling", async ({
   page,
 }) => {

@@ -40,6 +40,9 @@ import {
   type SyncCycleResult,
 } from "@/lib/sync/cycle";
 import { syncRollup } from "@/lib/sync/rollup";
+import { fetchWeatherSnapshot } from "@/lib/weather/fetch";
+import { formatWeatherCell } from "@/lib/weather/format";
+import type { WeatherSnapshot } from "@/lib/weather/types";
 
 /**
  * Below this, a press on the mic is a tap: recording stays on until the walker
@@ -92,6 +95,7 @@ export function CaptureComposer() {
     status: "idle",
   });
   const [pushBusy, setPushBusy] = useState(false);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const draftSaveGeneration = useRef(0);
   const syncGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -223,6 +227,40 @@ export function CaptureComposer() {
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drain via runForegroundSync
   }, [ready, online, captures]);
+
+  // Conditions as one quiet chip in the context line — never a panel. Wait
+  // for a GPS fix (a few seconds at most), then fetch the forecast; offline
+  // it falls back to the cached snapshot, and with no data the chip is
+  // simply absent.
+  useEffect(() => {
+    let cancelled = false;
+
+    const request = () => {
+      const fix = readAvailableLocation();
+      if (!fix) return false;
+      void fetchWeatherSnapshot(fix.latitude, fix.longitude).then(
+        (snapshot) => {
+          if (!cancelled && snapshot) setWeather(snapshot);
+        },
+      );
+      return true;
+    };
+
+    if (request()) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const timer = window.setInterval(() => {
+      if (request()) window.clearInterval(timer);
+    }, 400);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 8_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, []);
 
   useEffect(() => {
     if (!ready || isPending) return;
@@ -408,6 +446,7 @@ export function CaptureComposer() {
   }
 
   const gps = readAvailableLocation();
+  const weatherCell = weather ? formatWeatherCell(weather) : null;
   const rollup = syncRollup(captures.map((capture) => capture.status));
   const desk = summarizeDesk({ threads, captures });
   const waiting = deskWaitingLabel(desk);
@@ -601,6 +640,16 @@ export function CaptureComposer() {
           <span>Hold the mic to talk</span>
           <span aria-hidden="true">·</span>
           <span>GPS {gps ? "on" : "off"}</span>
+          {weatherCell ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span data-testid="capture-weather">
+                {weatherCell.sublabel === "Weather"
+                  ? weatherCell.value
+                  : `${weatherCell.value} ${weatherCell.sublabel}`}
+              </span>
+            </>
+          ) : null}
           <span aria-hidden="true">·</span>
           <span>{online ? "Online" : "Offline — saves to this phone"}</span>
           {saveConfirmation ? (
