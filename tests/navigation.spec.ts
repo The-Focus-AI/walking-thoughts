@@ -92,6 +92,34 @@ test.describe("streamlined navigation", () => {
     await expect(tabbar()).toBeVisible();
   });
 
+  test("a day tap still lands when the router's fetch hangs", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await commitCapture(page, "Deer trail above the quarry");
+
+    // One bar of signal: every client-side route payload fetch stalls
+    // forever. The tap must still land via the full-navigation fallback.
+    await page.route(/[?&]_rsc=/, () => {
+      // Never fulfilled, never continued — a hung fetch.
+    });
+
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
+    await expect(page).toHaveURL(/\/days\/\d{4}-\d{2}-\d{2}/, {
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId("daily-digest")).toBeVisible();
+
+    // And out of the day the same way.
+    await page
+      .getByRole("link", { name: /Deer trail above the quarry/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/threads\//, { timeout: 10_000 });
+    await expect(page.getByTestId("thread-chat")).toBeVisible();
+  });
+
   test("Thread view keeps the tab bar so it is never a dead end", async ({
     page,
   }) => {

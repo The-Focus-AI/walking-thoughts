@@ -9,6 +9,7 @@ import {
   AttachmentThumb,
   MediaLightbox,
 } from "@/components/media-lightbox";
+import { useLinkFallback } from "@/components/use-link-fallback";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
 import {
   artifactHref,
@@ -104,6 +105,7 @@ function ThreadRow({
   onFiled: () => void;
   onProjectCreated: (project: Project) => void;
 }) {
+  const onLinkClick = useLinkFallback();
   const status = threadStatus(view.captures);
   const words = view.captures[0]?.text ?? "";
   const mediaCount = view.captures.reduce(
@@ -134,7 +136,11 @@ function ThreadRow({
         .filter(Boolean)
         .join(" ")}
     >
-      <Link className="thread-row-main" href={`/threads/${view.thread.id}`}>
+      <Link
+        className="thread-row-main"
+        href={`/threads/${view.thread.id}`}
+        onClick={(event) => onLinkClick(event, `/threads/${view.thread.id}`)}
+      >
         <span className="thread-row-title">{view.thread.title}</span>
         {words && words !== view.thread.title ? (
           <span className="thread-row-words">{words}</span>
@@ -278,6 +284,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const [openReport, setOpenReport] = useState<ArtifactSummary | null>(null);
   const [openMedia, setOpenMedia] = useState<LocalAttachment | null>(null);
   const atTheDesk = useDeskViewport();
+  const onLinkClick = useLinkFallback();
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -611,13 +618,20 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                 the rows carry their report and media, openable in place. */}
             {atTheDesk && activeDayKey ? (
               <nav className="desk-sidebar-day" aria-label="This day's Threads">
-                <Link className="desk-sidebar-back" href="/days">
+                <Link
+                  className="desk-sidebar-back"
+                  href="/days"
+                  onClick={(event) => onLinkClick(event, "/days")}
+                >
                   ← Days
                 </Link>
                 <Link
                   className="desk-sidebar-day-title"
                   data-testid="desk-sidebar-day"
                   href={`/days/${activeDayKey}`}
+                  onClick={(event) =>
+                    onLinkClick(event, `/days/${activeDayKey}`)
+                  }
                 >
                   {dayTitle(activeDayKey)}
                 </Link>
@@ -687,6 +701,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                       className="desk-day-open"
                       href={`/days/${dayKey}`}
                       data-testid={`open-day-${dayKey}`}
+                      onClick={(event) =>
+                        onLinkClick(event, `/days/${dayKey}`)
+                      }
                     >
                       <span className="desk-day-title">{dayTitle(dayKey)}</span>
                       <span className="desk-day-tally">
