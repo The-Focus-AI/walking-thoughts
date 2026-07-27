@@ -5,6 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
+import {
+  AttachmentThumb,
+  MediaLightbox,
+} from "@/components/media-lightbox";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
 import {
   artifactHref,
@@ -31,6 +35,7 @@ import {
 import { getCaptureStore } from "@/lib/local-capture/store";
 import {
   KIND_LABELS,
+  type LocalAttachment,
   type LocalCapture,
   type LocalThread,
 } from "@/lib/local-capture/types";
@@ -82,6 +87,7 @@ function ThreadRow({
   showDay,
   artifact,
   onOpenReport,
+  onOpenMedia,
   onFiled,
   onProjectCreated,
 }: {
@@ -93,6 +99,8 @@ function ThreadRow({
   artifact?: ArtifactSummary;
   /** Set at the desk, where the report opens in place instead of a new tab. */
   onOpenReport?: (artifact: ArtifactSummary) => void;
+  /** Set at the desk, where a photo or clip opens in place over the day. */
+  onOpenMedia?: (attachment: LocalAttachment) => void;
   onFiled: () => void;
   onProjectCreated: (project: Project) => void;
 }) {
@@ -102,6 +110,12 @@ function ThreadRow({
     (count, capture) => count + capture.attachments.length,
     0,
   );
+  const lookable = view.captures
+    .flatMap((capture) => capture.attachments)
+    .filter(
+      (attachment) =>
+        attachment.kind === "image" || attachment.kind === "video",
+    );
 
   return (
     <li
@@ -143,6 +157,17 @@ function ThreadRow({
           {mediaCount > 0 ? ` · ${mediaCount} media` : ""}
         </span>
       </Link>
+      {onOpenMedia && lookable.length > 0 ? (
+        <div className="thread-row-thumbs" aria-label="Media from this Thread">
+          {lookable.slice(0, 4).map((attachment) => (
+            <AttachmentThumb
+              key={attachment.id}
+              attachment={attachment}
+              onOpen={() => onOpenMedia(attachment)}
+            />
+          ))}
+        </div>
+      ) : null}
       <div className="thread-row-side">
         {artifact ? (
           <a
@@ -251,6 +276,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   );
   /** The report being read over the day; desk only. */
   const [openReport, setOpenReport] = useState<ArtifactSummary | null>(null);
+  const [openMedia, setOpenMedia] = useState<LocalAttachment | null>(null);
   const atTheDesk = useDeskViewport();
   const loadGeneration = useRef(0);
 
@@ -380,12 +406,25 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     });
   }, [threads, query]);
 
+  /**
+   * The day the walker is inside — opened directly, or the day of the
+   * Thread being read. It is what the sidebar shows Threads for.
+   */
+  const activeDayKey = useMemo(() => {
+    if (selectedDayKey) return selectedDayKey;
+    if (!selectedThreadId) return null;
+    return (
+      threads.find((view) => view.thread.id === selectedThreadId)?.dayKey ??
+      null
+    );
+  }, [selectedDayKey, selectedThreadId, threads]);
+
   const dayThreads = useMemo(
     () =>
-      selectedDayKey
-        ? threads.filter((view) => view.dayKey === selectedDayKey)
+      activeDayKey
+        ? threads.filter((view) => view.dayKey === activeDayKey)
         : [],
-    [threads, selectedDayKey],
+    [threads, activeDayKey],
   );
 
   /**
@@ -549,6 +588,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   projects={projects}
                   artifact={artifacts.get(view.thread.id)}
                   onOpenReport={atTheDesk ? setOpenReport : undefined}
+                  onOpenMedia={atTheDesk ? setOpenMedia : undefined}
                   onFiled={() => void load()}
                   onProjectCreated={onProjectCreated}
                 />
@@ -566,6 +606,41 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
               </p>
             ) : null}
 
+            {/* Inside a day at the desk, the sidebar is that day's Threads:
+                the walker steps between them without leaving the day, and
+                the rows carry their report and media, openable in place. */}
+            {atTheDesk && activeDayKey ? (
+              <nav className="desk-sidebar-day" aria-label="This day's Threads">
+                <Link className="desk-sidebar-back" href="/days">
+                  ← Days
+                </Link>
+                <Link
+                  className="desk-sidebar-day-title"
+                  data-testid="desk-sidebar-day"
+                  href={`/days/${activeDayKey}`}
+                >
+                  {dayTitle(activeDayKey)}
+                </Link>
+                <ul
+                  className="threads-day-list"
+                  aria-label={`Threads from ${dayTitle(activeDayKey)}`}
+                >
+                  {orderedDayThreads.map((view) => (
+                    <ThreadRow
+                      key={view.thread.id}
+                      view={view}
+                      selected={view.thread.id === selectedThreadId}
+                      projects={projects}
+                      artifact={artifacts.get(view.thread.id)}
+                      onOpenReport={setOpenReport}
+                      onOpenMedia={setOpenMedia}
+                      onFiled={() => void load()}
+                      onProjectCreated={onProjectCreated}
+                    />
+                  ))}
+                </ul>
+              </nav>
+            ) : (
             <ul className="desk-days" aria-label="Days">
               {byDay.map(([dayKey, views]) => {
                 const sheet = summarizeDay({
@@ -645,6 +720,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                 );
               })}
             </ul>
+            )}
           </>
         )}
       </div>
@@ -671,7 +747,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
             dayKey={selectedDayKey}
             onClose={() => router.push("/days")}
           >
-            {orderedDayThreads.length > 0 ? (
+            {/* At the desk the sidebar already lists this day's Threads;
+                repeating them under the digest would say it twice. */}
+            {orderedDayThreads.length > 0 && !atTheDesk ? (
               <section className="day-threads" aria-label="Threads from this day">
                 <ul className="threads-day-list">
                   {orderedDayThreads.map((view) => (
@@ -701,6 +779,13 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         <ArtifactLightbox
           artifact={openReport}
           onClose={() => setOpenReport(null)}
+        />
+      ) : null}
+
+      {openMedia ? (
+        <MediaLightbox
+          attachment={openMedia}
+          onClose={() => setOpenMedia(null)}
         />
       ) : null}
 
