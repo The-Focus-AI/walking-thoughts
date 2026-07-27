@@ -8,11 +8,17 @@ import { experimental_transcribe as transcribeAudio } from "ai";
  * to a report: speech-to-text first. It also gives the walker their own words
  * back at the desk, which sending bytes to a model never would.
  *
- * The gateway lists five transcription models; this is the newest. `xai/grok-stt`
- * is a tenth the price per second if cost ever matters more than accuracy — one
- * env var, and the model that heard a Capture is recorded on its transcript.
+ * Newest is not the same as callable. The gateway lists five transcription
+ * models, and `openai/gpt-realtime-whisper` — the newest, and briefly the
+ * default here — is tagged `websocket-realtime`: it streams transcript deltas
+ * from live audio over a socket, and a held recording posted to the batch
+ * endpoint gets nothing back. Enrichment runs long after the walk, on a file,
+ * so the model has to do batch. `xai/grok-stt` says so outright ("batch and
+ * streaming modes"), was released 2026-03-16, and costs a tenth of the realtime
+ * model per second. The model that heard a Capture is recorded on its
+ * transcript, so a later change leaves the record of what produced each one.
  */
-export const DEFAULT_TRANSCRIPTION_MODEL = "openai/gpt-realtime-whisper";
+export const DEFAULT_TRANSCRIPTION_MODEL = "xai/grok-stt";
 
 export type TranscriptionRequest = {
   attachmentId: string;

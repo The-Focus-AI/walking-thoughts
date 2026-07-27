@@ -25,20 +25,27 @@ were wrong — 2025-era models, since dropped along with everything else release
 before 2026. Transcription is not the convenient route to a report for a spoken
 Capture; it is the only one.
 
-The gateway offers five transcription models. We default to the newest,
-`openai/gpt-realtime-whisper` (released 2026-05-07, $0.000284/sec ≈ $0.17 for
-a full ten-minute hold), over `xai/grok-stt` (2026-03-16, a tenth the price)
-because a misheard proper noun costs more than the audio does: the system
-instruction forbids guessing at a garbled name, so a bad transcript turns a
-report into a question back to the walker.
+The gateway offers five transcription models, and newest is not the same as
+callable. We defaulted to `openai/gpt-realtime-whisper` (2026-05-07) and it
+failed every audio Capture in production: it is tagged `websocket-realtime`
+and streams transcript deltas from live audio, while Enrichment runs long
+after the walk, on a file, over the batch endpoint. The default is
+`xai/grok-stt` (2026-03-16), which advertises "batch and streaming modes" and
+costs a tenth as much per second. When choosing a transcription model, read
+the tags: `websocket-transcription` alone is not enough.
 
 ## Consequences
 
 - Transcripts are retained on the Enrichment (`transcripts`, one row per audio
   attachment, with the model that heard them) and shown above the report, so
   the walker's own words survive even when the recording is later purged.
-- A transcription outage fails the job as `transcription_unavailable_<id>`,
-  which is retryable — a held thought is never silently reduced to a filename.
+- A transcription outage fails the job as
+  `transcription_unavailable_<model>_<id>`, which is retryable — a held thought
+  is never silently reduced to a filename. The model is named because a wrong
+  one fails identically forever, and naming it lets the queue offer the Thread
+  one fresh job when `AI_TRANSCRIPTION_MODEL` changes, exactly as a permanent
+  media refusal already does. The underlying gateway error is logged rather
+  than swallowed.
 - Audio Captures cost two model calls: one to hear, one to think.
 - Which model heard a Capture is recorded on its transcript, so switching
   `AI_TRANSCRIPTION_MODEL` later leaves the record of what produced each one.

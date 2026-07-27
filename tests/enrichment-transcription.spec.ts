@@ -245,3 +245,69 @@ test("a transcription outage fails the job retryably instead of dropping words",
   expect(result.results[0]?.reason).toContain("transcription_unavailable");
   expect(result.results[0]?.retryable).toBe(true);
 });
+
+test("audio a since-replaced transcription model could not hear is picked up by the new one", async () => {
+  const { threads, enrichment, blobs } = await seedAudioCapture("user_swap");
+  const [thread] = await threads.listThreads("user_swap");
+
+  // The realtime-only model that shipped as the default: it fails the same way
+  // every attempt, because a recorded file posted to a socket model never
+  // becomes words.
+  const failing = await processPendingEnrichments("user_swap", enrichment, {
+    gateway: createFakeGatewayClient(),
+    transcriber: {
+      model: "openai/gpt-realtime-whisper",
+      async transcribe() {
+        throw new Error("model does not support batch transcription");
+      },
+    },
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+  });
+  expect(failing.results[0]?.status).toBe("needs_attention");
+  expect(failing.results[0]?.reason).toContain(
+    "transcription_unavailable_openai/gpt-realtime-whisper",
+  );
+  // Retryable: a held thought is never written off as unreachable.
+  expect(failing.results[0]?.retryable).toBe(true);
+
+  // Pointing AI_TRANSCRIPTION_MODEL at a model that does batch is the fix, and
+  // the Thread must not sit behind the failed job to benefit from it.
+  const recovered = await processPendingEnrichments("user_swap", enrichment, {
+    gateway: createFakeGatewayClient(async (input) => ({
+      text: "Gold by mid-October.",
+      model: input.model,
+    })),
+    transcriber: createFakeTranscriptionClient(() => SPOKEN, "xai/grok-stt"),
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+  });
+  expect(recovered.results.some((result) => result.status === "complete")).toBe(
+    true,
+  );
+
+  const stored = await enrichment.listThreadEnrichments("user_swap", thread.id);
+  expect(stored[0]?.transcripts?.[0]).toMatchObject({
+    text: SPOKEN,
+    model: "xai/grok-stt",
+  });
+
+  // And it settles: one fresh job per model change, not one per cycle.
+  let secondCycleCalls = 0;
+  await processPendingEnrichments("user_swap", enrichment, {
+    gateway: createFakeGatewayClient(async (input) => {
+      secondCycleCalls += 1;
+      return { text: "should not run twice", model: input.model };
+    }),
+    transcriber: createFakeTranscriptionClient(() => SPOKEN, "xai/grok-stt"),
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+  });
+  expect(secondCycleCalls).toBe(0);
+  expect(
+    await enrichment.listThreadEnrichments("user_swap", thread.id),
+  ).toHaveLength(1);
+});
