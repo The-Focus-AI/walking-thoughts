@@ -25,6 +25,7 @@ import {
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import {
   calendarDayKey,
+  dayKeyForThread,
   formatDayShort,
 } from "@/lib/local-capture/calendar-day";
 import { getCaptureStore } from "@/lib/local-capture/store";
@@ -67,17 +68,6 @@ function threadStatus(captures: LocalCapture[]): {
 
 function isDayKey(value: string | undefined): value is string {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
-}
-
-function dayKeyForThread(
-  thread: LocalThread,
-  captures: LocalCapture[],
-): string {
-  // Prefer Capture day so day sections match what the day digest will read.
-  const firstCapture = captures[0];
-  return firstCapture
-    ? calendarDayKey(new Date(firstCapture.createdAt))
-    : calendarDayKey(new Date(thread.updatedAt));
 }
 
 function dayTitle(dayKey: string): string {

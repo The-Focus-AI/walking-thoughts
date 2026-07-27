@@ -18,6 +18,11 @@ import type { ArtifactSummary } from "@/lib/artifacts/types";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
+import {
+  calendarDayKey,
+  dayKeyForThread,
+  formatDayShort,
+} from "@/lib/local-capture/calendar-day";
 import { readAvailableLocation } from "@/lib/local-capture/location";
 import {
   canOfferLocalRemoval,
@@ -576,6 +581,15 @@ export function ThreadChat({
   const baseCapture = timeline.find((entry) => entry.kind === "capture");
   const conversation = timeline.filter((entry) => entry !== baseCapture);
 
+  // Back goes to the day this Thread belongs to, not the whole Days list —
+  // the walker was reading one day and should land back inside it.
+  const dayKey = thread ? dayKeyForThread(thread, captures) : null;
+  const dayLabel = !dayKey
+    ? "Days"
+    : dayKey === calendarDayKey()
+      ? "Today"
+      : formatDayShort(dayKey);
+
   return (
     <div
       className={embedded ? "thread-chat thread-chat-embedded" : "thread-chat"}
@@ -584,8 +598,11 @@ export function ThreadChat({
       <header className="thread-chat-header">
         <div>
           {!embedded ? (
-            <Link className="topbar-link" href="/days">
-              ← Days
+            <Link
+              className="topbar-link"
+              href={dayKey ? `/days/${dayKey}` : "/days"}
+            >
+              ← {dayLabel}
             </Link>
           ) : null}
           <h1>{thread?.title ?? "Thread"}</h1>

@@ -1,3 +1,5 @@
+import type { LocalCapture, LocalThread } from "./types";
+
 /** Local calendar day key (YYYY-MM-DD) for trail session boundaries. */
 export function calendarDayKey(date: Date = new Date()): string {
   const year = date.getFullYear();
@@ -15,6 +17,18 @@ export function formatDayHeading(dayKey: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+/** The day a Thread belongs to, matching the day digest's grouping. */
+export function dayKeyForThread(
+  thread: LocalThread,
+  captures: LocalCapture[],
+): string {
+  // Prefer Capture day so day sections match what the day digest will read.
+  const firstCapture = captures[0];
+  return firstCapture
+    ? calendarDayKey(new Date(firstCapture.createdAt))
+    : calendarDayKey(new Date(thread.updatedAt));
 }
 
 /** Compact chip label for day pickers, e.g. "Fri, Jul 24". */

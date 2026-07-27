@@ -177,6 +177,78 @@ test("the context line carries one weather chip when a forecast is known", async
   await expect(page.getByTestId("capture-weather")).toHaveText("54°F NW 8 MPH");
 });
 
+test("a slow first GPS fix still brings the weather chip up", async ({
+  page,
+}) => {
+  // A phone that just stepped outside times out its first, short probe; a
+  // later probe with a longer budget delivers. The first failure must not
+  // be read as GPS-off-forever.
+  await page.addInitScript(() => {
+    let calls = 0;
+    const geolocation = {
+      getCurrentPosition(
+        success: PositionCallback,
+        error?: PositionErrorCallback | null,
+      ) {
+        calls += 1;
+        if (calls === 1) {
+          error?.({
+            code: 3,
+            message: "cold start",
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } as GeolocationPositionError);
+          return;
+        }
+        window.setTimeout(() => {
+          success({
+            coords: {
+              latitude: 41.95,
+              longitude: -73.51,
+              accuracy: 12,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+            },
+            timestamp: Date.now(),
+          } as GeolocationPosition);
+        }, 700);
+      },
+      watchPosition() {
+        return 0;
+      },
+      clearWatch() {},
+    };
+    Object.defineProperty(navigator, "geolocation", {
+      value: geolocation,
+      configurable: true,
+    });
+  });
+  await page.route("**://api.open-meteo.com/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        current: {
+          temperature_2m: 54.2,
+          wind_speed_10m: 8.1,
+          wind_direction_10m: 315,
+          weather_code: 1,
+          time: "2026-07-27T10:00",
+        },
+        hourly: { time: [], precipitation_probability: [] },
+      }),
+    }),
+  );
+
+  await page.goto("/offline");
+  await expect(page.getByTestId("capture-weather")).toHaveText("54°F NW 8 MPH", {
+    timeout: 15_000,
+  });
+  await expect(page.getByText("GPS on")).toBeVisible();
+});
+
 test("capture dock fits narrow phones without horizontal scrolling", async ({
   page,
 }) => {

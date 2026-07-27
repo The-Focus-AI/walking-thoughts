@@ -55,6 +55,13 @@ const HOLD_TO_RECORD_MS = 250;
 /** A hold under a second is a slip of the thumb, not a thought. Discard it. */
 const MIN_HELD_RECORDING_MS = 1000;
 
+/**
+ * How long the weather chip is willing to wait for a GPS fix. A phone that
+ * just stepped outside can take this long to find satellites; a short budget
+ * reads as "GPS off" when the fix was seconds away.
+ */
+const GPS_FIX_BUDGET_MS = 15_000;
+
 function formatRecordingClock(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -96,6 +103,8 @@ export function CaptureComposer() {
   });
   const [pushBusy, setPushBusy] = useState(false);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  /** True once a GPS fix has arrived, so the context line flips to "on". */
+  const [located, setLocated] = useState(false);
   const draftSaveGeneration = useRef(0);
   const syncGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -228,16 +237,18 @@ export function CaptureComposer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drain via runForegroundSync
   }, [ready, online, captures]);
 
-  // Conditions as one quiet chip in the context line — never a panel. Wait
-  // for a GPS fix (a few seconds at most), then fetch the forecast; offline
-  // it falls back to the cached snapshot, and with no data the chip is
-  // simply absent.
+  // Conditions as one quiet chip in the context line — never a panel. Keep
+  // asking for a GPS fix with a budget long enough for a cold start, then
+  // fetch the forecast; offline it falls back to the cached snapshot, and
+  // with no data the chip is simply absent.
   useEffect(() => {
     let cancelled = false;
 
     const request = () => {
+      prefetchLocation(GPS_FIX_BUDGET_MS);
       const fix = readAvailableLocation();
       if (!fix) return false;
+      setLocated(true);
       void fetchWeatherSnapshot(fix.latitude, fix.longitude).then(
         (snapshot) => {
           if (!cancelled && snapshot) setWeather(snapshot);
@@ -254,7 +265,10 @@ export function CaptureComposer() {
     const timer = window.setInterval(() => {
       if (request()) window.clearInterval(timer);
     }, 400);
-    const stop = window.setTimeout(() => window.clearInterval(timer), 8_000);
+    const stop = window.setTimeout(
+      () => window.clearInterval(timer),
+      GPS_FIX_BUDGET_MS + 5_000,
+    );
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -445,7 +459,7 @@ export function CaptureComposer() {
     recordAbortRef.current?.abort();
   }
 
-  const gps = readAvailableLocation();
+  const gps = located || readAvailableLocation() !== null;
   const weatherCell = weather ? formatWeatherCell(weather) : null;
   const rollup = syncRollup(captures.map((capture) => capture.status));
   const desk = summarizeDesk({ threads, captures });
