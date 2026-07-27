@@ -26,9 +26,9 @@ test("desktop Days is a split view: day list left, the day or Thread right", asy
     "Stone wall into the reservoir",
   );
 
-  // The day the Thread belongs to is one row away, and opening it swaps the
-  // detail pane without losing the list.
-  await page.locator(".desk-day-open").first().click();
+  // Inside a Thread, the sidebar is its day: the day's name opens the day
+  // itself, swapping the detail pane without losing the list.
+  await page.getByTestId("desk-sidebar-day").click();
   await expect(page).toHaveURL(/\/days\/\d{4}-\d{2}-\d{2}/);
   await expect(page.getByTestId("daily-digest")).toBeVisible();
   await expect(
@@ -83,8 +83,8 @@ test("filing a Thread advances to the next unfiled one from the same day", async
     "Fern colony on the north side",
   );
 
-  // The day still holds the filed Thread, marked Reviewed and settled.
-  await page.locator(".desk-day-open").first().click();
+  // The day still holds the filed Thread: the sidebar keeps it in the
+  // day's list, marked Reviewed and settled.
   await expect(
     page.getByRole("link", { name: /Stone wall into the reservoir/ }).first(),
   ).toBeVisible();
@@ -95,4 +95,63 @@ test("filing a Thread advances to the next unfiled one from the same day", async
   await expect(
     page.getByRole("link", { name: /Stone wall into the reservoir/ }).first(),
   ).toBeVisible();
+});
+
+test("inside a day the sidebar is that day's Threads, media in reach", async ({
+  page,
+}) => {
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture text")).toBeVisible();
+
+  // A Capture with a photo, straight through the store like the shell would.
+  const threadId = await page.evaluate(async () => {
+    const store = (
+      globalThis as typeof globalThis & {
+        __WT_CAPTURE_STORE__?: {
+          commit(
+            text: string,
+            location: null,
+            options: object,
+          ): Promise<unknown>;
+          listRecentThreads(): Promise<Array<{ id: string }>>;
+        };
+      }
+    ).__WT_CAPTURE_STORE__;
+    await store!.commit("Culvert photo below the beaver dam", null, {
+      destination: { type: "new_thread" },
+      attachments: [
+        {
+          kind: "image",
+          mimeType: "image/jpeg",
+          fileName: "culvert.jpg",
+          bytes: new Blob([new Uint8Array([9])], { type: "image/jpeg" }),
+        },
+      ],
+    });
+    const threads = await store!.listRecentThreads();
+    return threads[0]!.id;
+  });
+
+  await page.goto(`/threads/${threadId}`);
+  await expect(page.getByTestId("thread-chat")).toBeVisible();
+
+  // The sidebar swapped: this day's Threads, not the day list.
+  await expect(page.getByTestId("desk-sidebar-day")).toBeVisible();
+  await expect(page.locator(".desk-day")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: /Culvert photo below the beaver dam/ }),
+  ).toBeVisible();
+
+  // The row's photo opens in the lightbox without leaving the day.
+  await page.getByTestId("thread-thumb").first().click();
+  const lightbox = page.getByTestId("media-lightbox");
+  await expect(lightbox).toBeVisible();
+  await expect(lightbox).toContainText("culvert.jpg");
+  await page.keyboard.press("Escape");
+  await expect(lightbox).toHaveCount(0);
+
+  // ← Days returns to the day list.
+  await page.getByRole("link", { name: "← Days" }).click();
+  await expect(page).toHaveURL(/\/days$/);
+  await expect(page.locator(".desk-day")).toHaveCount(1);
 });
