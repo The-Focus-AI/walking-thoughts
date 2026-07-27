@@ -1483,6 +1483,25 @@ h1 {
   font-size: 0.68rem;
 }
 
+/* A context cell the walker can tap — same quiet mono voice, underlined. */
+.capture-context-action {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.capture-context-action:disabled {
+  text-decoration: none;
+  cursor: default;
+}
+
 @keyframes recording-pulse {
   0%,
   100% {

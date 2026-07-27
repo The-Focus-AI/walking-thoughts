@@ -288,12 +288,18 @@ test.describe("trail Threads", () => {
       page.getByRole("link", { name: /Today's ridge notes/ }),
     ).toHaveCount(0);
 
-    // Leaving the Thread lands back on Days with both walks still listed.
+    // Leaving the Thread lands back inside the day it belongs to — the
+    // walker was reading that day, not the whole list.
     await page.getByRole("link", { name: /Older ridge notes/ }).click();
     await expect(page).toHaveURL(/\/threads\/older-day-thread/);
-    await page.getByRole("link", { name: "← Days" }).click();
-    await expect(page).toHaveURL(/\/days$/);
-    await expect(page.locator(".desk-day")).toHaveCount(2);
+    const old = new Date();
+    old.setDate(old.getDate() - 3);
+    const oldDayKey = `${old.getFullYear()}-${String(old.getMonth() + 1).padStart(2, "0")}-${String(old.getDate()).padStart(2, "0")}`;
+    await page.getByRole("link", { name: /^←/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/days/${oldDayKey}$`));
+    await expect(
+      page.getByRole("link", { name: /Older ridge notes/ }),
+    ).toBeVisible();
   });
 
   test("each Thread row names the kind the Enrichment read it as", async ({
