@@ -273,8 +273,10 @@ a {
   padding: max(1rem, env(safe-area-inset-top)) 1.25rem max(1rem, env(safe-area-inset-bottom));
 }
 
+/* The capture screen is one centered column: the composer, and nothing
+   beside it. */
 .trail-shell {
-  width: min(100%, 1280px);
+  width: min(100%, 44rem);
   gap: 0.75rem;
 }
 
@@ -282,83 +284,33 @@ a {
   display: grid;
   gap: 1rem;
   min-width: 0;
+  align-content: start;
 }
 
-@media (min-width: 900px) {
-  .trail-layout {
-    grid-template-columns: minmax(0, 1.1fr) minmax(20rem, 1fr);
-    align-items: start;
-  }
+/* Compact wordmark in the topbar — the screen belongs to the composer. */
+.trail-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
-.trail-map-hero {
-  position: relative;
-  min-height: 36svh;
-  border-radius: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.22);
-}
-
-@media (min-width: 900px) {
-  .trail-map-hero {
-    min-height: min(calc(100svh - 24rem), 44rem);
-    position: sticky;
-    top: 0.75rem;
-  }
-}
-
-.trail-map-hero .trail-map-hero-map {
-  position: absolute;
-  inset: 0;
-}
-
-.trail-map-hero-overlay {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  align-items: flex-end;
-  align-content: flex-end;
-  justify-content: space-between;
-  min-height: 36svh;
-  padding: 1rem 1.1rem 1.2rem;
-  background: linear-gradient(transparent 28%, rgba(16, 23, 18, 0.94) 74%);
-  pointer-events: none;
-}
-
-.trail-map-hero-overlay a,
-.trail-map-hero-overlay button {
-  pointer-events: auto;
-}
-
-@media (min-width: 900px) {
-  .trail-map-hero-overlay {
-    min-height: min(calc(100svh - 24rem), 44rem);
-  }
-}
-
-@media (max-width: 899px) {
-  .trail-map-hero .maplibregl-ctrl-top-right {
-    display: none;
-  }
-
-  .trail-map-hero-overlay .trail-map-hero-cta,
-  .trail-map-hero-overlay .offline-maps-secondary {
-    min-height: 2.4rem;
-    padding: 0 0.8rem;
-    font-size: 0.7rem;
-  }
-
-  .trail-map-hero-name {
-    font-size: clamp(1.2rem, 4.5vw, 2.2rem);
-  }
+/* The route is loading on a slow link: say so at once. */
+.route-loading {
+  margin: 0;
+  padding: 2rem 1.25rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* Map credits in the sheet's own voice: mono micro on the dusk ground.
    The extra .maplibregl-ctrl class outranks maplibre's own background. */
-.trail-map-hero .maplibregl-ctrl.maplibregl-ctrl-attrib,
 .journal-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
 .region-tracer-map .maplibregl-ctrl.maplibregl-ctrl-attrib {
   background-color: rgba(16, 23, 18, 0.85);
@@ -368,86 +320,23 @@ a {
   letter-spacing: 0.02em;
 }
 
-.trail-map-hero .maplibregl-ctrl-attrib a,
 .journal-map .maplibregl-ctrl-attrib a,
 .region-tracer-map .maplibregl-ctrl-attrib a {
   color: var(--muted);
 }
 
-.trail-map-hero .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button,
 .journal-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button,
 .region-tracer-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button {
   background-color: transparent;
   filter: invert(1) opacity(0.75);
 }
 
-.trail-map-hero .maplibregl-ctrl-attrib.maplibregl-compact,
 .journal-map .maplibregl-ctrl-attrib.maplibregl-compact,
 .region-tracer-map .maplibregl-ctrl-attrib.maplibregl-compact {
   background-color: rgba(16, 23, 18, 0.85);
 }
 
-.trail-map-hero-name {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  line-height: 0.95;
-  font-size: clamp(1.5rem, 4vw, 2.2rem);
-}
-
-.trail-map-hero-meta,
-.trail-map-hero-status {
-  margin: 0.25rem 0 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.trail-map-hero-missing {
-  display: grid;
-  gap: 0.65rem;
-  align-content: end;
-  min-height: 36svh;
-  padding: 1.25rem;
-}
-
-.trail-map-hero-missing h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  line-height: 0.95;
-  font-size: clamp(1.6rem, 5vw, 2.4rem);
-}
-
-/* Secondary on the trail home — Commit Capture holds the viewport's one
-   primary act, so the map affordances take the square outline. */
-.trail-map-hero-missing button,
-.trail-map-hero-cta {
-  display: inline-grid;
-  place-items: center;
-  min-height: 2.8rem;
-  padding: 0 1.1rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ink);
-  font-weight: 600;
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-decoration: none;
-  cursor: pointer;
-  width: fit-content;
-}
-
-.trail-map-hero-missing button:hover,
-.trail-map-hero-cta:hover {
-  border-color: var(--ink);
-}
-
+/* Region download progress — shared by Map Journal and Offline maps. */
 .trail-map-hero-progress {
   display: grid;
   gap: 0.45rem;
@@ -638,10 +527,6 @@ a {
   right: 0;
   top: -4px;
   border-top: 1px solid var(--line);
-}
-
-.trail-sync-footer .scale-bar {
-  flex: 0 0 100%;
 }
 
 .trail-sync-footer-lines {
@@ -896,7 +781,7 @@ h1 {
 
 .capture-composer textarea {
   width: 100%;
-  min-height: 3.4rem;
+  min-height: 5rem;
   resize: vertical;
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--line);
@@ -1541,10 +1426,12 @@ h1 {
   align-items: center;
 }
 
+/* Recording is the page's whole job: the media buttons are big enough to
+   hit with a gloved thumb on the move. */
 .capture-card .capture-icon-btn {
   flex: 0 0 auto;
-  width: 2.9rem;
-  min-height: 2.9rem;
+  width: 3.4rem;
+  min-height: 3.4rem;
   padding: 0;
   display: grid;
   place-items: center;
@@ -1563,8 +1450,8 @@ h1 {
 }
 
 .capture-card .capture-icon-btn svg {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.6rem;
+  height: 1.6rem;
 }
 
 .capture-card .capture-icon-btn[aria-pressed="true"] {
@@ -1582,7 +1469,7 @@ h1 {
 
 .capture-actions .capture-commit {
   flex: 1 1 auto;
-  min-height: 2.9rem;
+  min-height: 3.4rem;
 }
 
 .capture-context {

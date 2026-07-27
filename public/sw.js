@@ -1,8 +1,16 @@
 // Keep in sync with SHELL_CACHE_NAME in lib/offline-shell.ts.
-const CACHE_NAME = "walking-thoughts-shell-v12";
+const CACHE_NAME = "walking-thoughts-shell-v13";
+
+// Every screen the bottom tab bar can reach, plus the app chrome. Each of
+// these keeps a cached copy so a tab tap always lands on a page, with or
+// without a network.
 const SHELL = [
+  "/",
   "/offline",
+  "/days",
   "/journal",
+  "/interview",
+  "/offline-maps",
   "/region-tracer",
   "/manifest.webmanifest",
   "/icon-192.svg",
@@ -11,8 +19,34 @@ const SHELL = [
   "/fonts/barlow-condensed-600.woff2",
 ];
 
+// A one-bar connection passes every online check and then stalls. Give the
+// network this long to produce a page, then serve the cached shell instead.
+const NAVIGATION_TIMEOUT_MS = 3500;
+
+function fetchWithDeadline(request, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(request, { signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(
+        SHELL.map(async (path) => {
+          // Fetch each page individually: a signed-out redirect on one auth'd
+          // page must neither poison the cache (a redirected response cannot
+          // answer a navigation) nor fail the whole install.
+          const response = await fetch(path);
+          if (response.ok && !response.redirected) {
+            await cache.put(path, response);
+          }
+        }),
+      ),
+    ),
+  );
   self.skipWaiting();
 });
 
@@ -35,11 +69,12 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
-    // Network-first, and every successful online visit refreshes the cached
-    // shell copy — otherwise a deploy that leaves sw.js byte-identical would
-    // strand offline walkers on the old build's HTML forever.
+    // Network-first with a deadline, and every successful online visit
+    // refreshes the cached shell copy — otherwise a deploy that leaves sw.js
+    // byte-identical would strand offline walkers on the old build's HTML
+    // forever.
     event.respondWith(
-      fetch(request)
+      fetchWithDeadline(request, NAVIGATION_TIMEOUT_MS)
         .then((response) => {
           if (response.ok && SHELL.includes(url.pathname)) {
             const copy = response.clone();

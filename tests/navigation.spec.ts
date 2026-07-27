@@ -51,6 +51,47 @@ test.describe("streamlined navigation", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
+  test("bottom tab bar keeps working in airplane mode", async ({
+    context,
+    page,
+  }) => {
+    // One online visit prepares the shell: the service worker plus every
+    // tab destination's page and chunks.
+    await openCaptureShell(page);
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const registration = await navigator.serviceWorker.getRegistration();
+          return registration?.active?.state;
+        }),
+      )
+      .toBe("activated");
+
+    await context.setOffline(true);
+
+    const tabbar = () => page.getByRole("navigation", { name: "Primary" });
+
+    await tabbar().getByRole("link", { name: "Days" }).click();
+    await expect(page).toHaveURL(/\/days$/);
+    await expect(
+      page.getByRole("heading", { name: "Days", exact: true }),
+    ).toBeVisible();
+
+    await tabbar().getByRole("link", { name: "You", exact: true }).click();
+    await expect(page).toHaveURL(/\/interview/);
+    await expect(page.getByTestId("interview-panel")).toBeVisible();
+
+    await tabbar().getByRole("link", { name: "Map", exact: true }).click();
+    await expect(page).toHaveURL(/\/journal/);
+    await expect(tabbar()).toBeVisible();
+
+    // "/" needs Clerk in a configured install, so the composer itself lives
+    // on /offline here — the point is that the tab lands on a page at all.
+    await tabbar().getByRole("link", { name: "Capture" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(tabbar()).toBeVisible();
+  });
+
   test("Thread view keeps the tab bar so it is never a dead end", async ({
     page,
   }) => {

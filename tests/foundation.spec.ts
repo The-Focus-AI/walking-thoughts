@@ -57,9 +57,7 @@ test("installed shell remains useful when the network disappears", async ({
   await expect(
     page.getByRole("link", { name: "Walking Thoughts home" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Offline Region map" }),
-  ).toBeVisible();
+  await expect(page.getByTestId("app-tabbar")).toBeVisible();
 
   const manifest = await page.locator('link[rel="manifest"]').getAttribute("href");
   expect(manifest).toBe("/manifest.webmanifest");

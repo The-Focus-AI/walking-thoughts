@@ -71,7 +71,9 @@ test("compact capture dock records audio via tap-to-toggle and stages for review
     "1 Capture today",
   );
   await expect(page.getByLabel("Selected media")).toHaveCount(0);
-  await expect(page.getByText(/Network offline|Network online/)).toBeVisible();
+  await expect(
+    page.getByText(/^(Online|Offline — saves to this phone)$/),
+  ).toBeVisible();
 });
 
 test("holding the mic records and Captures the audio on release", async ({
