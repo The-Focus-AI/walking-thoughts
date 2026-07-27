@@ -367,18 +367,20 @@ export function ThreadChat({
   const isEnriching = captures.some((capture) => capture.status === "enriching");
 
   // Keep pulling while Enrichment is in flight so the report lands in view.
+  // Gently, and without re-hydrating every Thread per tick — the server
+  // works its queue a few jobs per ask.
   useEffect(() => {
     if (!isEnriching || !online) return;
     const timer = window.setInterval(() => {
       void (async () => {
         try {
-          await runSyncCycle({ store: getCaptureStore() });
+          await runSyncCycle({ store: getCaptureStore(), hydrate: false });
           await refresh();
         } catch {
           // Retryable; the researching notice stays visible.
         }
       })();
-    }, 2500);
+    }, 15_000);
     return () => window.clearInterval(timer);
   }, [isEnriching, online, refresh]);
 

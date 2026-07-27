@@ -200,3 +200,68 @@ test("runSyncCycle no-ops while offline and resumes when online", async () => {
   expect(online.capturesPushed).toBe(1);
   expect((await store.list())[0]?.status).toBe("complete");
 });
+
+test("the automatic cycle never resurrects failures; an explicit Retry does", async () => {
+  const store = createMemoryCaptureStore();
+  await store.commit("A thought mid-walk", null);
+
+  const retrySeen: Array<boolean | undefined> = [];
+  const transports = {
+    threadsTransport: {
+      async listThreads() {
+        return { unavailable: true } as const;
+      },
+    },
+    captureTransport: {
+      async pushCaptures(
+        captures: SyncCapturePayload[],
+      ): Promise<SyncPushResult> {
+        return {
+          results: captures.map((item) => ({
+            id: item.id,
+            threadId: item.threadId ?? item.id,
+            sequence: item.sequence,
+            status: "complete" as const,
+          })),
+          failures: [],
+        };
+      },
+    },
+    enrichmentTransport: {
+      async process(options?: { retryFailed?: boolean }) {
+        retrySeen.push(options?.retryFailed);
+        return { results: [], jobs: [] };
+      },
+    },
+  };
+
+  await runSyncCycle({ store, online: true, ...transports });
+  expect(retrySeen).toEqual([false]);
+
+  await runSyncCycle({ store, online: true, retryFailed: true, ...transports });
+  expect(retrySeen).toEqual([false, true]);
+});
+
+test("hydrate: false skips the full Thread download", async () => {
+  const store = createMemoryCaptureStore();
+  let listed = 0;
+  const transports = {
+    threadsTransport: {
+      async listThreads() {
+        listed += 1;
+        return { unavailable: true } as const;
+      },
+    },
+    enrichmentTransport: {
+      async process() {
+        return { results: [], jobs: [] };
+      },
+    },
+  };
+
+  await runSyncCycle({ store, online: true, hydrate: false, ...transports });
+  expect(listed).toBe(0);
+
+  await runSyncCycle({ store, online: true, ...transports });
+  expect(listed).toBe(1);
+});

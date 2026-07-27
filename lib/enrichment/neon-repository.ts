@@ -38,6 +38,10 @@ export function createNeonEnrichmentRepository(
         ADD COLUMN IF NOT EXISTS basis_history JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
+        ALTER TABLE enrichment_jobs
+        ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS enrichments (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
@@ -106,6 +110,7 @@ export function createNeonEnrichmentRepository(
     status: EnrichmentJob["status"];
     attempts: number;
     error: string | null;
+    started_at?: string | Date | null;
   }): EnrichmentJob {
     return {
       id: row.id,
@@ -119,6 +124,10 @@ export function createNeonEnrichmentRepository(
       status: row.status,
       attempts: row.attempts,
       error: row.error ?? undefined,
+      startedAt:
+        row.started_at instanceof Date
+          ? row.started_at.toISOString()
+          : (row.started_at ?? null),
     };
   }
 
@@ -316,7 +325,8 @@ export function createNeonEnrichmentRepository(
       await ensure();
       const rows = (await sql`
         SELECT id, idempotency_key, thread_id, basis_revision, basis_entry_ids,
-               basis_history, target_capture_ids, model, status, attempts, error
+               basis_history, target_capture_ids, model, status, attempts, error,
+               started_at
         FROM enrichment_jobs
         WHERE user_id = ${userId}
           AND status IN ('queued', 'running', 'failed')
@@ -332,6 +342,7 @@ export function createNeonEnrichmentRepository(
         status: EnrichmentJob["status"];
         attempts: number;
         error: string | null;
+        started_at: string | Date | null;
       }>;
       return rows.map(mapJob);
     },
@@ -342,14 +353,16 @@ export function createNeonEnrichmentRepository(
         UPDATE enrichment_jobs
         SET status = 'running',
             attempts = attempts + 1,
-            error = NULL
+            error = NULL,
+            started_at = now()
         WHERE user_id = ${userId}
           AND id = ${jobId}
           AND status IN ('queued', 'running')
       `;
       const rows = (await sql`
         SELECT id, idempotency_key, thread_id, basis_revision, basis_entry_ids,
-               basis_history, target_capture_ids, model, status, attempts, error
+               basis_history, target_capture_ids, model, status, attempts, error,
+               started_at
         FROM enrichment_jobs
         WHERE user_id = ${userId} AND id = ${jobId}
         LIMIT 1
@@ -365,6 +378,7 @@ export function createNeonEnrichmentRepository(
         status: EnrichmentJob["status"];
         attempts: number;
         error: string | null;
+        started_at: string | Date | null;
       }>;
       if (!rows[0]) throw new Error(`Unknown job ${jobId}`);
       return mapJob(rows[0]);

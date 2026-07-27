@@ -43,7 +43,19 @@ export type SyncCycleInput = {
   enrichmentTransport?: EnrichmentTransport;
   threadsTransport?: ThreadsTransport;
   trashTransport?: TrashTransport;
+  /**
+   * Resurrect failed Enrichment jobs server-side. Reserved for an explicit
+   * Retry tap — on the automatic heartbeat it would re-spend the model on
+   * every past failure, every cycle, and park new Captures behind them.
+   */
   retryFailed?: boolean;
+  /**
+   * Pull the full remote Thread list before draining the outbox. The
+   * default; a tight status-poll loop passes false, since Enrichment
+   * statuses come back in the drain itself and re-downloading every Thread
+   * each tick is what made "syncing" feel endless.
+   */
+  hydrate?: boolean;
 };
 
 export const SYNC_CYCLE_EVENT = "wt:sync-cycle";
@@ -74,18 +86,20 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
   let requeuedForSync = 0;
   let requeuedForEnrichment = 0;
   let capturesImported = 0;
-  const threadsTransport = input.threadsTransport ?? getThreadsTransport();
-  const listed = await threadsTransport.listThreads();
-  if (!("unavailable" in listed)) {
-    const hydrated = await input.store.applyRemoteThreads(listed);
-    capturesImported = hydrated.importedCaptureIds.length;
+  if (input.hydrate ?? true) {
+    const threadsTransport = input.threadsTransport ?? getThreadsTransport();
+    const listed = await threadsTransport.listThreads();
+    if (!("unavailable" in listed)) {
+      const hydrated = await input.store.applyRemoteThreads(listed);
+      capturesImported = hydrated.importedCaptureIds.length;
 
-    const recovered = await recoverStaleLocalCaptures(input.store, {
-      serverCaptureIds: serverCaptureIdSet(listed),
-      loadEnrichments: fetchThreadEnrichmentsFromNetwork,
-    });
-    requeuedForSync = recovered.requeuedForSync;
-    requeuedForEnrichment = recovered.requeuedForEnrichment;
+      const recovered = await recoverStaleLocalCaptures(input.store, {
+        serverCaptureIds: serverCaptureIdSet(listed),
+        loadEnrichments: fetchThreadEnrichmentsFromNetwork,
+      });
+      requeuedForSync = recovered.requeuedForSync;
+      requeuedForEnrichment = recovered.requeuedForEnrichment;
+    }
   }
 
   // Trash rides every cycle: local trash/restore mutations reach the server
@@ -113,7 +127,7 @@ async function executeSyncCycle(input: SyncCycleInput): Promise<SyncCycleResult>
   const enrichBatch = await enrichPendingCaptures(
     input.store,
     input.enrichmentTransport,
-    { retryFailed: input.retryFailed ?? true },
+    { retryFailed: input.retryFailed ?? false },
   );
 
   return {

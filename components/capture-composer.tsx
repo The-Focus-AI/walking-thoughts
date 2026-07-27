@@ -136,13 +136,18 @@ export function CaptureComposer() {
     setThreads(recent);
   }
 
-  async function runForegroundSync() {
+  async function runForegroundSync(options?: {
+    retryFailed?: boolean;
+    hydrate?: boolean;
+  }) {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     const generation = ++syncGeneration.current;
     setIsSyncing(true);
     try {
       const syncBatch = await runSyncCycle({
         store: getCaptureStore(),
+        retryFailed: options?.retryFailed,
+        hydrate: options?.hydrate,
       });
       if (generation === syncGeneration.current) {
         const optIn = evaluatePushOptInAfterSync({
@@ -227,7 +232,10 @@ export function CaptureComposer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runForegroundSync closes over latest store helpers
   }, [ready]);
 
-  // Keep Enrichment moving while any Capture is enriching and the shell is open.
+  // Keep Enrichment moving while any Capture is enriching and the shell is
+  // open. A gentle cadence, and no full Thread re-hydration per tick: the
+  // server works its queue a few jobs per ask, so asking harder than this
+  // only re-downloads the world and stacks duplicate work.
   useEffect(() => {
     if (!ready || !online) return;
     const hasEnriching = captures.some(
@@ -235,8 +243,8 @@ export function CaptureComposer() {
     );
     if (!hasEnriching) return;
     const timer = window.setInterval(() => {
-      void runForegroundSync();
-    }, 2500);
+      void runForegroundSync({ hydrate: false });
+    }, 15_000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drain via runForegroundSync
   }, [ready, online, captures]);
@@ -761,7 +769,7 @@ export function CaptureComposer() {
             <button
               type="button"
               className="capture-retry"
-              onClick={() => void runForegroundSync()}
+              onClick={() => void runForegroundSync({ retryFailed: true })}
               disabled={!ready || isSyncing}
             >
               Retry sync

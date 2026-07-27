@@ -160,6 +160,7 @@ export function createMemoryEnrichmentRepository(
         status: "running",
         attempts: job.attempts + 1,
         error: undefined,
+        startedAt: new Date().toISOString(),
       };
       db.jobs.set(`${userId}:${jobId}`, next);
       return next;
