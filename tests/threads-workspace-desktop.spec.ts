@@ -96,3 +96,59 @@ test("filing a Thread advances to the next unfiled one from the same day", async
     page.getByRole("link", { name: /Stone wall into the reservoir/ }).first(),
   ).toBeVisible();
 });
+
+test("a day's Threads step next and previous at the desk", async ({ page }) => {
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture text")).toBeVisible();
+  await seedCapture(page, "Stone wall into the reservoir");
+  await seedCapture(page, "Fern colony on the north side");
+  await seedCapture(page, "Beaver dam below the culvert");
+
+  // Enter from the day, so stepping follows the order just read.
+  await page.goto("/days");
+  await page.locator(".desk-day-open").first().click();
+  await expect(page.getByTestId("daily-digest")).toBeVisible();
+
+  const rows = page.locator(".day-threads .thread-row-title");
+  await expect(rows).toHaveCount(3);
+  const titles = await rows.allInnerTexts();
+
+  await page.locator(".day-threads .thread-row-main").first().click();
+  const nav = page.getByTestId("desk-thread-nav");
+  await expect(nav).toBeVisible();
+  await expect(page.getByTestId("desk-thread-place")).toContainText("1 of 3");
+  // Nothing before the first Thread of a day: a day has ends.
+  await expect(page.getByTestId("desk-thread-previous")).toBeDisabled();
+
+  await page.getByTestId("desk-thread-next").click();
+  await expect(page.getByTestId("desk-thread-place")).toContainText("2 of 3");
+  await expect(page.getByTestId("thread-capture-hero")).toContainText(titles[1]);
+
+  await page.getByTestId("desk-thread-next").click();
+  await expect(page.getByTestId("desk-thread-place")).toContainText("3 of 3");
+  await expect(page.getByTestId("thread-capture-hero")).toContainText(titles[2]);
+  // And nothing after the last.
+  await expect(page.getByTestId("desk-thread-next")).toBeDisabled();
+
+  // Previous walks back down the same order.
+  await page.getByTestId("desk-thread-previous").click();
+  await expect(page.getByTestId("desk-thread-place")).toContainText("2 of 3");
+  await expect(page.getByTestId("thread-capture-hero")).toContainText(titles[1]);
+
+  // The place reads as a way back to the day it belongs to.
+  await page.getByTestId("desk-thread-place").click();
+  await expect(page).toHaveURL(/\/days\/\d{4}-\d{2}-\d{2}/);
+});
+
+test("the step nav is desk chrome, not phone chrome", async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 900 });
+  await page.goto("/offline");
+  await expect(page.getByLabel("Capture text")).toBeVisible();
+  const first = await seedCapture(page, "Stone wall into the reservoir");
+  await seedCapture(page, "Fern colony on the north side");
+
+  await page.goto(`/threads/${first}`);
+  await expect(page.getByTestId("thread-chat")).toBeVisible();
+  // The phone steps with a swipe; the column spends no room on chrome.
+  await expect(page.getByTestId("desk-thread-nav")).toHaveCount(0);
+});

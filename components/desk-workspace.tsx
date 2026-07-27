@@ -69,6 +69,25 @@ function isDayKey(value: string | undefined): value is string {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
+/**
+ * The order a day puts its Threads in: unfiled work first — the reason to
+ * sit down is what is still open — and within that, the ones with a report
+ * waiting. Shared by the day pane's list and by stepping between Threads,
+ * so next and previous walk the order the walker just read.
+ */
+function byDeskPriority(
+  artifacts: Map<string, ArtifactSummary>,
+): (a: ThreadListView, b: ThreadListView) => number {
+  return (a, b) => {
+    const aFiled = a.thread.reviewedAt ? 1 : 0;
+    const bFiled = b.thread.reviewedAt ? 1 : 0;
+    if (aFiled !== bFiled) return aFiled - bFiled;
+    const aRead = artifacts.has(a.thread.id) ? 0 : 1;
+    const bRead = artifacts.has(b.thread.id) ? 0 : 1;
+    return aRead - bRead;
+  };
+}
+
 function dayKeyForThread(
   thread: LocalThread,
   captures: LocalCapture[],
@@ -398,23 +417,43 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     [threads, selectedDayKey],
   );
 
-  /**
-   * Unfiled work first — the reason to sit down is what is still open — and
-   * within that, the Threads with a report waiting. Those are the ones the
-   * day actually left to read; the rest are glanced at and filed.
-   */
+  /** The day's own Threads, in the order the day puts them in. */
   const orderedDayThreads = useMemo(
-    () =>
-      [...dayThreads].sort((a, b) => {
-        const aFiled = a.thread.reviewedAt ? 1 : 0;
-        const bFiled = b.thread.reviewedAt ? 1 : 0;
-        if (aFiled !== bFiled) return aFiled - bFiled;
-        const aRead = artifacts.has(a.thread.id) ? 0 : 1;
-        const bRead = artifacts.has(b.thread.id) ? 0 : 1;
-        return aRead - bRead;
-      }),
+    () => [...dayThreads].sort(byDeskPriority(artifacts)),
     [dayThreads, artifacts],
   );
+
+  /** The day the open Thread belongs to — a Thread route names no day. */
+  const openThreadDayKey = useMemo(
+    () =>
+      selectedThreadId
+        ? (threads.find((view) => view.thread.id === selectedThreadId)?.dayKey ??
+          null)
+        : null,
+    [threads, selectedThreadId],
+  );
+
+  /**
+   * Where the open Thread sits among its own day's, and what is on either
+   * side of it. A day is the unit of work, so stepping stays inside one:
+   * running off the end of a day is the day being finished, not a reason to
+   * be dropped into the previous one.
+   */
+  const dayPosition = useMemo(() => {
+    if (!selectedThreadId || !openThreadDayKey) return null;
+    const ids = threads
+      .filter((view) => view.dayKey === openThreadDayKey)
+      .sort(byDeskPriority(artifacts))
+      .map((view) => view.thread.id);
+    const index = ids.indexOf(selectedThreadId);
+    if (index === -1) return null;
+    return {
+      index,
+      total: ids.length,
+      previousId: ids[index - 1] ?? null,
+      nextId: ids[index + 1] ?? null,
+    };
+  }, [threads, artifacts, openThreadDayKey, selectedThreadId]);
 
   /** Threads in display order (day by day) for swipe stepping. */
   const orderedThreadIds = useMemo(
@@ -670,11 +709,57 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         {/* Route pages render null; the workspace owns the detail pane. */}
         {children}
         {selectedThreadId ? (
-          <ThreadChat
-            key={selectedThreadId}
-            threadId={selectedThreadId}
-            onReviewedChange={onReviewedChange}
-          />
+          <div className="desk-thread-view">
+            {/* Desk only: the phone steps with a swipe, and a 412px column
+                has no room to spend on chrome the gesture already covers. */}
+            {atTheDesk && dayPosition && openThreadDayKey ? (
+              <nav
+                className="desk-thread-nav"
+                aria-label="Threads from this day"
+                data-testid="desk-thread-nav"
+              >
+                <button
+                  type="button"
+                  className="desk-thread-step"
+                  data-testid="desk-thread-previous"
+                  disabled={!dayPosition.previousId}
+                  onClick={() => {
+                    if (dayPosition.previousId) {
+                      router.push(`/threads/${dayPosition.previousId}`);
+                    }
+                  }}
+                >
+                  ← Previous
+                </button>
+                <Link
+                  className="desk-thread-place"
+                  href={`/days/${openThreadDayKey}`}
+                  data-testid="desk-thread-place"
+                >
+                  {dayTitle(openThreadDayKey)} · {dayPosition.index + 1} of{" "}
+                  {dayPosition.total}
+                </Link>
+                <button
+                  type="button"
+                  className="desk-thread-step"
+                  data-testid="desk-thread-next"
+                  disabled={!dayPosition.nextId}
+                  onClick={() => {
+                    if (dayPosition.nextId) {
+                      router.push(`/threads/${dayPosition.nextId}`);
+                    }
+                  }}
+                >
+                  Next →
+                </button>
+              </nav>
+            ) : null}
+            <ThreadChat
+              key={selectedThreadId}
+              threadId={selectedThreadId}
+              onReviewedChange={onReviewedChange}
+            />
+          </div>
         ) : selectedDayKey ? (
           <DailyDigestPanel
             key={selectedDayKey}

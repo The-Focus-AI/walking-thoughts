@@ -3386,6 +3386,55 @@ footer {
   color: var(--muted);
 }
 
+/* Stepping between a day's Threads. Desk only — the nav is not rendered on
+   the phone, where the same move is a swipe — so this is a plain wrapper
+   until the split view takes over. */
+.desk-thread-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.desk-thread-step {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  padding: 0.3rem 0.8rem;
+  color: var(--muted);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.desk-thread-step:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* The ends of a day are a fact about the day, not an error: the button
+   stays in place and stops working. */
+.desk-thread-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.desk-thread-place {
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.desk-thread-place:hover {
+  color: var(--ink);
+}
+
 .thread-row-selected {
   border-color: rgba(169, 209, 143, 0.55);
   background: rgba(169, 209, 143, 0.08);
@@ -3423,11 +3472,28 @@ footer {
     min-width: 0;
   }
 
+  /* The nav takes its own row so the chat still bounds itself to what is
+     left — the log scrolls internally, and a growing page must not push the
+     composer off the bottom. */
+  .desk-thread-view {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+  }
+
   .desk-detail-pane .thread-chat {
     height: 100%;
     min-height: 0;
     width: 100%;
     max-width: none;
+  }
+
+  /* Line the nav up with the column the chat holds itself to. */
+  .desk-thread-nav {
+    width: min(100%, 46rem);
+    margin-inline: auto;
+    box-sizing: border-box;
   }
 
   .desk-detail-pane .day-digest-pane {
