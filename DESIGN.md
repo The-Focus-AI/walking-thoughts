@@ -311,8 +311,8 @@ from the losing Field Notebook variant); UI text sits at 1.45–1.5.
   micro), and status label (mono micro), with the entry body right.
   Every Capture row uses it; never hide status behind a tap.
 - **The instrument strip** is retired from the Capture surface — the
-  composer owns that screen, with GPS and network state as one quiet
-  mono line under the actions. Where a strip appears (desk or map
+  composer owns that screen, with GPS, conditions ("54°F NW 8 MPH"),
+  and network state folded into one quiet mono line under the actions. Where a strip appears (desk or map
   surfaces), it follows the original spec:
   four ruled cells — Elevation, Position, Ascent, Weather — big condensed
   tabular values over mono micro sublabels, read left to right like a
