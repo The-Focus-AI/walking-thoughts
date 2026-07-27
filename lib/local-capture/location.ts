@@ -4,11 +4,20 @@ const PROMPT_BUDGET_MS = 300;
 /** A fix older than this is re-requested on the next prefetch. */
 const FIX_FRESH_MS = 60_000;
 
+/** How long a walker who explicitly asked is willing to watch the sky. */
+const GESTURE_BUDGET_MS = 15_000;
+
 type LocationReader = {
   /** Return coordinates already on hand; never waits on the GPS stack. */
   readAvailable(): CaptureLocation | null;
   /** Warm the cache in the background for a later commit. */
   prefetch(budgetMs?: number): void;
+  /**
+   * The walker asked: surface the browser's permission prompt if it has
+   * one to show, wait for a fix, and report what came back. Clears a
+   * remembered denial — a tap means "ask again".
+   */
+  request(budgetMs?: number): Promise<CaptureLocation | null>;
 };
 
 function coordsFromPosition(position: GeolocationPosition): CaptureLocation {
@@ -73,6 +82,32 @@ export function createLocationReader(
     prefetch(budgetMs = PROMPT_BUDGET_MS) {
       probe(budgetMs);
     },
+    request(budgetMs = GESTURE_BUDGET_MS) {
+      denied = false;
+      if (!geolocation) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        try {
+          geolocation.getCurrentPosition(
+            (position) => {
+              fix = coordsFromPosition(position);
+              fixAt = Date.now();
+              resolve(fix);
+            },
+            (error) => {
+              if (error.code === 1) denied = true;
+              resolve(fix);
+            },
+            {
+              enableHighAccuracy: false,
+              maximumAge: FIX_FRESH_MS,
+              timeout: budgetMs,
+            },
+          );
+        } catch {
+          resolve(fix);
+        }
+      });
+    },
   };
 }
 
@@ -85,4 +120,10 @@ export function readAvailableLocation(): CaptureLocation | null {
 
 export function prefetchLocation(budgetMs?: number): void {
   defaultReader?.prefetch(budgetMs);
+}
+
+export function requestLocationFix(
+  budgetMs?: number,
+): Promise<CaptureLocation | null> {
+  return defaultReader?.request(budgetMs) ?? Promise.resolve(null);
 }

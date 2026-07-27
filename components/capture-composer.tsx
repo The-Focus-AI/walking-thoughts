@@ -12,6 +12,7 @@ import { attachmentInputFromFile } from "@/lib/local-capture/attachment-input";
 import {
   prefetchLocation,
   readAvailableLocation,
+  requestLocationFix,
 } from "@/lib/local-capture/location";
 import {
   persistenceLabel,
@@ -105,6 +106,9 @@ export function CaptureComposer() {
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   /** True once a GPS fix has arrived, so the context line flips to "on". */
   const [located, setLocated] = useState(false);
+  const [gpsAsking, setGpsAsking] = useState(false);
+  /** What to do about location when asking for it got nothing. */
+  const [gpsHint, setGpsHint] = useState<string | null>(null);
   const draftSaveGeneration = useRef(0);
   const syncGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -459,6 +463,45 @@ export function CaptureComposer() {
     recordAbortRef.current?.abort();
   }
 
+  /**
+   * The tap on "GPS off" is a user gesture — the one moment the browser
+   * will show its location prompt. Ask right now, and when nothing comes
+   * back, say plainly whether the site is blocked or the sky just hasn't
+   * answered yet.
+   */
+  async function onAskForGps() {
+    setGpsAsking(true);
+    setGpsHint(null);
+    try {
+      const fix = await requestLocationFix();
+      if (fix) {
+        setLocated(true);
+        const snapshot = await fetchWeatherSnapshot(
+          fix.latitude,
+          fix.longitude,
+        );
+        if (snapshot) setWeather(snapshot);
+        return;
+      }
+      let blocked = false;
+      try {
+        const status = await navigator.permissions?.query({
+          name: "geolocation",
+        });
+        blocked = status?.state === "denied";
+      } catch {
+        // No Permissions API — keep the generic hint.
+      }
+      setGpsHint(
+        blocked
+          ? "Location is blocked for this site — allow it in your browser's site settings, then tap GPS again"
+          : "No GPS fix yet — allow location when asked, or tap again with open sky",
+      );
+    } finally {
+      setGpsAsking(false);
+    }
+  }
+
   const gps = located || readAvailableLocation() !== null;
   const weatherCell = weather ? formatWeatherCell(weather) : null;
   const rollup = syncRollup(captures.map((capture) => capture.status));
@@ -653,7 +696,18 @@ export function CaptureComposer() {
         <p className="capture-context" role="status">
           <span>Hold the mic to talk</span>
           <span aria-hidden="true">·</span>
-          <span>GPS {gps ? "on" : "off"}</span>
+          {gps ? (
+            <span>GPS on</span>
+          ) : (
+            <button
+              type="button"
+              className="capture-context-action"
+              onClick={() => void onAskForGps()}
+              disabled={gpsAsking}
+            >
+              {gpsAsking ? "GPS asking…" : "GPS off — turn on"}
+            </button>
+          )}
           {weatherCell ? (
             <>
               <span aria-hidden="true">·</span>
@@ -670,6 +724,12 @@ export function CaptureComposer() {
             <>
               <span aria-hidden="true">·</span>
               <span>{saveConfirmation}</span>
+            </>
+          ) : null}
+          {gpsHint ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span data-testid="gps-hint">{gpsHint}</span>
             </>
           ) : null}
         </p>

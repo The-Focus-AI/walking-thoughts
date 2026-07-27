@@ -249,6 +249,116 @@ test("a slow first GPS fix still brings the weather chip up", async ({
   await expect(page.getByText("GPS on")).toBeVisible();
 });
 
+test("tapping GPS off asks for permission and lights the chip on a grant", async ({
+  page,
+}) => {
+  // Permission was never granted, so the quiet background probe is refused
+  // and stays refused. The tap is the user gesture that re-asks; here the
+  // walker answers the prompt with Allow, and the next reading succeeds.
+  await page.addInitScript(() => {
+    let calls = 0;
+    const geolocation = {
+      getCurrentPosition(
+        success: PositionCallback,
+        error?: PositionErrorCallback | null,
+      ) {
+        calls += 1;
+        if (calls === 1) {
+          error?.({
+            code: 1,
+            message: "permission not granted",
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } as GeolocationPositionError);
+          return;
+        }
+        success({
+          coords: {
+            latitude: 41.95,
+            longitude: -73.51,
+            accuracy: 12,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+          },
+          timestamp: Date.now(),
+        } as GeolocationPosition);
+      },
+      watchPosition() {
+        return 0;
+      },
+      clearWatch() {},
+    };
+    Object.defineProperty(navigator, "geolocation", {
+      value: geolocation,
+      configurable: true,
+    });
+  });
+  await page.route("**://api.open-meteo.com/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        current: {
+          temperature_2m: 54.2,
+          wind_speed_10m: 8.1,
+          wind_direction_10m: 315,
+          weather_code: 1,
+          time: "2026-07-27T10:00",
+        },
+        hourly: { time: [], precipitation_probability: [] },
+      }),
+    }),
+  );
+
+  await page.goto("/offline");
+  await page.getByRole("button", { name: "GPS off — turn on" }).click();
+  await expect(page.getByTestId("capture-weather")).toHaveText("54°F NW 8 MPH");
+  await expect(page.getByText("GPS on")).toBeVisible();
+});
+
+test("a site with location blocked says where to allow it", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const geolocation = {
+      getCurrentPosition(
+        _success: PositionCallback,
+        error?: PositionErrorCallback | null,
+      ) {
+        error?.({
+          code: 1,
+          message: "permission denied",
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
+      },
+      watchPosition() {
+        return 0;
+      },
+      clearWatch() {},
+    };
+    Object.defineProperty(navigator, "geolocation", {
+      value: geolocation,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "permissions", {
+      value: {
+        query: async () => ({ state: "denied" }),
+      },
+      configurable: true,
+    });
+  });
+
+  await page.goto("/offline");
+  await page.getByRole("button", { name: "GPS off — turn on" }).click();
+  await expect(page.getByTestId("gps-hint")).toContainText(
+    "Location is blocked for this site",
+  );
+});
+
 test("capture dock fits narrow phones without horizontal scrolling", async ({
   page,
 }) => {
