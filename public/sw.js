@@ -85,10 +85,21 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(
-          async () =>
-            (await caches.match(url.pathname)) || caches.match("/offline"),
-        ),
+        .catch(async () => {
+          const exact = await caches.match(url.pathname);
+          if (exact) return exact;
+          // A day or Thread deep link has no cached copy of its own; the
+          // Days workspace shell is the right room to land in, not the
+          // capture screen.
+          if (
+            url.pathname.startsWith("/days/") ||
+            url.pathname.startsWith("/threads/")
+          ) {
+            const days = await caches.match("/days");
+            if (days) return days;
+          }
+          return caches.match("/offline");
+        }),
     );
     return;
   }

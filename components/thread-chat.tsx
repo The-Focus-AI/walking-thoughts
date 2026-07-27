@@ -7,6 +7,7 @@ import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import { statusLabel } from "@/components/thread-entries";
+import { useLinkFallback } from "@/components/use-link-fallback";
 import {
   artifactHref,
   artifactsByThread,
@@ -310,6 +311,7 @@ export function ThreadChat({
   /** The report being read over the Thread; desk only. */
   const [reading, setReading] = useState<ArtifactSummary | null>(null);
   const atTheDesk = useDeskViewport();
+  const onLinkClick = useLinkFallback();
   const router = useRouter();
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
@@ -603,6 +605,9 @@ export function ThreadChat({
             <Link
               className="topbar-link"
               href={dayKey ? `/days/${dayKey}` : "/days"}
+              onClick={(event) =>
+                onLinkClick(event, dayKey ? `/days/${dayKey}` : "/days")
+              }
             >
               ← {dayLabel}
             </Link>
