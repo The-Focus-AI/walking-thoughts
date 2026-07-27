@@ -295,10 +295,11 @@ from the losing Field Notebook variant); UI text sits at 1.45–1.5.
   (Capture / Days / Map / You), Capture dock sticky above it in the thumb
   zone. Respect `env(safe-area-inset-*)` everywhere.
 - **Two surfaces, two jobs.** Capture is the trail instrument and holds
-  only the map, the composer, and the day's tally — never a list of
-  Threads. Days is the desk, where a walk is read, answered, and filed.
-  The only thing that crosses from desk to trail is one line of count
-  ("2 reports ready"), never the reports themselves.
+  only the composer and the day's tally — never a list of Threads, and
+  not the map either: the Offline Region lives on the Map tab, one
+  thumb-tap away. Days is the desk, where a walk is read, answered, and
+  filed. The only thing that crosses from desk to trail is one line of
+  count ("2 reports ready"), never the reports themselves.
 - **Dense on mobile, spacious on desktop.** The phone is the field
   instrument — notebook, topo map, kneeboard: tight 8–12px gaps, the
   station gutter carrying structure, no decorative padding. The desktop
@@ -309,7 +310,10 @@ from the losing Field Notebook variant); UI text sits at 1.45–1.5.
   column stacking station time (display, tabular), elevation (mono
   micro), and status label (mono micro), with the entry body right.
   Every Capture row uses it; never hide status behind a tap.
-- **The instrument strip** sits under the masthead on trail surfaces:
+- **The instrument strip** is retired from the Capture surface — the
+  composer owns that screen, with GPS and network state as one quiet
+  mono line under the actions. Where a strip appears (desk or map
+  surfaces), it follows the original spec:
   four ruled cells — Elevation, Position, Ascent, Weather — big condensed
   tabular values over mono micro sublabels, read left to right like a
   cockpit scan. Cells with no data are omitted, not left empty; the strip

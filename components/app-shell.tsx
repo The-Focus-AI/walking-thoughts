@@ -3,9 +3,7 @@ import Link from "next/link";
 import { AppNav } from "@/components/app-nav";
 import { CaptureComposer } from "@/components/capture-composer";
 import { OfflineReadiness } from "@/components/offline-readiness";
-import { InstrumentStrip, SheetMasthead } from "@/components/sheet";
 import { SyncRuntime } from "@/components/sync-runtime";
-import { TrailMapHero } from "@/components/trail-map-hero";
 
 type AppShellProps = {
   account?: ReactNode;
@@ -13,10 +11,10 @@ type AppShellProps = {
 };
 
 /**
- * The trail surface: where you are, and what you want to say about it.
- * Nothing else — the day's Threads, the reports, the account desk all live
- * one tap away on Days and You, so this screen stays a field instrument.
- * Screen-to-screen navigation is the shared bottom tab bar (AppNav).
+ * The trail surface has one job: record the thought — text, photo, video, or
+ * audio. Everything else (the day's Threads, the maps, the reports, the
+ * account desk) lives one tap away on the bottom tab bar, so this screen
+ * stays a field instrument with nothing around the composer.
  */
 export function AppShell({ account, configurationRequired }: AppShellProps) {
   return (
@@ -27,6 +25,7 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
           <span className="brand-mark" aria-hidden="true">
             W
           </span>
+          <h1 className="trail-title">Trail Log</h1>
         </Link>
         <div className="topbar-actions">
           <OfflineReadiness />
@@ -34,12 +33,7 @@ export function AppShell({ account, configurationRequired }: AppShellProps) {
         </div>
       </header>
 
-      <SheetMasthead />
-      <InstrumentStrip />
-
       <div className="trail-layout">
-        <TrailMapHero />
-
         {configurationRequired ? (
           <aside className="configuration-note" role="status">
             <strong>Secure setup required</strong>

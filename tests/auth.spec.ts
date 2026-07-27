@@ -27,9 +27,7 @@ test.describe("single-user Clerk boundary", () => {
     await expect(
       page.getByRole("heading", { name: "Trail Log", exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("region", { name: "Offline Region map" }),
-    ).toBeVisible();
+    await expect(page.getByLabel("Capture text")).toBeVisible();
     await expect(page.getByText("Shell ready")).toBeVisible();
 
     await context.setOffline(true);

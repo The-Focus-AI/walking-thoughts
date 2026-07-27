@@ -9,12 +9,15 @@ export function OfflineReadiness() {
 
   useEffect(() => {
     let active = true;
+    // Every tab-bar destination, so a tap on the nav always has a page to
+    // land on even with no network at all.
     cacheShellResources([
       "/",
       "/offline",
       "/offline-maps",
       "/days",
       "/journal",
+      "/interview",
       "/manifest.webmanifest",
       "/icon-192.svg",
       "/icon-512.svg",

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
-import { ScaleBar } from "@/components/sheet";
 import {
   deskWaitingLabel,
   summarizeDesk,
@@ -599,13 +598,11 @@ export function CaptureComposer() {
           />
         </div>
         <p className="capture-context" role="status">
-          <span>Hold the mic to talk · release Captures it</span>
-          <span aria-hidden="true">·</span>
-          <span>Each Capture starts its own Thread</span>
+          <span>Hold the mic to talk</span>
           <span aria-hidden="true">·</span>
           <span>GPS {gps ? "on" : "off"}</span>
           <span aria-hidden="true">·</span>
-          <span>{online ? "Network online" : "Network offline"}</span>
+          <span>{online ? "Online" : "Offline — saves to this phone"}</span>
           {saveConfirmation ? (
             <>
               <span aria-hidden="true">·</span>
@@ -620,7 +617,6 @@ export function CaptureComposer() {
         role="status"
         data-testid="trail-sync-footer"
       >
-        <ScaleBar />
         <div className="trail-sync-footer-lines">
           <strong className="trail-sync-promise">
             Committed locally first · Synced when in range

@@ -29,7 +29,15 @@ test("Offline page can finish installing the Offline Region pack", async ({
   await page.goto("/offline-maps");
   await expect(page.getByTestId("offline-maps-page")).toBeVisible();
 
+  // The page checks device storage and fetches the manifest before it knows
+  // which state to show — wait for a decided state instead of sampling the
+  // "Looking for trail maps…" frame, where the button does not exist yet.
   const download = page.getByRole("button", { name: "Download Offline Region" });
+  await expect(
+    download
+      .or(page.getByTestId("offline-maps-ready"))
+      .or(page.getByTestId("offline-region-download-progress")),
+  ).toBeVisible({ timeout: 30_000 });
   if (await download.isVisible().catch(() => false)) {
     await download.click();
   }
