@@ -48,6 +48,12 @@ export type EnrichmentJob = {
   status: EnrichmentJobStatus;
   attempts: number;
   error?: string;
+  /**
+   * When the current claim on this job began. A running job with a fresh
+   * claim belongs to another in-flight process call; one with a stale claim
+   * was orphaned by a killed invocation and may be re-claimed.
+   */
+  startedAt?: string | null;
 };
 
 /**

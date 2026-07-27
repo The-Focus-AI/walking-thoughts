@@ -52,6 +52,24 @@ import type {
   ThreadEnrichment,
 } from "./types";
 
+/**
+ * Model jobs run per process call. Each job can spend transcription, a
+ * report-writing pass, and a publish pass; running the whole backlog in one
+ * HTTP request outlives every caller's patience and gets re-asked from the
+ * top. The rest of the queue belongs to the next call.
+ */
+const MAX_JOBS_PER_CALL = 3;
+
+/** Stop starting new jobs once a call has been at it this long. */
+const CALL_TIME_BUDGET_MS = 45_000;
+
+/**
+ * A running claim older than this belonged to a killed invocation and may be
+ * re-claimed; a fresher one is another in-flight call working the same job,
+ * and running it here too would spend the model twice on the same Thread.
+ */
+const RUNNING_CLAIM_LEASE_MS = 5 * 60_000;
+
 type PushHooks = {
   repository: PushRepository;
   sender: PushSender | null;
@@ -428,10 +446,9 @@ async function runJob(
     }));
   }
 
-  const running =
-    job.status === "running"
-      ? job
-      : await repository.markJobRunning(userId, job.id);
+  // Always re-claim, even a job already marked running: the fresh claim
+  // timestamp is what tells concurrent calls to leave it alone.
+  const running = await repository.markJobRunning(userId, job.id);
 
   const thread = threadsById.get(running.threadId);
   if (!thread) {
@@ -753,12 +770,24 @@ export async function processPendingEnrichments(
   const threads = await repository.listPendingThreads(userId);
   const threadsById = new Map(threads.map((thread) => [thread.id, thread]));
   const openJobs = await repository.listOpenJobs(userId);
-  const runnable = openJobs.filter(
-    (job) => job.status === "queued" || job.status === "running",
+  const now = Date.now();
+  const claimable = openJobs.filter(
+    (job) =>
+      job.status === "queued" ||
+      (job.status === "running" &&
+        (!job.startedAt ||
+          now - Date.parse(job.startedAt) > RUNNING_CLAIM_LEASE_MS)),
   );
+  // Fresh work first: the Capture the walker just took must not queue
+  // behind a herd of retried failures.
+  const runnable = [...claimable]
+    .sort((a, b) => a.attempts - b.attempts)
+    .slice(0, MAX_JOBS_PER_CALL);
 
   const results: EnrichmentCaptureResult[] = [];
+  const deadline = Date.now() + CALL_TIME_BUDGET_MS;
   for (const job of runnable) {
+    if (results.length > 0 && Date.now() > deadline) break;
     const jobResults = await runJob(
       userId,
       repository,
