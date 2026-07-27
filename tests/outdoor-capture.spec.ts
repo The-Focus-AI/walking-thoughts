@@ -313,7 +313,11 @@ test("tapping GPS off asks for permission and lights the chip on a grant", async
   );
 
   await page.goto("/offline");
-  await page.getByRole("button", { name: "GPS off — turn on" }).click();
+  const gpsButton = page.getByRole("button", { name: "GPS off — turn on" });
+  // The chip speaks in the context line's quiet voice — it must never
+  // inherit the card's gold action-button dress.
+  await expect(gpsButton).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await gpsButton.click();
   await expect(page.getByTestId("capture-weather")).toHaveText("54°F NW 8 MPH");
   await expect(page.getByText("GPS on")).toBeVisible();
 });
