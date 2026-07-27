@@ -1483,21 +1483,26 @@ h1 {
   font-size: 0.68rem;
 }
 
-/* A context cell the walker can tap — same quiet mono voice, underlined. */
-.capture-context-action {
+/* A context cell the walker can tap — the same quiet mono voice as its
+   neighbors, just underlined. Scoped under .capture-card so the card's
+   gold action-button rule cannot restyle it. */
+.capture-card .capture-context-action {
   appearance: none;
-  background: none;
-  border: 0;
+  min-height: 0;
   padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   color: inherit;
   font: inherit;
   font-variant-numeric: inherit;
+  font-weight: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
 }
 
-.capture-context-action:disabled {
+.capture-card .capture-context-action:disabled {
   text-decoration: none;
   cursor: default;
 }
