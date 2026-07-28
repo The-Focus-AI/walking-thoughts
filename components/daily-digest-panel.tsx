@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import {
@@ -118,7 +119,7 @@ type DailyDigestPanelProps = {
  * left to do, and what Walking Thoughts could not place. Read from local
  * state, so it paints offline and instantly.
  */
-function DaySheetPanel({ sheet }: { sheet: DaySheet }) {
+function DaySheetPanel({ sheet, dayKey }: { sheet: DaySheet; dayKey: string }) {
   if (sheet.threadCount === 0) return null;
   return (
     <aside className="day-sheet" data-testid="day-sheet">
@@ -166,14 +167,17 @@ function DaySheetPanel({ sheet }: { sheet: DaySheet }) {
         </p>
       ) : null}
 
-      {/* What the day still wants is stated once, as a count. The Threads
-          themselves are listed right below with their own chips — repeating
-          them here made the same link appear twice. */}
+      {/* What the day still wants, said once — and tappable: the link
+          filters the day down to exactly those Threads, each carrying its
+          question and an answer box on the row. */}
       {sheet.needsWord.length > 0 ? (
         <p className="day-sheet-asks" data-testid="day-sheet-asks">
           {sheet.needsWord.length}{" "}
           {sheet.needsWord.length === 1 ? "Thread needs" : "Threads need"} a
-          word from you
+          word from you —{" "}
+          <Link href={`/days/${dayKey}?f=word`} data-testid="day-sheet-answer">
+            answer {sheet.needsWord.length === 1 ? "it" : "them"}
+          </Link>
         </p>
       ) : null}
     </aside>
@@ -367,7 +371,7 @@ export function DailyDigestPanel({
       </header>
 
       <div className="day-chat-log" ref={logRef}>
-        {sheet ? <DaySheetPanel sheet={sheet} /> : null}
+        {sheet ? <DaySheetPanel sheet={sheet} dayKey={dayKey} /> : null}
         {children}
         {messages.length === 0 && !busy ? (
           <div
