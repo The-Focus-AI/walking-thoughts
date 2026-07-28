@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "@/components/app-nav";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
@@ -40,9 +40,10 @@ import {
   type LocalCapture,
   type LocalThread,
 } from "@/lib/local-capture/types";
+import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getReviewTransport } from "@/lib/sync/review-client";
 import type { Project } from "@/lib/sync/types";
-import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
+import { SYNC_CYCLE_EVENT, runSyncCycle } from "@/lib/sync/cycle";
 import { syncRollup } from "@/lib/sync/rollup";
 
 type ThreadListView = {
@@ -51,6 +52,194 @@ type ThreadListView = {
   enrichments: ThreadEnrichment[];
   dayKey: string;
 };
+
+/** One way of working the pile: the chips over Days and each day's list. */
+type DeskFilter = "word" | "attention" | "reports" | "media";
+
+const FILTER_LABELS: Record<DeskFilter, string> = {
+  word: "Needs a word",
+  attention: "Needs attention",
+  reports: "Has a report",
+  media: "Has media",
+};
+
+function isDeskFilter(value: string | null): value is DeskFilter {
+  return (
+    value === "word" ||
+    value === "attention" ||
+    value === "reports" ||
+    value === "media"
+  );
+}
+
+function matchesFilter(
+  view: ThreadListView,
+  artifacts: ReadonlyMap<string, ArtifactSummary>,
+  filter: DeskFilter,
+): boolean {
+  switch (filter) {
+    case "word":
+      return Boolean(view.thread.ask);
+    case "attention":
+      return view.captures.some(
+        (capture) => capture.status === "needs_attention",
+      );
+    case "reports":
+      return artifacts.has(view.thread.id);
+    case "media":
+      return view.captures.some((capture) => capture.attachments.length > 0);
+  }
+}
+
+function countFilters(
+  views: ThreadListView[],
+  artifacts: ReadonlyMap<string, ArtifactSummary>,
+): Record<DeskFilter, number> {
+  const counts = { word: 0, attention: 0, reports: 0, media: 0 };
+  for (const view of views) {
+    for (const key of Object.keys(counts) as DeskFilter[]) {
+      if (matchesFilter(view, artifacts, key)) counts[key] += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * The filter chips. Each is a link carrying ?f=, so the pill and the day
+ * sheet can deep-link straight into a working set, and Back undoes it.
+ * A way of working with nothing in it stays off the row.
+ */
+function FilterChips({
+  base,
+  active,
+  counts,
+  onNavigate,
+}: {
+  base: string;
+  active: DeskFilter | null;
+  counts: Record<DeskFilter, number>;
+  onNavigate: (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) => void;
+}) {
+  const chips: Array<{ key: DeskFilter | null; label: string; count?: number }> =
+    [
+      { key: null, label: "All" },
+      ...(Object.keys(FILTER_LABELS) as DeskFilter[]).map((key) => ({
+        key,
+        label: FILTER_LABELS[key],
+        count: counts[key],
+      })),
+    ];
+  return (
+    <nav className="desk-filters" aria-label="Filter Threads">
+      {chips.map((chip) => {
+        if (chip.key && !chip.count) return null;
+        const href = chip.key ? `${base}?f=${chip.key}` : base;
+        const selected = active === chip.key;
+        return (
+          <Link
+            key={chip.label}
+            className={
+              selected ? "desk-filter desk-filter-active" : "desk-filter"
+            }
+            href={href}
+            aria-current={selected ? "true" : undefined}
+            data-testid={`desk-filter-${chip.key ?? "all"}`}
+            onClick={(event) => onNavigate(event, href)}
+          >
+            {chip.label}
+            {chip.count ? ` · ${chip.count}` : ""}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * The Enrichment met a name it could not place and asked. The question and
+ * its answer box live on the row itself — answering must not depend on
+ * opening the chat.
+ */
+function AskAnswer({
+  threadId,
+  ask,
+  onAnswered,
+}: {
+  threadId: string;
+  ask: string;
+  onAnswered: () => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function answer() {
+    const text = draft.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const store = getCaptureStore();
+      await store.commit(text, readAvailableLocation(), {
+        destination: { type: "thread", threadId },
+      });
+      setSent(true);
+      setDraft("");
+      if (typeof navigator === "undefined" || navigator.onLine !== false) {
+        runSyncCycle({ store }).catch(() => undefined);
+      }
+      onAnswered();
+    } catch {
+      setError("Could not save the answer");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="thread-ask-panel" data-testid="thread-ask-panel">
+      <p className="thread-ask-question">{ask}</p>
+      {sent ? (
+        <p className="thread-ask-sent" role="status">
+          Answer saved — the next Enrichment reads it
+        </p>
+      ) : (
+        <form
+          className="thread-ask-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void answer();
+          }}
+        >
+          <input
+            className="thread-ask-input"
+            value={draft}
+            placeholder="Answer with a word or two…"
+            aria-label={`Answer: ${ask}`}
+            onChange={(event) => setDraft(event.target.value)}
+            disabled={busy}
+          />
+          <button
+            type="submit"
+            className="thread-ask-send"
+            disabled={busy || !draft.trim()}
+          >
+            Answer
+          </button>
+        </form>
+      )}
+      {error ? (
+        <p className="capture-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function threadStatus(captures: LocalCapture[]): {
   label: string;
@@ -163,6 +352,13 @@ function ThreadRow({
           {mediaCount > 0 ? ` · ${mediaCount} media` : ""}
         </span>
       </Link>
+      {view.thread.ask ? (
+        <AskAnswer
+          threadId={view.thread.id}
+          ask={view.thread.ask}
+          onAnswered={onFiled}
+        />
+      ) : null}
       {onOpenMedia && lookable.length > 0 ? (
         <div className="thread-row-thumbs" aria-label="Media from this Thread">
           {lookable.slice(0, 4).map((attachment) => (
@@ -271,6 +467,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const dayParam =
     typeof params.dayKey === "string" ? params.dayKey : undefined;
   const selectedDayKey = isDayKey(dayParam) ? dayParam : null;
+  const searchParams = useSearchParams();
+  const rawFilter = searchParams?.get("f") ?? null;
+  const filter = isDeskFilter(rawFilter) ? rawFilter : null;
 
   const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -283,6 +482,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   /** The report being read over the day; desk only. */
   const [openReport, setOpenReport] = useState<ArtifactSummary | null>(null);
   const [openMedia, setOpenMedia] = useState<LocalAttachment | null>(null);
+  const [retryBusy, setRetryBusy] = useState(false);
   const atTheDesk = useDeskViewport();
   const onLinkClick = useLinkFallback();
   const loadGeneration = useRef(0);
@@ -452,6 +652,49 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     [dayThreads, artifacts],
   );
 
+  /** The day's list under the active filter — what the chips actually cut. */
+  const visibleDayThreads = useMemo(
+    () =>
+      filter
+        ? orderedDayThreads.filter((view) =>
+            matchesFilter(view, artifacts, filter),
+          )
+        : orderedDayThreads,
+    [orderedDayThreads, artifacts, filter],
+  );
+
+  const dayFilterCounts = useMemo(
+    () => countFilters(dayThreads, artifacts),
+    [dayThreads, artifacts],
+  );
+
+  const allFilterCounts = useMemo(
+    () => countFilters(threads, artifacts),
+    [threads, artifacts],
+  );
+
+  /**
+   * A filter on /days with no day open is a working queue: the matching
+   * Threads across every day, newest day first, ready to be gone through
+   * one by one.
+   */
+  const queueThreads = useMemo(
+    () =>
+      filter
+        ? byDay
+            .flatMap(([, views]) => views)
+            .filter((view) => matchesFilter(view, artifacts, filter))
+        : [],
+    [byDay, artifacts, filter],
+  );
+
+  /** Where the filter chips live right now, for their hrefs. */
+  const basePath = selectedThreadId
+    ? `/threads/${selectedThreadId}`
+    : selectedDayKey
+      ? `/days/${selectedDayKey}`
+      : "/days";
+
   /** Threads in display order (day by day) for swipe stepping. */
   const orderedThreadIds = useMemo(
     () =>
@@ -518,6 +761,20 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     },
     [load, router, threads, selectedThreadId],
   );
+
+  /** "N need attention", answered: one explicit retry of everything stuck. */
+  async function retryAttention() {
+    if (retryBusy) return;
+    setRetryBusy(true);
+    try {
+      await runSyncCycle({ store: getCaptureStore(), retryFailed: true });
+      await load();
+    } catch {
+      // Row chips keep saying what is still stuck.
+    } finally {
+      setRetryBusy(false);
+    }
+  }
 
   const hasSelection = Boolean(selectedThreadId || selectedDayKey);
 
@@ -635,11 +892,27 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                 >
                   {dayTitle(activeDayKey)}
                 </Link>
+                <FilterChips
+                  base={basePath}
+                  active={filter}
+                  counts={dayFilterCounts}
+                  onNavigate={onLinkClick}
+                />
+                {filter === "attention" ? (
+                  <button
+                    type="button"
+                    className="capture-retry"
+                    onClick={() => void retryAttention()}
+                    disabled={retryBusy}
+                  >
+                    {retryBusy ? "Retrying…" : "Retry sync"}
+                  </button>
+                ) : null}
                 <ul
                   className="threads-day-list"
                   aria-label={`Threads from ${dayTitle(activeDayKey)}`}
                 >
-                  {orderedDayThreads.map((view) => (
+                  {visibleDayThreads.map((view) => (
                     <ThreadRow
                       key={view.thread.id}
                       view={view}
@@ -653,8 +926,60 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                     />
                   ))}
                 </ul>
+                {filter && visibleDayThreads.length === 0 ? (
+                  <p className="trail-thread-empty">
+                    Nothing in this day matches that filter.
+                  </p>
+                ) : null}
               </nav>
+            ) : filter && !activeDayKey ? (
+              <div className="desk-queue" aria-label="Filtered Threads">
+                <FilterChips
+                  base="/days"
+                  active={filter}
+                  counts={allFilterCounts}
+                  onNavigate={onLinkClick}
+                />
+                {filter === "attention" ? (
+                  <button
+                    type="button"
+                    className="capture-retry"
+                    onClick={() => void retryAttention()}
+                    disabled={retryBusy}
+                  >
+                    {retryBusy ? "Retrying…" : "Retry sync"}
+                  </button>
+                ) : null}
+                <ul className="threads-day-list" aria-label="Filtered Threads">
+                  {queueThreads.map((view) => (
+                    <ThreadRow
+                      key={view.thread.id}
+                      view={view}
+                      showDay
+                      selected={false}
+                      projects={projects}
+                      artifact={artifacts.get(view.thread.id)}
+                      onOpenReport={atTheDesk ? setOpenReport : undefined}
+                      onOpenMedia={atTheDesk ? setOpenMedia : undefined}
+                      onFiled={() => void load()}
+                      onProjectCreated={onProjectCreated}
+                    />
+                  ))}
+                </ul>
+                {queueThreads.length === 0 ? (
+                  <p className="trail-thread-empty">
+                    Nothing matches that filter right now.
+                  </p>
+                ) : null}
+              </div>
             ) : (
+            <>
+            <FilterChips
+              base="/days"
+              active={null}
+              counts={allFilterCounts}
+              onNavigate={onLinkClick}
+            />
             <ul className="desk-days" aria-label="Days">
               {byDay.map(([dayKey, views]) => {
                 const sheet = summarizeDay({
@@ -737,6 +1062,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                 );
               })}
             </ul>
+            </>
             )}
           </>
         )}
@@ -766,10 +1092,31 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
           >
             {/* At the desk the sidebar already lists this day's Threads;
                 repeating them under the digest would say it twice. */}
-            {orderedDayThreads.length > 0 && !atTheDesk ? (
+            {dayThreads.length > 0 && !atTheDesk ? (
               <section className="day-threads" aria-label="Threads from this day">
+                <FilterChips
+                  base={basePath}
+                  active={filter}
+                  counts={dayFilterCounts}
+                  onNavigate={onLinkClick}
+                />
+                {filter === "attention" ? (
+                  <button
+                    type="button"
+                    className="capture-retry"
+                    onClick={() => void retryAttention()}
+                    disabled={retryBusy}
+                  >
+                    {retryBusy ? "Retrying…" : "Retry sync"}
+                  </button>
+                ) : null}
+                {filter && visibleDayThreads.length === 0 ? (
+                  <p className="trail-thread-empty">
+                    Nothing in this day matches that filter.
+                  </p>
+                ) : null}
                 <ul className="threads-day-list">
-                  {orderedDayThreads.map((view) => (
+                  {visibleDayThreads.map((view) => (
                     <ThreadRow
                       key={view.thread.id}
                       view={view}

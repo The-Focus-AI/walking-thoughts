@@ -1153,6 +1153,100 @@ h1 {
   align-content: start;
 }
 
+.desk-queue {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+
+/* Ways of working the pile — quiet chips, the active one inverted. */
+.desk-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.desk-filter {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.desk-filter:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.desk-filter-active {
+  color: var(--forest);
+  background: var(--sun);
+  border-color: var(--sun);
+}
+
+/* The Enrichment's open question, answerable on the row itself. */
+.thread-ask-panel {
+  flex-basis: 100%;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--machine);
+  border-radius: 4px;
+}
+
+.thread-ask-question {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.thread-ask-form {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.thread-ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.thread-ask-send {
+  padding: 0.45rem 0.9rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--sun);
+  color: var(--forest);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.thread-ask-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.thread-ask-sent {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--machine);
+}
+
 .desk-sidebar-back {
   color: var(--muted);
   text-decoration: none;

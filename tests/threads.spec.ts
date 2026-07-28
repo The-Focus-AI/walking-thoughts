@@ -441,4 +441,161 @@ test.describe("trail Threads", () => {
     await ask.getByRole("button", { name: "Answer in this Thread" }).click();
     await expect(page.locator("#thread-chat-followup")).toBeFocused();
   });
+
+  test("the day filters to what needs a word, answerable on the row", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await commitCapture(page, "Scope of work for Goldin");
+    await commitCapture(page, "Plain note with nothing open");
+
+    // The first Thread came back with a question the model would not guess.
+    await page.evaluate(async () => {
+      type SeedStore = {
+        listRecentThreads(): Promise<
+          Array<{ id: string; title: string; revision: number; updatedAt: string }>
+        >;
+        listThread(id: string): Promise<{
+          captures: Array<{
+            id: string;
+            text: string;
+            createdAt: string;
+            sequence: number;
+          }>;
+        }>;
+        applyRemoteThreads(threads: unknown[]): Promise<unknown>;
+      };
+      const store = (
+        globalThis as typeof globalThis & { __WT_CAPTURE_STORE__?: SeedStore }
+      ).__WT_CAPTURE_STORE__!;
+      const threads = await store.listRecentThreads();
+      const thread = threads.find((entry) =>
+        entry.title.includes("Goldin"),
+      )!;
+      const view = await store.listThread(thread.id);
+      await store.applyRemoteThreads([
+        {
+          id: thread.id,
+          title: thread.title,
+          revision: thread.revision,
+          updatedAt: thread.updatedAt,
+          kind: null,
+          topics: [],
+          ask: "Who is Goldin — a client, a project, or a person?",
+          captures: view.captures.map((capture) => ({
+            id: capture.id,
+            text: capture.text,
+            createdAt: capture.createdAt,
+            location: null,
+            sequence: capture.sequence,
+            attachments: [],
+          })),
+        },
+      ]);
+    });
+
+    // Keep the seeded local truth: the test server never saw the ask, and a
+    // background hydration would clobber it mid-test.
+    await page.route("**/api/sync/threads", (route) =>
+      route.fulfill({ status: 503, body: "" }),
+    );
+
+    await page.goto("/days");
+    await page.locator(".desk-day-open").first().click();
+
+    // The sheet's count is now a way in, not just a statement.
+    await page.getByTestId("day-sheet-answer").click();
+    await expect(page).toHaveURL(/f=word/);
+
+    // Filtered down to the Thread that asked; the other row is gone. The
+    // phone's visible pane is the detail pane — the day list sits hidden
+    // beside it, so every look goes through the pane.
+    const pane = page.locator(".desk-detail-pane");
+    await expect(
+      pane.getByRole("link", { name: /Scope of work for Goldin/ }),
+    ).toBeVisible();
+    await expect(
+      pane.getByRole("link", { name: /Plain note with nothing open/ }),
+    ).toHaveCount(0);
+
+    // The question sits on the row with its own answer box.
+    const panel = pane.getByTestId("thread-ask-panel");
+    await expect(panel).toContainText("Who is Goldin");
+    await panel.getByRole("textbox").fill("Goldin is a client");
+    await panel.getByRole("button", { name: "Answer" }).click();
+    await expect(panel).toContainText("Answer saved");
+
+    // The answer landed in the Thread as an ordinary Capture.
+    const answered = await page.evaluate(async () => {
+      type SeedStore = {
+        listRecentThreads(): Promise<Array<{ id: string; title: string }>>;
+        listThread(id: string): Promise<{
+          captures: Array<{ text: string }>;
+        }>;
+      };
+      const store = (
+        globalThis as typeof globalThis & { __WT_CAPTURE_STORE__?: SeedStore }
+      ).__WT_CAPTURE_STORE__!;
+      const threads = await store.listRecentThreads();
+      const thread = threads.find((entry) => entry.title.includes("Goldin"))!;
+      const view = await store.listThread(thread.id);
+      return view.captures.map((capture) => capture.text);
+    });
+    expect(answered).toContain("Goldin is a client");
+
+    // "All" clears the filter and the other Thread returns.
+    await pane.getByTestId("desk-filter-all").click();
+    await expect(
+      pane.getByRole("link", { name: /Plain note with nothing open/ }),
+    ).toBeVisible();
+  });
+
+  test("/days with a filter is a working queue across days", async ({
+    page,
+  }) => {
+    await openCaptureShell(page);
+    await commitCapture(page, "Plain note without media");
+
+    // A Capture that actually carries a photo, straight through the store.
+    await page.evaluate(async () => {
+      const store = (
+        globalThis as typeof globalThis & {
+          __WT_CAPTURE_STORE__?: {
+            commit(
+              text: string,
+              location: null,
+              options: object,
+            ): Promise<unknown>;
+          };
+        }
+      ).__WT_CAPTURE_STORE__!;
+      await store.commit("Photo of the culvert grate", null, {
+        destination: { type: "new_thread" },
+        attachments: [
+          {
+            kind: "image",
+            mimeType: "image/jpeg",
+            fileName: "grate.jpg",
+            bytes: new Blob([new Uint8Array([9])], { type: "image/jpeg" }),
+          },
+        ],
+      });
+    });
+
+    // Keep the seeded attachment: the test server never saw it, and a
+    // background hydration would clobber it mid-test.
+    await page.route("**/api/sync/threads", (route) =>
+      route.fulfill({ status: 503, body: "" }),
+    );
+
+    await page.goto("/days?f=media");
+    await expect(
+      page.getByRole("link", { name: /Photo of the culvert grate/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Plain note without media/ }),
+    ).toHaveCount(0);
+    // Day rows are replaced by the queue while a filter is on.
+    await expect(page.locator(".desk-day")).toHaveCount(0);
+  });
 });

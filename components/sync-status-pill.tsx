@@ -106,13 +106,21 @@ export function SyncStatusPill() {
 
   return (
     <Link
-      href={authBlocked && online ? "/sign-in" : "/days"}
+      href={
+        authBlocked && online
+          ? "/sign-in"
+          : rollup.needs_attention > 0
+            ? "/days?f=attention"
+            : "/days"
+      }
       className={`sync-pill sync-pill-${tone}`}
       data-testid="sync-pill"
       title={
         authBlocked && online
           ? "The server refused this device's session — sign in again to sync"
-          : "Capture sync status — open Days for per-Thread detail"
+          : rollup.needs_attention > 0
+            ? "Open the stuck Threads and retry them"
+            : "Capture sync status — open Days for per-Thread detail"
       }
     >
       <span className="sync-pill-dot" aria-hidden="true" />
