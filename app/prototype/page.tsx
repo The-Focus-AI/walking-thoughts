@@ -40,6 +40,8 @@ const DESK_INBOX = [
   { key: "A", label: "Triage rail", winner: false },
   { key: "B", label: "Light table", winner: false },
   { key: "C", label: "Batch ledger", winner: false },
+  { key: "D", label: "Lens desk", winner: false },
+  { key: "E", label: "Dialogue desk", winner: false },
 ] as const;
 
 const DESIGN_DIRECTIONS = [
@@ -98,7 +100,8 @@ export default function PrototypeIndexPage() {
               Desktop processing: get through the unreviewed queue — keep or
               dismiss research separately from marking the Thread reviewed,
               see stored media, and see similar past Threads while filing.
-              Desktop-only.
+              Round 2 (D, E) adds regroupable lenses and per-Thread
+              back-and-forth. Desktop-only.
             </p>
           </div>
           <div className="proto-index-open-row">

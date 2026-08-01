@@ -42,6 +42,16 @@ Open:
 | B | Light table | Media inventory first: storage stat strip, contact sheet of every attachment grouped by day (text-only Threads get dashed tiles), ringed = unreviewed. Filing happens in a drawer off the selected tile. |
 | C | Batch ledger | Dense day-batched table: inline kind/project selects, keep/drop research cells, a "prior" column expanding the similarity trace, multi-select sweep bar and per-day "Sweep day". |
 
+### Round 2 — from feedback on A–C
+
+Feedback: A's keyboard is good; C's detail is right but too dense; need
+back-and-forth with a Thread; grouping should not be locked to days.
+
+| Key | Name | Idea |
+| --- | --- | --- |
+| D | Lens desk | One grouping control re-groups the same queue: Days / Topics (project or leading mention) / Kind / Media / Reports vs quick notes. Calm expandable rows instead of C's table; A's keys kept, plus `g` cycles the lens. |
+| E | Dialogue desk | The Thread reads as a conversation — trail Capture, Enrichment, then desk Q&A turns. Suggested follow-up chips and a free-ask composer (simulated answers); filing is a compact header bar (Keep research / Mark reviewed). `j`/`k` switches Threads. |
+
 ## What this implies for production (out of scope here)
 
 1. **Filing API grows one field.** `ThreadFiling` gains a research verdict

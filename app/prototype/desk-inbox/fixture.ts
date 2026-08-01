@@ -22,6 +22,11 @@ export type ProtoRelated = {
   sharedMention?: string;
 };
 
+export type ProtoQA = {
+  q: string;
+  a: string;
+};
+
 export type ProtoQueueThread = {
   id: string;
   title: string;
@@ -32,6 +37,8 @@ export type ProtoQueueThread = {
   excerpt: string;
   /** One-line summary of the Enrichment report. */
   enrichmentSummary: string;
+  /** True when the Enrichment is a full report (Artifact candidate), not a quick note. */
+  hasReport: boolean;
   /** Kind the Enrichment guessed (confirmable at the desk). */
   kindGuess: ProtoKind;
   /** Project the Enrichment guessed, if any. */
@@ -39,6 +46,8 @@ export type ProtoQueueThread = {
   mentions: string[];
   media: ProtoMedia[];
   related: ProtoRelated[];
+  /** Canned follow-up questions with answers, for the back-and-forth. */
+  askSuggestions: ProtoQA[];
 };
 
 export type ProtoKind =
@@ -142,6 +151,7 @@ export const QUEUE: ProtoQueueThread[] = [
       "Found where the downhill wall corners into a second one running along the contour. Feels like a field boundary, not a property line.",
     enrichmentSummary:
       "Corner junctions like this usually mark enclosure-era field divisions; the contour wall likely predates the downhill one.",
+    hasReport: true,
     kindGuess: "question",
     projectGuess: "p-walls",
     mentions: ["stone walls", "reservoir", "field boundary"],
@@ -152,6 +162,16 @@ export const QUEUE: ProtoQueueThread[] = [
     related: [
       { threadId: "past-1", score: 0.91, sharedMention: "stone walls" },
       { threadId: "past-2", score: 0.62, sharedMention: "reservoir" },
+    ],
+    askSuggestions: [
+      {
+        q: "How can I tell which wall is older at the corner?",
+        a: "Look at the junction itself: the later wall usually butts against the earlier one rather than interlocking. Your photo shows the downhill wall's end stones resting against the contour wall's face — consistent with the contour wall being first. Lichen coverage and basal sinking on the contour wall point the same way.",
+      },
+      {
+        q: "Does this corner show up on the 1850s maps?",
+        a: "The 1853 county atlas shows a field boundary meeting the reservoir lot line within ~100 m of your GPS point. The alignment matches the contour wall; the downhill wall is absent, suggesting it postdates 1853. Worth checking the 1874 Beers atlas next.",
+      },
     ],
   },
   {
@@ -164,6 +184,7 @@ export const QUEUE: ProtoQueueThread[] = [
       "Culvert is half silted up again, water cutting a channel across the road surface. Should tell the land trust before fall rains.",
     enrichmentSummary:
       "Maintenance task: silted culvert; suggests reporting with GPS point and photo to the trail crew.",
+    hasReport: false,
     kindGuess: "task",
     projectGuess: "p-trail",
     mentions: ["culvert", "woods road", "land trust"],
@@ -171,6 +192,16 @@ export const QUEUE: ProtoQueueThread[] = [
       { id: "m3", type: "photo", label: "Silted culvert mouth", tone: "linear-gradient(135deg,#3a3327,#6e5f3f)", bytes: 3.6 * MB },
     ],
     related: [{ threadId: "past-3", score: 0.78, sharedMention: "land trust" }],
+    askSuggestions: [
+      {
+        q: "Draft the report email to the land trust.",
+        a: "Draft: \"Silted culvert under the woods road crossing (41.842, -73.363), photo attached. Water is cutting across the road surface; likely to wash out with fall rains. Same crossing reported for the blowdown on Jul 24 — may be worth one crew visit for both.\" Want it queued as a task?",
+      },
+      {
+        q: "When was this culvert last cleared?",
+        a: "Nothing in your Threads mentions this culvert before today. The Jul 24 blowdown Thread is the nearest prior report on this road — no maintenance history recorded for the crossing itself.",
+      },
+    ],
   },
   {
     id: "t3",
@@ -181,12 +212,23 @@ export const QUEUE: ProtoQueueThread[] = [
     excerpt: "That two-note call again — third time this month over the clearcut.",
     enrichmentSummary:
       "Call pattern matches broad-winged hawk; late July fits pre-migration staging.",
+    hasReport: false,
     kindGuess: "observation",
     mentions: ["broad-winged hawk", "clearcut"],
     media: [
       { id: "m4", type: "audio", label: "Hawk call, 0:41", tone: "linear-gradient(135deg,#26303a,#3d5468)", bytes: 1.1 * MB },
     ],
     related: [],
+    askSuggestions: [
+      {
+        q: "When do broad-wings leave this area?",
+        a: "Broad-winged hawks in northwest Connecticut kettle up and leave in a narrow mid-September window — most pass between Sep 10 and 25. If you're hearing one through August, it's likely a local breeder from the ridge east of the clearcut.",
+      },
+      {
+        q: "Play me the three calls together.",
+        a: "You have recordings from Jul 8, Jul 19, and today. All three show the same thin two-note pattern with the second note dropping — consistent with one bird. (In production this would line up the clips for playback.)",
+      },
+    ],
   },
   {
     id: "t4",
@@ -198,11 +240,22 @@ export const QUEUE: ProtoQueueThread[] = [
       "Chapter structure could follow one wall from valley floor to ridge — each elevation band is a different era of land use.",
     enrichmentSummary:
       "Sharpened the outline: five elevation bands, each pairing a wall segment with its era; suggested two comparable books.",
+    hasReport: true,
     kindGuess: "idea",
     projectGuess: "p-walls",
     mentions: ["stone walls", "book outline"],
     media: [],
     related: [{ threadId: "past-1", score: 0.84, sharedMention: "stone walls" }],
+    askSuggestions: [
+      {
+        q: "Which wall would make the best spine for the book?",
+        a: "The reservoir ridge wall is the strongest candidate in your Threads: you've captured it at four elevations, it has the dated corner junction, and it ends underwater — which gives the book its closing image. The Mohawk overlook walls are more photogenic but you have no history on them yet.",
+      },
+      {
+        q: "What are the two comparable books it suggested?",
+        a: "Robert Thorson's \"Stone by Stone\" (the geology-first survey) and Susan Allport's \"Sermons in Stone\" (the archival-first history). The gap between them — one wall read closely across its whole length — is the slot your outline fills.",
+      },
+    ],
   },
   {
     id: "t5",
@@ -214,6 +267,7 @@ export const QUEUE: ProtoQueueThread[] = [
       "Perfectly round flat spot, maybe ten meters across, black soil under the leaf litter. Charcoal hearth?",
     enrichmentSummary:
       "Almost certainly a colliers' hearth; this slope supplied the Cornwall iron furnaces. Report includes an 1850s map overlay.",
+    hasReport: true,
     kindGuess: "question",
     projectGuess: "p-reservoir",
     mentions: ["charcoal hearth", "iron furnace", "north slope"],
@@ -226,6 +280,16 @@ export const QUEUE: ProtoQueueThread[] = [
       { threadId: "past-2", score: 0.71, sharedMention: "iron furnace" },
       { threadId: "past-1", score: 0.58 },
     ],
+    askSuggestions: [
+      {
+        q: "How many hearths would this slope have had?",
+        a: "Colliers typically worked a pitch of 6–10 hearths spaced 100–150 m apart on a slope this size. Yours is the first you've recorded here; the 1850s map overlay shows the furnace road switchbacking through this contour, so walking that line should turn up the others.",
+      },
+      {
+        q: "Is it legal to dig a test hole in the black soil?",
+        a: "This slope is state forest — ground disturbance needs a DEEP archaeology permit, and charcoal hearths qualify as cultural resources. Photographing the soil profile where the trail already cuts it is fine; digging is not.",
+      },
+    ],
   },
   {
     id: "t6",
@@ -235,12 +299,19 @@ export const QUEUE: ProtoQueueThread[] = [
     place: "Trailhead",
     excerpt: "Blurry shot of the broken latch — retake next time.",
     enrichmentSummary: "Low-signal capture; likely a reminder, not research.",
+    hasReport: false,
     kindGuess: "noise",
     mentions: ["trailhead gate"],
     media: [
       { id: "m8", type: "photo", label: "Blurry latch", tone: "linear-gradient(135deg,#33352f,#565a4e)", bytes: 2.2 * MB },
     ],
     related: [],
+    askSuggestions: [
+      {
+        q: "Remind me next time I'm at the trailhead.",
+        a: "Done — in production this would set a location-armed reminder: next Capture within 200 m of the trailhead gets a \"retake the latch photo\" nudge.",
+      },
+    ],
   },
   {
     id: "t7",
@@ -252,12 +323,23 @@ export const QUEUE: ProtoQueueThread[] = [
       "The stump sprouts from earlier this month are chest high now, leaves look clean. Same clone as the ledge cluster?",
     enrichmentSummary:
       "Growth rate is consistent with root-collar sprouts; blight usually appears at 5–8 years. Suggests marking for yearly checks.",
+    hasReport: false,
     kindGuess: "observation",
     mentions: ["American chestnut", "ledge trail"],
     media: [
       { id: "m9", type: "photo", label: "Sprout cluster, chest high", tone: "linear-gradient(135deg,#2f4a2d,#71915a)", bytes: 3.4 * MB },
     ],
     related: [{ threadId: "past-4", score: 0.93, sharedMention: "American chestnut" }],
+    askSuggestions: [
+      {
+        q: "Is this the same clone as the ledge cluster?",
+        a: "Almost certainly — chestnut root systems survive the blight and re-sprout for decades, and your two clusters are 40 m apart on the same contour. Same-clone sprouts leaf out within a day or two of each other; both your Jul 12 and today's photos show the same leaf stage.",
+      },
+      {
+        q: "Should I report this to TACF?",
+        a: "The American Chestnut Foundation tracks wild survivors that reach flowering size. Yours are sprouts, so not yet — but mark them; if a stem passes ~4 in DBH without blight cankers, that's a report they want.",
+      },
+    ],
   },
   {
     id: "t8",
@@ -269,6 +351,7 @@ export const QUEUE: ProtoQueueThread[] = [
       "Straight terrace cut below the dam, too level to be a road. Penstock or flume line for the old mill?",
     enrichmentSummary:
       "Likely the 1902 penstock alignment; report traces it to the mill foundation and links two survey photos.",
+    hasReport: true,
     kindGuess: "question",
     projectGuess: "p-reservoir",
     mentions: ["penstock", "reservoir", "mill"],
@@ -279,6 +362,16 @@ export const QUEUE: ProtoQueueThread[] = [
     related: [
       { threadId: "past-2", score: 0.88, sharedMention: "reservoir" },
       { threadId: "past-1", score: 0.64, sharedMention: "reservoir" },
+    ],
+    askSuggestions: [
+      {
+        q: "Where exactly was the mill it fed?",
+        a: "The 1902 survey places the mill at the confluence 600 m downstream — the foundation should sit river-left where the terrace grade ends. Your flooded-farms research (Jul 21) names a Pratt family sawmill at that confluence; this is very likely the same site.",
+      },
+      {
+        q: "Can I walk the full penstock line?",
+        a: "From your terrace point the alignment runs 400 m through state forest (open), then crosses a posted parcel for the last 200 m before the mill site. The state-forest stretch should show as a continuous level cut; the posted stretch you'd need permission for.",
+      },
     ],
   },
 ];
@@ -294,6 +387,11 @@ export function pastThread(id: string): ProtoPastThread | undefined {
 export function projectName(id?: string | null): string | null {
   if (!id) return null;
   return PROJECTS.find((project) => project.id === id)?.name ?? null;
+}
+
+/** The topic a Thread files under when grouping by topic: project first, then leading mention. */
+export function topicOf(thread: ProtoQueueThread): string {
+  return projectName(thread.projectGuess) ?? thread.mentions[0] ?? "unfiled";
 }
 
 export function timeOf(iso: string): string {

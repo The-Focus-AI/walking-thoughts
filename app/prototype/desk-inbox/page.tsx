@@ -15,7 +15,14 @@ import { Suspense, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { PrototypeSwitcher } from "@/components/prototype-switcher";
 import { DESK_VARIANTS, DeskA, DeskB, DeskC } from "./variants";
+import { DeskD, DeskE } from "./iterate-variants";
 import "./prototype-desk.css";
+
+const ALL_VARIANTS = [
+  ...DESK_VARIANTS,
+  { key: "D", label: "Lens desk" },
+  { key: "E", label: "Dialogue desk" },
+];
 
 function DeskInboxPrototype() {
   const searchParams = useSearchParams();
@@ -24,6 +31,8 @@ function DeskInboxPrototype() {
   let body: ReactNode;
   if (variant === "B") body = <DeskB />;
   else if (variant === "C") body = <DeskC />;
+  else if (variant === "D") body = <DeskD />;
+  else if (variant === "E") body = <DeskE />;
   else body = <DeskA />;
 
   return (
@@ -33,7 +42,7 @@ function DeskInboxPrototype() {
         <span>process · {variant}</span>
       </div>
       <div className="proto-viewport-frame">{body}</div>
-      <PrototypeSwitcher param="variant" options={[...DESK_VARIANTS]} />
+      <PrototypeSwitcher param="variant" options={ALL_VARIANTS} />
     </div>
   );
 }
