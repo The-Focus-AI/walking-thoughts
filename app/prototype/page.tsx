@@ -40,11 +40,11 @@ const DESK_INBOX = [
   { key: "A", label: "Triage rail", winner: false },
   { key: "B", label: "Light table", winner: false },
   { key: "C", label: "Batch ledger", winner: false },
-  { key: "D", label: "Lens desk", winner: false },
+  { key: "D", label: "Lens desk", winner: true },
   { key: "E", label: "Dialogue desk", winner: false },
   { key: "F", label: "Filter bar", winner: false },
   { key: "G", label: "Command desk", winner: false },
-  { key: "H", label: "Facet rail", winner: false },
+  { key: "H", label: "Facet rail", winner: true },
 ] as const;
 
 const DESIGN_DIRECTIONS = [
@@ -104,7 +104,12 @@ export default function PrototypeIndexPage() {
               dismiss research separately from marking the Thread reviewed,
               see stored media, and see similar past Threads while filing.
               Round 2 (D, E) adds regroupable lenses and per-Thread
-              back-and-forth. Desktop-only.
+              back-and-forth; round 3 (F–H) adds filtering. Desktop-only.
+            </p>
+            <p className="proto-index-verdict" role="status">
+              Verdict: <strong>D + H</strong> — Lens desk structure with the
+              Facet rail's counted filters (see VERDICT.md). Winners
+              highlighted below.
             </p>
           </div>
           <div className="proto-index-open-row">
