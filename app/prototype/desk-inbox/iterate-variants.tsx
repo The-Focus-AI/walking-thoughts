@@ -34,7 +34,7 @@ import {
 /* Variant D — Lens desk                                               */
 /* ------------------------------------------------------------------ */
 
-const LENSES = [
+export const LENSES = [
   { key: "days", label: "Days" },
   { key: "topics", label: "Topics" },
   { key: "kind", label: "Kind" },
@@ -42,16 +42,16 @@ const LENSES = [
   { key: "reports", label: "Reports" },
 ] as const;
 
-type LensKey = (typeof LENSES)[number]["key"];
+export type LensKey = (typeof LENSES)[number]["key"];
 
-type LensGroup = {
+export type LensGroup = {
   key: string;
   label: string;
   sub?: string;
   threads: ProtoQueueThread[];
 };
 
-function groupBy(lens: LensKey): LensGroup[] {
+export function groupBy(lens: LensKey): LensGroup[] {
   if (lens === "days") {
     return DAYS.map((day) => ({
       key: day.key,

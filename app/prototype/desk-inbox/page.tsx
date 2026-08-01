@@ -16,12 +16,16 @@ import { useSearchParams } from "next/navigation";
 import { PrototypeSwitcher } from "@/components/prototype-switcher";
 import { DESK_VARIANTS, DeskA, DeskB, DeskC } from "./variants";
 import { DeskD, DeskE } from "./iterate-variants";
+import { DeskF, DeskG, DeskH } from "./filter-variants";
 import "./prototype-desk.css";
 
 const ALL_VARIANTS = [
   ...DESK_VARIANTS,
   { key: "D", label: "Lens desk" },
   { key: "E", label: "Dialogue desk" },
+  { key: "F", label: "Filter bar" },
+  { key: "G", label: "Command desk" },
+  { key: "H", label: "Facet rail" },
 ];
 
 function DeskInboxPrototype() {
@@ -33,6 +37,9 @@ function DeskInboxPrototype() {
   else if (variant === "C") body = <DeskC />;
   else if (variant === "D") body = <DeskD />;
   else if (variant === "E") body = <DeskE />;
+  else if (variant === "F") body = <DeskF />;
+  else if (variant === "G") body = <DeskG />;
+  else if (variant === "H") body = <DeskH />;
   else body = <DeskA />;
 
   return (

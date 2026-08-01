@@ -42,6 +42,9 @@ const DESK_INBOX = [
   { key: "C", label: "Batch ledger", winner: false },
   { key: "D", label: "Lens desk", winner: false },
   { key: "E", label: "Dialogue desk", winner: false },
+  { key: "F", label: "Filter bar", winner: false },
+  { key: "G", label: "Command desk", winner: false },
+  { key: "H", label: "Facet rail", winner: false },
 ] as const;
 
 const DESIGN_DIRECTIONS = [

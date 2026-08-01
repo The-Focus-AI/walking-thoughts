@@ -52,6 +52,19 @@ back-and-forth with a Thread; grouping should not be locked to days.
 | D | Lens desk | One grouping control re-groups the same queue: Days / Topics (project or leading mention) / Kind / Media / Reports vs quick notes. Calm expandable rows instead of C's table; A's keys kept, plus `g` cycles the lens. |
 | E | Dialogue desk | The Thread reads as a conversation — trail Capture, Enrichment, then desk Q&A turns. Suggested follow-up chips and a free-ask composer (simulated answers); filing is a compact header bar (Keep research / Mark reviewed). `j`/`k` switches Threads. |
 
+### Round 3 — filtering on D
+
+Feedback: D wins, but needs search and a way to zoom in — which are
+questions, which are tasks, which are still open. Three takes on the same
+filter model (text · kind · state · media · prior · report), all keeping
+D's grouped expandable rows and keys:
+
+| Key | Name | Idea |
+| --- | --- | --- |
+| F | Filter bar | Explicit controls in one row: search box (`/` focuses), kind chips, All/Open/Reviewed/Kept segmented control, media select. Composes with the Group-by lenses; live "n of 8" count with clear. |
+| G | Command desk | One omnibox speaking tokens — `kind:question is:open has:photo by:topics wall`. Free words search text/mentions/places; suggestion chips append tokens; grouping itself is a token (`by:`). |
+| H | Facet rail | Sidebar facets with live counts (State, Kind, Topic, Media, History). The counts answer "which ones are questions" before any click; selections combine across groups; zero-count facets disable. |
+
 ## What this implies for production (out of scope here)
 
 1. **Filing API grows one field.** `ThreadFiling` gains a research verdict
