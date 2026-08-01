@@ -21,8 +21,12 @@ One Enrichment published as a page: the report laid out as a survey sheet, brows
 _Avoid_: Document, export, share link, post
 
 **Day**:
-One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The unit of work at the desk — Threads are reached through the day they were walked, not through a flat list.
+One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The default arrangement at the desk — Threads arrive stacked by the day they were walked, though a Lens may re-stack the same pile another way.
 _Avoid_: Session, entry, log, feed
+
+**Lens**:
+How the desk stacks the unreviewed pile: by Day (the default), Topic, Kind, Media, or Reports. A Lens only re-groups — it never changes which Threads are in the pile, and it is not a filter.
+_Avoid_: View, tab, sort, mode
 
 **Kind**:
 What a Thread turns out to be — question, idea, task, observation, place, media, or noise. A property the Enrichment reads off the Thread, not a thing in its own right: an idea is a Thread that is an idea, never a record of its own.
