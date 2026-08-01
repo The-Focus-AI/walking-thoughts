@@ -107,9 +107,9 @@ export default function PrototypeIndexPage() {
               back-and-forth; round 3 (F–H) adds filtering. Desktop-only.
             </p>
             <p className="proto-index-verdict" role="status">
-              Verdict: <strong>D + H</strong> — Lens desk structure with the
-              Facet rail's counted filters (see VERDICT.md). Winners
-              highlighted below.
+              Verdict: <strong>D + H</strong> — Lens desk structure with
+              counted facet filters from the Facet rail (see VERDICT.md).
+              Winners highlighted below.
             </p>
           </div>
           <div className="proto-index-open-row">
