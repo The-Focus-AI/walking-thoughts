@@ -4,6 +4,7 @@ import {
 } from "@/lib/artifacts/document";
 import { getArtifactRepository } from "@/lib/artifacts/repository";
 import { requireSyncAccess } from "@/lib/sync/access";
+import { getThreadRepository } from "@/lib/sync/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,17 @@ export async function GET(request: Request, context: RouteContext) {
   );
   if (!artifact) {
     return Response.json({ error: "artifact_not_found" }, { status: 404 });
+  }
+
+  // A dismissed Research Verdict retracts the page (ADR 0016). The page is
+  // never deleted — keeping the research again makes this same address
+  // resolve again, because the gate reads the Thread's current verdict.
+  const verdict = await getThreadRepository().getThreadResearchVerdict(
+    access.userId,
+    artifact.threadId,
+  );
+  if (verdict === "dismissed") {
+    return Response.json({ error: "artifact_retracted" }, { status: 404 });
   }
 
   return new Response(renderArtifactDocument(artifact), {

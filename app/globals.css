@@ -3764,6 +3764,7 @@ footer {
 
 .thread-filing-kinds,
 .thread-filing-projects,
+.thread-filing-verdict,
 .thread-filing-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3773,6 +3774,8 @@ footer {
 .thread-filing-kind,
 .thread-filing-project,
 .thread-filing-read,
+.thread-filing-keep,
+.thread-filing-dismiss,
 .thread-filing-cancel,
 .thread-filing-new button {
   border: 1px solid var(--line);
@@ -3815,4 +3818,32 @@ footer {
 .thread-filing-read {
   border-color: rgba(169, 209, 143, 0.5);
   color: var(--identity);
+}
+
+/* The Research Verdict: keeping shelves the research, dismissing lets it
+   go (and retracts the Artifact page). Settled state reads back. */
+.thread-filing-keep {
+  border-color: rgba(169, 209, 143, 0.5);
+  color: var(--identity);
+}
+
+.thread-filing-keep.settled {
+  background: rgba(169, 209, 143, 0.16);
+}
+
+.thread-filing-dismiss.settled {
+  background: rgba(216, 143, 143, 0.14);
+  border-color: rgba(216, 143, 143, 0.5);
+}
+
+/* Dismissed research folds away; the Thread's history stays whole. */
+.enrichment-report-dismissed > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.4rem 0;
 }

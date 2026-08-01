@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { titleFromText } from "@/lib/local-capture/thread-destination";
-import { asThreadKind } from "@/lib/local-capture/types";
+import { asResearchVerdict, asThreadKind } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   Project,
@@ -65,6 +65,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         ALTER TABLE sync_threads
         ADD COLUMN IF NOT EXISTS ask TEXT
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS research_verdict TEXT
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_projects (
@@ -378,7 +382,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await ensure();
       const threads = (await sql`
         SELECT t.id, t.title, t.revision, t.updated_at, t.reviewed_at, t.kind,
-               t.topics, t.ask, t.project_id, p.name AS project_name
+               t.topics, t.ask, t.project_id, t.research_verdict,
+               p.name AS project_name
         FROM sync_threads t
         LEFT JOIN sync_projects p ON p.id = t.project_id AND p.user_id = t.user_id
         WHERE t.user_id = ${userId}
@@ -399,6 +404,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         topics: string[] | null;
         ask: string | null;
         project_id: string | null;
+        research_verdict: string | null;
         project_name: string | null;
       }>;
 
@@ -435,6 +441,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           ask: thread.ask ?? null,
           projectId: thread.project_id ?? null,
           projectName: thread.project_name ?? null,
+          researchVerdict: asResearchVerdict(thread.research_verdict),
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -561,6 +568,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
             project_id = CASE
               WHEN ${filing.projectId === undefined} THEN project_id
               ELSE ${filing.projectId ?? null}
+            END,
+            research_verdict = CASE
+              WHEN ${filing.researchVerdict === undefined} THEN research_verdict
+              ELSE ${filing.researchVerdict ?? null}
             END
         WHERE user_id = ${userId} AND id = ${threadId}
         RETURNING id
@@ -589,6 +600,15 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
             ask = ${classification.ask}
         WHERE user_id = ${userId} AND id = ${threadId}
       `;
+    },
+
+    async getThreadResearchVerdict(userId, threadId) {
+      await ensure();
+      const rows = (await sql`
+        SELECT research_verdict FROM sync_threads
+        WHERE user_id = ${userId} AND id = ${threadId}
+      `) as Array<{ research_verdict: string | null }>;
+      return asResearchVerdict(rows[0]?.research_verdict);
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

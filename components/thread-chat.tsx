@@ -763,6 +763,17 @@ export function ThreadChat({
               capture={entry.capture}
               retention={retention}
             />
+          ) : thread?.researchVerdict === "dismissed" ? (
+            // Dismissed research renders collapsed, never deleted: the
+            // Thread's history stays whole, it just stops leading (ADR 0016).
+            <details
+              key={entry.enrichment.id}
+              className="enrichment-report-dismissed"
+              data-testid="dismissed-report"
+            >
+              <summary>Research dismissed — report folded away</summary>
+              <EnrichmentReport enrichment={entry.enrichment} />
+            </details>
           ) : (
             <EnrichmentReport
               key={entry.enrichment.id}

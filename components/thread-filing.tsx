@@ -39,6 +39,7 @@ export function ThreadFiling({
     kind?: ThreadKind | null;
     projectId?: string | null;
     projectName?: string | null;
+    researchVerdict?: "kept" | "dismissed" | null;
   }) {
     if (busy) return;
     setBusy(true);
@@ -49,6 +50,7 @@ export function ThreadFiling({
         reviewed: true,
         kind: filing.kind,
         projectId: filing.projectId,
+        researchVerdict: filing.researchVerdict,
       });
       if (!result) {
         setError("Filing needs a connection.");
@@ -61,6 +63,10 @@ export function ThreadFiling({
         projectId:
           filing.projectId === undefined ? undefined : (result.projectId ?? null),
         projectName: result.projectName ?? filing.projectName ?? null,
+        researchVerdict:
+          filing.researchVerdict === undefined
+            ? undefined
+            : (result.researchVerdict ?? filing.researchVerdict ?? null),
       });
       setOpen(false);
       onFiled();
@@ -190,6 +196,38 @@ export function ThreadFiling({
           {error}
         </p>
       ) : null}
+
+      <p className="thread-filing-label">Research</p>
+      <div className="thread-filing-verdict">
+        {/* The Research Verdict is separate from Reviewed: either choice
+            files the Thread, and dismissing retracts its Artifact page. */}
+        <button
+          type="button"
+          className={
+            thread.researchVerdict === "kept"
+              ? "thread-filing-keep settled"
+              : "thread-filing-keep"
+          }
+          disabled={busy}
+          data-testid="file-keep-research"
+          onClick={() => void file({ researchVerdict: "kept" })}
+        >
+          {thread.researchVerdict === "kept" ? "Research kept ✓" : "Keep research"}
+        </button>
+        <button
+          type="button"
+          className={
+            thread.researchVerdict === "dismissed"
+              ? "thread-filing-dismiss settled"
+              : "thread-filing-dismiss"
+          }
+          disabled={busy}
+          data-testid="file-dismiss-research"
+          onClick={() => void file({ researchVerdict: "dismissed" })}
+        >
+          {thread.researchVerdict === "dismissed" ? "Dismissed ✓" : "Dismiss"}
+        </button>
+      </div>
 
       <div className="thread-filing-actions">
         {/* Sometimes filing is just having read the report. */}

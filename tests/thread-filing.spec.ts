@@ -167,3 +167,50 @@ test("the guess files an unfiled Thread and leaves a filed one alone", async () 
   expect(walkerFiled?.projectId ?? null).toBeNull();
   expect(walkerFiled?.kind).toBe("task");
 });
+
+test("the Research Verdict files with the Thread and round-trips", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const id = await seedThread(threads, "t-verdict", "Who stacked these walls");
+
+  const kept = await threads.fileThread("user_a", id, {
+    reviewedAt: "2026-08-01T09:00:00.000Z",
+    researchVerdict: "kept",
+  });
+  expect(kept?.researchVerdict).toBe("kept");
+  expect(kept?.reviewedAt).toBe("2026-08-01T09:00:00.000Z");
+
+  const listed = await threads.listThreads("user_a");
+  expect(listed.find((t) => t.id === id)?.researchVerdict).toBe("kept");
+  expect(await threads.getThreadResearchVerdict("user_a", id)).toBe("kept");
+});
+
+test("filing without a verdict leaves the settled one standing", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const id = await seedThread(threads, "t-verdict-keep", "Charcoal hearth flat");
+
+  await threads.fileThread("user_a", id, {
+    reviewedAt: "2026-08-01T09:00:00.000Z",
+    researchVerdict: "dismissed",
+  });
+  // Refiling the kind says nothing about the research.
+  const refiled = await threads.fileThread("user_a", id, {
+    kind: "question",
+    reviewedAt: "2026-08-01T09:05:00.000Z",
+  });
+  expect(refiled?.researchVerdict).toBe("dismissed");
+
+  // An explicit null clears it back to unset.
+  const cleared = await threads.fileThread("user_a", id, {
+    reviewedAt: "2026-08-01T09:10:00.000Z",
+    researchVerdict: null,
+  });
+  expect(cleared?.researchVerdict).toBeNull();
+  expect(await threads.getThreadResearchVerdict("user_a", id)).toBeNull();
+});
+
+test("a Thread with no verdict reads as unset, not an error", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const id = await seedThread(threads, "t-verdict-unset", "Hawk over the clearcut");
+  expect(await threads.getThreadResearchVerdict("user_a", id)).toBeNull();
+  expect(await threads.getThreadResearchVerdict("user_a", "t-missing")).toBeNull();
+});

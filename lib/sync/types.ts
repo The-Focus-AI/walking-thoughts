@@ -93,6 +93,8 @@ export type ServerThread = {
   projectId?: string | null;
   /** Carried alongside the id so a filed Thread reads correctly offline. */
   projectName?: string | null;
+  /** The walker's Research Verdict from Filing; null/absent = unset. */
+  researchVerdict?: "kept" | "dismissed" | null;
   captures: Array<{
     id: string;
     text: string;
@@ -202,8 +204,18 @@ export type ThreadRepository = {
       kind?: string | null;
       projectId?: string | null;
       reviewedAt: string | null;
+      /** Omitted keeps the current verdict; null clears it. */
+      researchVerdict?: "kept" | "dismissed" | null;
     },
   ): Promise<ServerThread | null>;
+  /**
+   * The Thread's Research Verdict, read cheaply for the Artifact page's
+   * retraction gate: a dismissed Thread's page stops resolving (ADR 0016).
+   */
+  getThreadResearchVerdict(
+    userId: string,
+    threadId: string,
+  ): Promise<"kept" | "dismissed" | null>;
   /**
    * The walker's Projects — `confirmed` only. Desk surfaces call this one;
    * a Proposed Project must never read as a decision the walker made.

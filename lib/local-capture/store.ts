@@ -301,6 +301,10 @@ export function createMemoryCaptureStore(
                 filing.projectId === undefined
                   ? (thread.projectName ?? null)
                   : (filing.projectName ?? null),
+              researchVerdict:
+                filing.researchVerdict === undefined
+                  ? (thread.researchVerdict ?? null)
+                  : filing.researchVerdict,
             }
           : thread,
       );
@@ -968,6 +972,10 @@ export function createIdbCaptureStore(): CaptureStore {
             filing.projectId === undefined
               ? (existing.projectName ?? null)
               : (filing.projectName ?? null),
+          researchVerdict:
+            filing.researchVerdict === undefined
+              ? (existing.researchVerdict ?? null)
+              : filing.researchVerdict,
         });
         await transactionDone(transaction);
       } finally {
