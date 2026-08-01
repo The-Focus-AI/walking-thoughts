@@ -17,7 +17,7 @@ An AI-generated Thread entry based on that Thread's complete history at a record
 _Avoid_: Sync, processing, response
 
 **Artifact**:
-One Enrichment published as a page: the report laid out as a survey sheet, browsable on its own URL, kept whole. Only Enrichments that were reports earn one — a question researched or an idea sharpened — and the queue publishes them as it enriches, so the page is waiting at the desk. The Enrichment stays the Thread entry; the Artifact is the readable form of it.
+One Enrichment published as a page: the report laid out as a survey sheet, browsable on its own URL, kept whole. Only Enrichments that were reports earn one — a question researched or an idea sharpened — and the queue publishes them as it enriches, so the page is waiting at the desk. The Enrichment stays the Thread entry; the Artifact is the readable form of it. A dismissed Research Verdict retracts the page; keeping the research again restores it at the same address.
 _Avoid_: Document, export, share link, post
 
 **Day**:
