@@ -41,8 +41,12 @@ A name the Enrichment has floated for an effort it keeps seeing, carried in the 
 _Avoid_: Candidate, suggestion, draft project, cluster
 
 **Filing**:
-What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
+What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, settle the Research Verdict, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
 _Avoid_: Triage, sorting, processing
+
+**Research Verdict**:
+What the walker settled about a Thread's research while Filing: kept (worth returning to), dismissed (read and let go), or unset. One verdict per Thread, separate from Reviewed — a Thread is processed either way; the verdict says whether its research stays in reach.
+_Avoid_: Rating, like, star, archive
 
 **Reviewed**:
 A Thread state set when the walker has processed it back at the desk. Threads start new and sit in the review queue until marked Reviewed.
