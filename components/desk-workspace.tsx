@@ -7,6 +7,7 @@ import { AppNav } from "@/components/app-nav";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import {
   AttachmentThumb,
+  AttachmentTile,
   MediaLightbox,
 } from "@/components/media-lightbox";
 import { useLinkFallback } from "@/components/use-link-fallback";
@@ -303,6 +304,9 @@ function ThreadRow({
   showDay,
   expandable,
   focused,
+  query,
+  gallery,
+  onTrash,
   artifact,
   onOpenReport,
   onOpenMedia,
@@ -317,6 +321,12 @@ function ThreadRow({
   expandable?: boolean;
   /** The row the desk's keyboard is on. */
   focused?: boolean;
+  /** Carried into the Thread so the working set survives the trip. */
+  query?: string;
+  /** The walker asked to look at media: show all of it, big. */
+  gallery?: boolean;
+  /** Set at the desk, where a Thread can be thrown away from its row. */
+  onTrash?: (threadId: string) => void;
   /** The published page for this Thread, when its report earned one. */
   artifact?: ArtifactSummary;
   /** Set at the desk, where the report opens in place instead of a new tab. */
@@ -328,6 +338,9 @@ function ThreadRow({
 }) {
   const onLinkClick = useLinkFallback();
   const [expanded, setExpanded] = useState(false);
+  const threadHref = query
+    ? `/threads/${view.thread.id}?${query}`
+    : `/threads/${view.thread.id}`;
   const status = threadStatus(view.captures);
   const words = view.captures[0]?.text ?? "";
   const mediaCount = view.captures.reduce(
@@ -363,8 +376,8 @@ function ThreadRow({
     >
       <Link
         className="thread-row-main"
-        href={`/threads/${view.thread.id}`}
-        onClick={(event) => onLinkClick(event, `/threads/${view.thread.id}`)}
+        href={threadHref}
+        onClick={(event) => onLinkClick(event, threadHref)}
       >
         <span className="thread-row-title">{view.thread.title}</span>
         {words && words !== view.thread.title ? (
@@ -396,15 +409,31 @@ function ThreadRow({
         />
       ) : null}
       {onOpenMedia && lookable.length > 0 ? (
-        <div className="thread-row-thumbs" aria-label="Media from this Thread">
-          {lookable.slice(0, 4).map((attachment) => (
-            <AttachmentThumb
-              key={attachment.id}
-              attachment={attachment}
-              onOpen={() => onOpenMedia(attachment)}
-            />
-          ))}
-        </div>
+        gallery ? (
+          <div
+            className="thread-row-gallery"
+            data-testid="thread-row-gallery"
+            aria-label="Media from this Thread"
+          >
+            {lookable.map((attachment) => (
+              <AttachmentTile
+                key={attachment.id}
+                attachment={attachment}
+                onOpen={() => onOpenMedia(attachment)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="thread-row-thumbs" aria-label="Media from this Thread">
+            {lookable.slice(0, 4).map((attachment) => (
+              <AttachmentThumb
+                key={attachment.id}
+                attachment={attachment}
+                onOpen={() => onOpenMedia(attachment)}
+              />
+            ))}
+          </div>
+        )
       ) : null}
       <div className="thread-row-side">
         {artifact ? (
@@ -541,6 +570,24 @@ function ThreadRow({
             onFiled={onFiled}
             onProjectCreated={onProjectCreated}
           />
+          {/* Filing and throwing away are different things, and the desk
+              has never said so anywhere. */}
+          {onTrash ? (
+            <div className="thread-row-remove">
+              <span className="thread-row-remove-note">
+                Reviewed files this Thread and keeps it. Trash removes it —
+                recoverable for 30 days, then purged with its media.
+              </span>
+              <button
+                type="button"
+                className="thread-row-trash"
+                data-testid={`trash-thread-${view.thread.id}`}
+                onClick={() => onTrash(view.thread.id)}
+              >
+                Trash
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -577,6 +624,18 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const lens = readLens(searchParams ?? undefined);
   const filtering = hasFacets(facets);
 
+  /**
+   * The working set is the walker's place in the pile, so it travels with
+   * every move the desk makes: opening a Thread, advancing after a filing,
+   * backing out to the day. Losing it on a tap is how a queue resets under
+   * someone who was halfway through it.
+   */
+  const urlQuery = searchParams?.toString() ?? "";
+  const keepQuery = useCallback(
+    (path: string) => (urlQuery ? `${path}?${urlQuery}` : path),
+    [urlQuery],
+  );
+
   const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -592,6 +651,10 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   /** The row the keyboard is on, and whether the keys emptied the queue. */
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [clearedByKeyboard, setClearedByKeyboard] = useState(false);
+  /** The last Thread thrown away, still offering its way back. */
+  const [trashed, setTrashed] = useState<{ id: string; title: string } | null>(
+    null,
+  );
   const atTheDesk = useDeskViewport();
   const onLinkClick = useLinkFallback();
   const loadGeneration = useRef(0);
@@ -850,10 +913,18 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       const index = orderedThreadIds.indexOf(selectedThreadId);
       if (index === -1) return;
       const nextId = orderedThreadIds[index + step];
-      if (nextId) router.push(`/threads/${nextId}`);
+      if (nextId) router.push(keepQuery(`/threads/${nextId}`));
     },
-    [orderedThreadIds, router, selectedThreadId],
+    [orderedThreadIds, router, selectedThreadId, keepQuery],
   );
+
+  /**
+   * Asking for photos is asking to look at them: under a Media facet or the
+   * Media Lens the rows become a contact sheet rather than a text list with
+   * four stamps on the end.
+   */
+  const gallery =
+    lens === "media" || Boolean(facets.media && facets.media !== "text");
 
   /** The keys are live wherever the rows themselves are. */
   const stacksVisible =
@@ -873,11 +944,42 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const focusRef = useRef<string | null>(null);
   const queueRef = useRef<string[]>(queueIds);
   const openRef = useRef<string[]>(openIds);
-  /** Filed in this burst, before the reload could take them out of Open. */
-  const filedRef = useRef<Set<string>>(new Set());
-  focusRef.current = focused;
-  queueRef.current = queueIds;
-  openRef.current = openIds;
+  /** Settled in this burst, before the reload could take them out of Open. */
+  const settledRef = useRef<Set<string>>(new Set());
+  const threadsRef = useRef<ThreadListView[]>(threads);
+  // Mirrored after each commit, never during render. The walker's own
+  // presses write these refs synchronously in the handler below, which is
+  // what keeps a fast burst honest; this only carries in what changed
+  // elsewhere — a reload landing, a facet taking a row away.
+  useEffect(() => {
+    focusRef.current = focused;
+    queueRef.current = queueIds;
+    openRef.current = openIds;
+    threadsRef.current = threads;
+  });
+
+  /**
+   * Step focus off a row that is leaving the queue — filed or thrown away —
+   * onto the next open row below it, else the nearest above. Focus moves at
+   * once, before the network answers, so a walker working at speed is never
+   * held up by it and never left pointing at nothing.
+   */
+  const stepOffRow = useCallback((id: string): void => {
+    const queue = queueRef.current;
+    const index = queue.indexOf(id);
+    const open = new Set(
+      openRef.current.filter((entry) => !settledRef.current.has(entry)),
+    );
+    open.delete(id);
+    const next =
+      queue.slice(index + 1).find((entry) => open.has(entry)) ??
+      [...queue.slice(0, index)].reverse().find((entry) => open.has(entry)) ??
+      null;
+    settledRef.current.add(id);
+    focusRef.current = next;
+    setFocusedId(next);
+    setClearedByKeyboard(next === null);
+  }, []);
 
   useEffect(() => {
     if (!focused) return;
@@ -886,38 +988,60 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
       ?.scrollIntoView({ block: "nearest" });
   }, [focused]);
 
-  /**
-   * File the focused row and step to the next open one. Where focus lands
-   * is read from the queue as the walker sees it — the next open row below,
-   * else the nearest above — so a filing never leaves focus dangling. Focus
-   * moves at once, before the network answers, so the queue keeps up.
-   */
+  /** File the focused row and step on. */
   const fileFocused = useCallback(
     async (verdict: ResearchVerdict | null) => {
       const current = focusRef.current;
       if (!current) return;
-      const queue = queueRef.current;
-      const index = queue.indexOf(current);
-      const open = new Set(
-        openRef.current.filter((id) => !filedRef.current.has(id)),
-      );
-      open.delete(current);
-      const next =
-        queue.slice(index + 1).find((id) => open.has(id)) ??
-        [...queue.slice(0, index)].reverse().find((id) => open.has(id)) ??
-        null;
-      filedRef.current.add(current);
-      focusRef.current = next;
-      setFocusedId(next);
-      setClearedByKeyboard(next === null);
+      stepOffRow(current);
       await fileThread(
         current,
         verdict === null ? {} : { researchVerdict: verdict },
       );
       await load();
     },
-    [load],
+    [load, stepOffRow],
   );
+
+  /**
+   * Some Threads are not to be filed — they are to be thrown away. Trashing
+   * from the desk goes nowhere: the row leaves the queue, focus steps on,
+   * and the working set the walker built is still exactly where it was.
+   * Trash is recoverable, so the desk offers an Undo instead of stopping to
+   * ask.
+   */
+  const trashRow = useCallback(
+    async (threadId: string) => {
+      const view = threadsRef.current.find(
+        (entry) => entry.thread.id === threadId,
+      );
+      stepOffRow(threadId);
+      setTrashed({ id: threadId, title: view?.thread.title ?? "Thread" });
+      try {
+        const store = getCaptureStore();
+        await store.trashThread(threadId);
+        void runSyncCycle({ store });
+      } catch {
+        setTrashed(null);
+        setError("Could not move that Thread to Trash");
+      }
+      await load();
+    },
+    [load, stepOffRow],
+  );
+
+  const undoTrash = useCallback(async () => {
+    if (!trashed) return;
+    try {
+      const store = getCaptureStore();
+      await store.restoreFromTrash("thread", trashed.id);
+      void runSyncCycle({ store });
+      setTrashed(null);
+    } catch {
+      setError("Could not restore that Thread");
+    }
+    await load();
+  }, [load, trashed]);
 
   useEffect(() => {
     if (!stacksVisible) return;
@@ -969,6 +1093,13 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
           event.preventDefault();
           void fileFocused("dismissed");
           return;
+        case "#":
+        case "Delete": {
+          event.preventDefault();
+          const target = focusRef.current;
+          if (target) void trashRow(target);
+          return;
+        }
         case "g": {
           event.preventDefault();
           const next = LENSES[(LENSES.indexOf(lens) + 1) % LENSES.length];
@@ -979,7 +1110,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [stacksVisible, fileFocused, lens, router, basePath, facets]);
+  }, [stacksVisible, fileFocused, trashRow, lens, router, basePath, facets]);
 
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -1105,9 +1236,11 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
           >
             <Link
               className="desk-day-open"
-              href={`/days/${dayKey}`}
+              href={keepQuery(`/days/${dayKey}`)}
               data-testid={`open-day-${dayKey}`}
-              onClick={(event) => onLinkClick(event, `/days/${dayKey}`)}
+              onClick={(event) =>
+                onLinkClick(event, keepQuery(`/days/${dayKey}`))
+              }
             >
               <span className="desk-day-title">{dayTitle(dayKey)}</span>
               <span className="desk-day-tally">
@@ -1253,17 +1386,19 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                     >
                       <Link
                         className="desk-sidebar-back"
-                        href="/days"
-                        onClick={(event) => onLinkClick(event, "/days")}
+                        href={keepQuery("/days")}
+                        onClick={(event) =>
+                          onLinkClick(event, keepQuery("/days"))
+                        }
                       >
                         ← Days
                       </Link>
                       <Link
                         className="desk-sidebar-day-title"
                         data-testid="desk-sidebar-day"
-                        href={`/days/${activeDayKey}`}
+                        href={keepQuery(`/days/${activeDayKey}`)}
                         onClick={(event) =>
-                          onLinkClick(event, `/days/${activeDayKey}`)
+                          onLinkClick(event, keepQuery(`/days/${activeDayKey}`))
                         }
                       >
                         {dayTitle(activeDayKey)}
@@ -1279,7 +1414,27 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                     <p className="desk-keys" data-testid="desk-keys">
                       <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>r</kbd> keep ·{" "}
                       <kbd>n</kbd> reviewed · <kbd>x</kbd> dismiss ·{" "}
-                      <kbd>g</kbd> lens
+                      <kbd>#</kbd> trash · <kbd>g</kbd> lens
+                    </p>
+                  ) : null}
+                  {trashed ? (
+                    <p
+                      className="desk-trashed"
+                      data-testid="desk-trashed"
+                      role="status"
+                    >
+                      <span>
+                        “{trashed.title}” moved to Trash — recoverable for 30
+                        days.
+                      </span>
+                      <button
+                        type="button"
+                        className="desk-undo-trash"
+                        data-testid="desk-undo-trash"
+                        onClick={() => void undoTrash()}
+                      >
+                        Undo
+                      </button>
                     </p>
                   ) : null}
                   {retrySync}
@@ -1329,6 +1484,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                                 view={view}
                                 expandable
                                 focused={view.thread.id === focused}
+                                query={urlQuery}
+                                gallery={gallery}
+                                onTrash={(id) => void trashRow(id)}
                                 selected={
                                   view.thread.id === selectedThreadId
                                 }
@@ -1415,7 +1573,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
           <DailyDigestPanel
             key={selectedDayKey}
             dayKey={selectedDayKey}
-            onClose={() => router.push("/days")}
+            onClose={() => router.push(keepQuery("/days"))}
           >
             {/* At the desk the sidebar already lists this day's Threads;
                 repeating them under the digest would say it twice. */}
