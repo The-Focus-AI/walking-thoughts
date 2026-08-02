@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { getCaptureStore } from "@/lib/local-capture/store";
+import { fileThread, type ThreadFilingInput } from "@/lib/desk/file-thread";
 import {
   KIND_DESK_ORDER,
   KIND_LABELS,
   type LocalThread,
-  type ThreadKind,
 } from "@/lib/local-capture/types";
 import { getReviewTransport } from "@/lib/sync/review-client";
 import type { Project } from "@/lib/sync/types";
@@ -38,39 +37,15 @@ export function ThreadFiling({
 
   const filed = Boolean(thread.reviewedAt);
 
-  async function file(filing: {
-    kind?: ThreadKind | null;
-    projectId?: string | null;
-    projectName?: string | null;
-    researchVerdict?: "kept" | "dismissed" | null;
-  }) {
+  async function file(filing: ThreadFilingInput) {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const transport = getReviewTransport();
     try {
-      const result = await transport.fileThread?.(thread.id, {
-        reviewed: true,
-        kind: filing.kind,
-        projectId: filing.projectId,
-        researchVerdict: filing.researchVerdict,
-      });
-      if (!result) {
+      if (!(await fileThread(thread.id, filing))) {
         setError("Filing needs a connection.");
         return;
       }
-      await getCaptureStore().applyThreadFiling({
-        threadId: thread.id,
-        reviewedAt: result.reviewedAt,
-        kind: (result.kind as ThreadKind | null) ?? filing.kind ?? null,
-        projectId:
-          filing.projectId === undefined ? undefined : (result.projectId ?? null),
-        projectName: result.projectName ?? filing.projectName ?? null,
-        researchVerdict:
-          filing.researchVerdict === undefined
-            ? undefined
-            : (result.researchVerdict ?? filing.researchVerdict ?? null),
-      });
       if (!defaultOpen) setOpen(false);
       onFiled();
     } finally {

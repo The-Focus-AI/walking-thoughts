@@ -1382,6 +1382,41 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+/* Hands on the keyboard: the legend, the focused row, and the clear queue. */
+.desk-keys {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.desk-keys kbd {
+  padding: 0.05rem 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font: inherit;
+  color: var(--ink);
+}
+
+.thread-row-focused {
+  outline: 2px solid var(--sun);
+  outline-offset: 1px;
+}
+
+.desk-queue-done {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--sun);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
 /* A row opened in place: the whole Thread without leaving the queue. */
 .thread-row-expand {
   padding: 0.24rem 0.55rem;

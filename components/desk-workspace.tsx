@@ -13,6 +13,7 @@ import { useLinkFallback } from "@/components/use-link-fallback";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
 import { DeskRail, LensControl } from "@/components/desk-rail";
 import {
+  LENSES,
   facetCounts,
   facetHref,
   hasFacets,
@@ -25,6 +26,7 @@ import {
   type FacetSelection,
   type FacetThread,
 } from "@/lib/desk/facets";
+import { fileThread } from "@/lib/desk/file-thread";
 import {
   artifactHref,
   artifactsByThread,
@@ -53,6 +55,7 @@ import {
   type LocalAttachment,
   type LocalCapture,
   type LocalThread,
+  type ResearchVerdict,
 } from "@/lib/local-capture/types";
 import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getReviewTransport } from "@/lib/sync/review-client";
@@ -297,6 +300,7 @@ function ThreadRow({
   projects,
   showDay,
   expandable,
+  focused,
   artifact,
   onOpenReport,
   onOpenMedia,
@@ -309,6 +313,8 @@ function ThreadRow({
   showDay?: boolean;
   /** At the desk a row opens in place instead of sending the walker away. */
   expandable?: boolean;
+  /** The row the desk's keyboard is on. */
+  focused?: boolean;
   /** The published page for this Thread, when its report earned one. */
   artifact?: ArtifactSummary;
   /** Set at the desk, where the report opens in place instead of a new tab. */
@@ -335,9 +341,12 @@ function ThreadRow({
 
   return (
     <li
+      data-thread-row={view.thread.id}
+      data-focused={focused ? "true" : undefined}
       className={[
         "thread-row",
         selected ? "thread-row-selected" : "",
+        focused ? "thread-row-focused" : "",
         view.thread.reviewedAt ? "thread-row-filed" : "",
         // An unread report is the reason to sit down: the row takes the
         // Annotation's own mark — sky left rule over a sky tint — until it
@@ -578,6 +587,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   const [openReport, setOpenReport] = useState<ArtifactSummary | null>(null);
   const [openMedia, setOpenMedia] = useState<LocalAttachment | null>(null);
   const [retryBusy, setRetryBusy] = useState(false);
+  /** The row the keyboard is on, and whether the keys emptied the queue. */
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [clearedByKeyboard, setClearedByKeyboard] = useState(false);
   const atTheDesk = useDeskViewport();
   const onLinkClick = useLinkFallback();
   const loadGeneration = useRef(0);
@@ -797,6 +809,25 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     }));
   }, [visibleViews, facetThreads, lens]);
 
+  /**
+   * Processing at the desk is hands-on-keyboard: j/k walk the rows the
+   * facets and Lens are showing, r/n/x file the focused one and step to the
+   * next open row, g cycles the Lens. Clearing a day never needs the mouse.
+   */
+  const queueIds = useMemo(
+    () => stacks.flatMap((stack) => stack.views.map((view) => view.thread.id)),
+    [stacks],
+  );
+
+  const openIds = useMemo(
+    () =>
+      stacks
+        .flatMap((stack) => stack.views)
+        .filter((view) => !view.thread.reviewedAt)
+        .map((view) => view.thread.id),
+    [stacks],
+  );
+
   /** Where the filter chips live right now, for their hrefs. */
   const basePath = selectedThreadId
     ? `/threads/${selectedThreadId}`
@@ -821,6 +852,132 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     },
     [orderedThreadIds, router, selectedThreadId],
   );
+
+  /** The keys are live wherever the rows themselves are. */
+  const stacksVisible =
+    atTheDesk &&
+    !query &&
+    !(!activeDayKey && lens === "days" && !filtering);
+
+  /** A row the facets have since taken away cannot hold focus. */
+  const focused =
+    focusedId && queueIds.includes(focusedId) ? focusedId : null;
+
+  /**
+   * The keys read the queue and the focus from refs, not from the closure a
+   * render happened to leave behind: a walker filing at speed presses again
+   * before React has committed the last one, and every press must land.
+   */
+  const focusRef = useRef<string | null>(null);
+  const queueRef = useRef<string[]>(queueIds);
+  const openRef = useRef<string[]>(openIds);
+  /** Filed in this burst, before the reload could take them out of Open. */
+  const filedRef = useRef<Set<string>>(new Set());
+  focusRef.current = focused;
+  queueRef.current = queueIds;
+  openRef.current = openIds;
+
+  useEffect(() => {
+    if (!focused) return;
+    document
+      .querySelector(`[data-thread-row="${focused}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [focused]);
+
+  /**
+   * File the focused row and step to the next open one. Where focus lands
+   * is read from the queue as the walker sees it — the next open row below,
+   * else the nearest above — so a filing never leaves focus dangling. Focus
+   * moves at once, before the network answers, so the queue keeps up.
+   */
+  const fileFocused = useCallback(
+    async (verdict: ResearchVerdict | null) => {
+      const current = focusRef.current;
+      if (!current) return;
+      const queue = queueRef.current;
+      const index = queue.indexOf(current);
+      const open = new Set(
+        openRef.current.filter((id) => !filedRef.current.has(id)),
+      );
+      open.delete(current);
+      const next =
+        queue.slice(index + 1).find((id) => open.has(id)) ??
+        [...queue.slice(0, index)].reverse().find((id) => open.has(id)) ??
+        null;
+      filedRef.current.add(current);
+      focusRef.current = next;
+      setFocusedId(next);
+      setClearedByKeyboard(next === null);
+      await fileThread(
+        current,
+        verdict === null ? {} : { researchVerdict: verdict },
+      );
+      await load();
+    },
+    [load],
+  );
+
+  useEffect(() => {
+    if (!stacksVisible) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // Typing a Project name or an answer is typing, never a shortcut.
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      const step = (delta: 1 | -1) => {
+        event.preventDefault();
+        const queue = queueRef.current;
+        if (queue.length === 0) return;
+        const current = focusRef.current;
+        const index = current ? queue.indexOf(current) : -1;
+        const next =
+          index === -1
+            ? (delta === 1 ? queue[0] : queue[queue.length - 1])
+            : queue[
+                Math.min(queue.length - 1, Math.max(0, index + delta))
+              ];
+        focusRef.current = next;
+        setClearedByKeyboard(false);
+        setFocusedId(next);
+      };
+      switch (event.key) {
+        case "j":
+          step(1);
+          return;
+        case "k":
+          step(-1);
+          return;
+        case "r":
+          event.preventDefault();
+          void fileFocused("kept");
+          return;
+        case "n":
+          event.preventDefault();
+          void fileFocused(null);
+          return;
+        case "x":
+          event.preventDefault();
+          void fileFocused("dismissed");
+          return;
+        case "g": {
+          event.preventDefault();
+          const next = LENSES[(LENSES.indexOf(lens) + 1) % LENSES.length];
+          router.push(facetHref(basePath, facets, next));
+          return;
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stacksVisible, fileFocused, lens, router, basePath, facets]);
 
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -1116,7 +1273,23 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                     selection={facets}
                     lens={lens}
                   />
+                  {stacksVisible ? (
+                    <p className="desk-keys" data-testid="desk-keys">
+                      <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>r</kbd> keep ·{" "}
+                      <kbd>n</kbd> reviewed · <kbd>x</kbd> dismiss ·{" "}
+                      <kbd>g</kbd> lens
+                    </p>
+                  ) : null}
                   {retrySync}
+                  {stacksVisible && clearedByKeyboard && openIds.length === 0 ? (
+                    <p
+                      className="desk-queue-done"
+                      data-testid="desk-queue-done"
+                      role="status"
+                    >
+                      Nothing open left here.
+                    </p>
+                  ) : null}
                   {!activeDayKey && lens === "days" && !filtering ? (
                     dayCards
                   ) : (
@@ -1153,6 +1326,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                                 key={view.thread.id}
                                 view={view}
                                 expandable
+                                focused={view.thread.id === focused}
                                 selected={
                                   view.thread.id === selectedThreadId
                                 }
