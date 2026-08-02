@@ -1190,6 +1190,242 @@ h1 {
   border-color: var(--sun);
 }
 
+/* --- The desk's facet rail and Lens ---------------------------------------- */
+
+.desk-browse {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.desk-browse-main {
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.desk-rail {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.desk-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.desk-rail-title,
+.desk-rail-group-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.desk-rail-clear {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--machine);
+  text-decoration: none;
+}
+
+.desk-rail-clear:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.desk-rail-group {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.desk-rail-rows {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row says its name and what it would leave; nothing behind it and it
+   stays on the rail, greyed — the shape of the pile includes its gaps. */
+.desk-rail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.22rem 0.4rem;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.desk-rail-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.desk-rail-row.is-active {
+  color: var(--forest);
+  background: var(--sun);
+  font-weight: 700;
+}
+
+.desk-rail-row.is-empty {
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.desk-rail-row-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Lens never filters, so it sits over the stacks, not on the rail. */
+.desk-lens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.desk-lens-label {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 0.15rem;
+}
+
+.desk-lens-option {
+  padding: 0.22rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.desk-lens-option:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.desk-lens-option.is-active {
+  color: var(--ink);
+  border-color: var(--ink);
+  font-weight: 700;
+}
+
+.desk-stacks {
+  display: grid;
+  gap: 1.1rem;
+  align-content: start;
+}
+
+.desk-stack {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.desk-stack-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.desk-stack-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.desk-stack-title a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.desk-stack-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row opened in place: the whole Thread without leaving the queue. */
+.thread-row-expand {
+  padding: 0.24rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.thread-row-expand:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.thread-row-detail {
+  flex-basis: 100%;
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.thread-row-detail-words p {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.thread-row-detail-enrichment {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
 /* The Enrichment's open question, answerable on the row itself. */
 .thread-ask-panel {
   flex-basis: 100%;
@@ -3511,6 +3747,17 @@ footer {
     overflow-y: auto;
     padding: 1.25rem 1.1rem 2rem;
     border-right: 1px solid var(--line);
+  }
+
+  /* Nothing open yet: the desk is the queue, so the pile gets the width and
+     the rail stands beside it rather than above it. */
+  .desk-workspace:not(.has-selection) {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  }
+
+  .desk-workspace:not(.has-selection) .desk-browse {
+    grid-template-columns: minmax(180px, 210px) minmax(0, 1fr);
+    gap: 1.4rem;
   }
 
   .desk-workspace:not(.has-selection) .desk-detail-pane,

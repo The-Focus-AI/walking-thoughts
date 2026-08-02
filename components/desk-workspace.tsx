@@ -11,6 +11,20 @@ import {
 } from "@/components/media-lightbox";
 import { useLinkFallback } from "@/components/use-link-fallback";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
+import { DeskRail, LensControl } from "@/components/desk-rail";
+import {
+  facetCounts,
+  facetHref,
+  hasFacets,
+  readFacets,
+  readLens,
+  matchesFacets,
+  stackByLens,
+  toggleFacet,
+  type FacetGroup,
+  type FacetSelection,
+  type FacetThread,
+} from "@/lib/desk/facets";
 import {
   artifactHref,
   artifactsByThread,
@@ -53,104 +67,111 @@ type ThreadListView = {
   dayKey: string;
 };
 
-/** One way of working the pile: the chips over Days and each day's list. */
-type DeskFilter = "word" | "attention" | "reports" | "media";
+/**
+ * The phone's chips, written as selections in the desk's filter model. The
+ * rail and the chips are two renderings of one thing: a chip sets the same
+ * URL param the desktop row would, so a link travels between them.
+ */
+const CHIPS: Array<{
+  key: string;
+  label: string;
+  group: FacetGroup;
+  value: string;
+}> = [
+  { key: "word", label: "Needs a word", group: "attention", value: "word" },
+  {
+    key: "attention",
+    label: "Needs attention",
+    group: "attention",
+    value: "stuck",
+  },
+  { key: "reports", label: "Has a report", group: "reports", value: "full" },
+  { key: "media", label: "Has media", group: "media", value: "any" },
+];
 
-const FILTER_LABELS: Record<DeskFilter, string> = {
-  word: "Needs a word",
-  attention: "Needs attention",
-  reports: "Has a report",
-  media: "Has media",
-};
-
-function isDeskFilter(value: string | null): value is DeskFilter {
-  return (
-    value === "word" ||
-    value === "attention" ||
-    value === "reports" ||
-    value === "media"
-  );
-}
-
-function matchesFilter(
+/** The facts the facets ask about, read off a Thread the desk already holds. */
+function toFacetThread(
   view: ThreadListView,
   artifacts: ReadonlyMap<string, ArtifactSummary>,
-  filter: DeskFilter,
-): boolean {
-  switch (filter) {
-    case "word":
-      return Boolean(view.thread.ask);
-    case "attention":
-      return view.captures.some(
-        (capture) => capture.status === "needs_attention",
-      );
-    case "reports":
-      return artifacts.has(view.thread.id);
-    case "media":
-      return view.captures.some((capture) => capture.attachments.length > 0);
-  }
-}
-
-function countFilters(
-  views: ThreadListView[],
-  artifacts: ReadonlyMap<string, ArtifactSummary>,
-): Record<DeskFilter, number> {
-  const counts = { word: 0, attention: 0, reports: 0, media: 0 };
-  for (const view of views) {
-    for (const key of Object.keys(counts) as DeskFilter[]) {
-      if (matchesFilter(view, artifacts, key)) counts[key] += 1;
-    }
-  }
-  return counts;
+): FacetThread {
+  const mediaKinds = [
+    ...new Set(
+      view.captures.flatMap((capture) =>
+        capture.attachments.map((attachment) => attachment.kind),
+      ),
+    ),
+  ];
+  return {
+    id: view.thread.id,
+    dayKey: view.dayKey,
+    kind: view.thread.kind ?? null,
+    reviewed: Boolean(view.thread.reviewedAt),
+    researchVerdict: view.thread.researchVerdict ?? null,
+    needsWord: Boolean(view.thread.ask),
+    needsAttention: view.captures.some(
+      (capture) => capture.status === "needs_attention",
+    ),
+    projectId: view.thread.projectId ?? null,
+    projectName: view.thread.projectName ?? null,
+    mediaKinds,
+    hasReport: artifacts.has(view.thread.id),
+    hasEnrichment: view.enrichments.length > 0,
+  };
 }
 
 /**
- * The filter chips. Each is a link carrying ?f=, so the pill and the day
- * sheet can deep-link straight into a working set, and Back undoes it.
- * A way of working with nothing in it stays off the row.
+ * The chip row. Each is a link carrying the shared facet params, so the pill
+ * and the day sheet can deep-link straight into a working set, and Back
+ * undoes it. A way of working with nothing in it stays off the row.
  */
 function FilterChips({
   base,
-  active,
+  selection,
   counts,
   onNavigate,
 }: {
   base: string;
-  active: DeskFilter | null;
-  counts: Record<DeskFilter, number>;
+  selection: FacetSelection;
+  counts: Record<FacetGroup, Record<string, number>>;
   onNavigate: (
     event: React.MouseEvent<HTMLAnchorElement>,
     href: string,
   ) => void;
 }) {
-  const chips: Array<{ key: DeskFilter | null; label: string; count?: number }> =
-    [
-      { key: null, label: "All" },
-      ...(Object.keys(FILTER_LABELS) as DeskFilter[]).map((key) => ({
-        key,
-        label: FILTER_LABELS[key],
-        count: counts[key],
-      })),
-    ];
   return (
     <nav className="desk-filters" aria-label="Filter Threads">
-      {chips.map((chip) => {
-        if (chip.key && !chip.count) return null;
-        const href = chip.key ? `${base}?f=${chip.key}` : base;
-        const selected = active === chip.key;
+      <Link
+        className={
+          hasFacets(selection) ? "desk-filter" : "desk-filter desk-filter-active"
+        }
+        href={facetHref(base, {})}
+        aria-current={hasFacets(selection) ? undefined : "true"}
+        data-testid="desk-filter-all"
+        onClick={(event) => onNavigate(event, facetHref(base, {}))}
+      >
+        All
+      </Link>
+      {CHIPS.map((chip) => {
+        const selected = selection[chip.group] === chip.value;
+        const count = counts[chip.group]?.[chip.value] ?? 0;
+        if (!count && !selected) return null;
+        const href = facetHref(
+          base,
+          toggleFacet(selection, chip.group, chip.value),
+        );
         return (
           <Link
-            key={chip.label}
+            key={chip.key}
             className={
               selected ? "desk-filter desk-filter-active" : "desk-filter"
             }
             href={href}
             aria-current={selected ? "true" : undefined}
-            data-testid={`desk-filter-${chip.key ?? "all"}`}
+            data-testid={`desk-filter-${chip.key}`}
             onClick={(event) => onNavigate(event, href)}
           >
             {chip.label}
-            {chip.count ? ` · ${chip.count}` : ""}
+            {count ? ` · ${count}` : ""}
           </Link>
         );
       })}
@@ -275,6 +296,7 @@ function ThreadRow({
   selected,
   projects,
   showDay,
+  expandable,
   artifact,
   onOpenReport,
   onOpenMedia,
@@ -285,6 +307,8 @@ function ThreadRow({
   selected: boolean;
   projects: Project[];
   showDay?: boolean;
+  /** At the desk a row opens in place instead of sending the walker away. */
+  expandable?: boolean;
   /** The published page for this Thread, when its report earned one. */
   artifact?: ArtifactSummary;
   /** Set at the desk, where the report opens in place instead of a new tab. */
@@ -295,6 +319,7 @@ function ThreadRow({
   onProjectCreated: (project: Project) => void;
 }) {
   const onLinkClick = useLinkFallback();
+  const [expanded, setExpanded] = useState(false);
   const status = threadStatus(view.captures);
   const words = view.captures[0]?.text ?? "";
   const mediaCount = view.captures.reduce(
@@ -407,12 +432,25 @@ function ThreadRow({
             {view.thread.reviewedAt ? "" : "?"}
           </span>
         ) : null}
-        <ThreadFiling
-          thread={view.thread}
-          projects={projects}
-          onFiled={onFiled}
-          onProjectCreated={onProjectCreated}
-        />
+        {expandable ? (
+          <button
+            type="button"
+            className="thread-row-expand"
+            data-testid={`expand-thread-${view.thread.id}`}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {expanded ? "Close" : "Open"}
+          </button>
+        ) : null}
+        {expandable && expanded ? null : (
+          <ThreadFiling
+            thread={view.thread}
+            projects={projects}
+            onFiled={onFiled}
+            onProjectCreated={onProjectCreated}
+          />
+        )}
         {view.thread.ask ? (
           <span
             className="thread-row-ask"
@@ -446,6 +484,54 @@ function ThreadRow({
           </span>
         )}
       </div>
+      {/* Opened in place: the words as they were said, what the Enrichment
+          made of them, everything the Thread carries, and the filing — so a
+          row can be settled without leaving the queue. */}
+      {expandable && expanded ? (
+        <div
+          className="thread-row-detail"
+          data-testid={`thread-detail-${view.thread.id}`}
+        >
+          <div className="thread-row-detail-words">
+            {view.captures.map((capture) => (
+              <p key={capture.id}>{capture.text}</p>
+            ))}
+          </div>
+          {view.enrichments.length > 0 ? (
+            <p
+              className="thread-row-detail-enrichment"
+              data-testid="thread-detail-enrichment"
+            >
+              {view.enrichments[view.enrichments.length - 1].text}
+            </p>
+          ) : (
+            <p className="thread-row-detail-enrichment">
+              No Enrichment yet.
+            </p>
+          )}
+          {lookable.length > 0 ? (
+            <div
+              className="thread-row-thumbs"
+              aria-label="Media from this Thread"
+            >
+              {lookable.map((attachment) => (
+                <AttachmentThumb
+                  key={attachment.id}
+                  attachment={attachment}
+                  onOpen={() => onOpenMedia?.(attachment)}
+                />
+              ))}
+            </div>
+          ) : null}
+          <ThreadFiling
+            thread={view.thread}
+            projects={projects}
+            defaultOpen
+            onFiled={onFiled}
+            onProjectCreated={onProjectCreated}
+          />
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -468,8 +554,17 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     typeof params.dayKey === "string" ? params.dayKey : undefined;
   const selectedDayKey = isDayKey(dayParam) ? dayParam : null;
   const searchParams = useSearchParams();
-  const rawFilter = searchParams?.get("f") ?? null;
-  const filter = isDeskFilter(rawFilter) ? rawFilter : null;
+  /**
+   * One filter model for both surfaces, carried in the URL. Links made
+   * before the rail existed still say `?f=`; they translate on read and the
+   * rail writes the newer params from then on.
+   */
+  const facets = useMemo(
+    () => readFacets(searchParams ?? undefined),
+    [searchParams],
+  );
+  const lens = readLens(searchParams ?? undefined);
+  const filtering = hasFacets(facets);
 
   const [threads, setThreads] = useState<ThreadListView[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -652,41 +747,55 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     [dayThreads, artifacts],
   );
 
-  /** The day's list under the active filter — what the chips actually cut. */
-  const visibleDayThreads = useMemo(
-    () =>
-      filter
-        ? orderedDayThreads.filter((view) =>
-            matchesFilter(view, artifacts, filter),
-          )
-        : orderedDayThreads,
-    [orderedDayThreads, artifacts, filter],
-  );
-
-  const dayFilterCounts = useMemo(
-    () => countFilters(dayThreads, artifacts),
-    [dayThreads, artifacts],
-  );
-
-  const allFilterCounts = useMemo(
-    () => countFilters(threads, artifacts),
-    [threads, artifacts],
-  );
-
   /**
-   * A filter on /days with no day open is a working queue: the matching
-   * Threads across every day, newest day first, ready to be gone through
-   * one by one.
+   * What the facets are asked about. Inside a day the scope is that day —
+   * the rail then says what this day holds; outside it, the whole pile.
    */
-  const queueThreads = useMemo(
+  const scopeViews = useMemo(
     () =>
-      filter
-        ? byDay
-            .flatMap(([, views]) => views)
-            .filter((view) => matchesFilter(view, artifacts, filter))
-        : [],
-    [byDay, artifacts, filter],
+      activeDayKey
+        ? orderedDayThreads
+        : byDay.flatMap(([, views]) => views),
+    [activeDayKey, orderedDayThreads, byDay],
   );
+
+  const facetThreads = useMemo(
+    () => scopeViews.map((view) => toFacetThread(view, artifacts)),
+    [scopeViews, artifacts],
+  );
+
+  const counts = useMemo(
+    () => facetCounts(facetThreads, facets, projects),
+    [facetThreads, facets, projects],
+  );
+
+  /** The Threads the facets let through, in the scope's own order. */
+  const visibleViews = useMemo(() => {
+    if (!filtering) return scopeViews;
+    const passing = new Set(
+      facetThreads
+        .filter((thread) => matchesFacets(thread, facets))
+        .map((thread) => thread.id),
+    );
+    return scopeViews.filter((view) => passing.has(view.thread.id));
+  }, [scopeViews, facetThreads, facets, filtering]);
+
+  /** The Lens re-stacks exactly that set; it never changes its membership. */
+  const stacks = useMemo(() => {
+    const byId = new Map(visibleViews.map((view) => [view.thread.id, view]));
+    return stackByLens(
+      facetThreads.filter((thread) => byId.has(thread.id)),
+      lens,
+    ).map((stack) => ({
+      key: stack.key,
+      title: lens === "days" ? dayTitle(stack.key) : stack.title,
+      /** Days stay openable from their heading; other stacks are groupings. */
+      href: lens === "days" ? `/days/${stack.key}` : null,
+      views: stack.threadIds
+        .map((id) => byId.get(id))
+        .filter((view): view is ThreadListView => Boolean(view)),
+    }));
+  }, [visibleViews, facetThreads, lens]);
 
   /** Where the filter chips live right now, for their hrefs. */
   const basePath = selectedThreadId
@@ -777,6 +886,101 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   }
 
   const hasSelection = Boolean(selectedThreadId || selectedDayKey);
+
+  /** "N need attention" is answered from wherever it is asked. */
+  const retrySync =
+    facets.attention === "stuck" ? (
+      <button
+        type="button"
+        className="capture-retry"
+        onClick={() => void retryAttention()}
+        disabled={retryBusy}
+      >
+        {retryBusy ? "Retrying…" : "Retry sync"}
+      </button>
+    ) : null;
+
+  /**
+   * The Days Lens with nothing narrowed is the day list itself — the shape
+   * of the whole pile. Narrow it, or change the Lens, and the days open
+   * into the Threads they hold.
+   */
+  const dayCards = (
+    <ul className="desk-days" aria-label="Days">
+      {byDay.map(([dayKey, views]) => {
+        const sheet = summarizeDay({
+          dayKey,
+          threads: views.map((view) => view.thread),
+          captures: views.flatMap((view) => view.captures),
+          threadsWithReports: reportThreadIds,
+        });
+        const waiting = sheet.threadCount - sheet.reviewed;
+        const stuck = views.some((view) =>
+          view.captures.some((capture) => capture.status === "needs_attention"),
+        );
+        // A day says the most specific true thing about itself: a Thread
+        // stuck on a question first, then reports waiting to be read, then
+        // work merely unfiled.
+        const state =
+          sheet.needsWord.length > 0
+            ? `${sheet.needsWord.length} need${
+                sheet.needsWord.length === 1 ? "s" : ""
+              } a word`
+            : sheet.toRead.length > 0
+              ? `${sheet.toRead.length} report${
+                  sheet.toRead.length === 1 ? "" : "s"
+                } to read`
+              : waiting > 0
+                ? `${waiting} waiting`
+                : "All filed";
+        return (
+          <li
+            key={dayKey}
+            className={[
+              "desk-day",
+              selectedDayKey === dayKey ? "desk-day-selected" : "",
+              stuck || sheet.needsWord.length > 0 ? "desk-day-attention" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <Link
+              className="desk-day-open"
+              href={`/days/${dayKey}`}
+              data-testid={`open-day-${dayKey}`}
+              onClick={(event) => onLinkClick(event, `/days/${dayKey}`)}
+            >
+              <span className="desk-day-title">{dayTitle(dayKey)}</span>
+              <span className="desk-day-tally">
+                {sheet.threadCount}{" "}
+                {sheet.threadCount === 1 ? "Thread" : "Threads"} ·{" "}
+                {sheet.captureCount}{" "}
+                {sheet.captureCount === 1 ? "Capture" : "Captures"}
+                {sheet.photoCount > 0 ? ` · ${sheet.photoCount} media` : ""}
+              </span>
+              <span
+                className={[
+                  "desk-day-state",
+                  waiting > 0 || sheet.needsWord.length > 0
+                    ? "desk-day-state-open"
+                    : "",
+                  // A day with reading waiting says so in the machine's sky,
+                  // the same voice as the reports.
+                  sheet.needsWord.length === 0 && sheet.toRead.length > 0
+                    ? "desk-day-state-reports"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {state}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   // Phone panes share the window scroll: remember where the walker was in
   // the day list and put them back there after closing a day or Thread
@@ -870,199 +1074,146 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
               </p>
             ) : null}
 
-            {/* Inside a day at the desk, the sidebar is that day's Threads:
-                the walker steps between them without leaving the day, and
-                the rows carry their report and media, openable in place. */}
-            {atTheDesk && activeDayKey ? (
-              <nav className="desk-sidebar-day" aria-label="This day's Threads">
-                <Link
-                  className="desk-sidebar-back"
-                  href="/days"
-                  onClick={(event) => onLinkClick(event, "/days")}
-                >
-                  ← Days
-                </Link>
-                <Link
-                  className="desk-sidebar-day-title"
-                  data-testid="desk-sidebar-day"
-                  href={`/days/${activeDayKey}`}
-                  onClick={(event) =>
-                    onLinkClick(event, `/days/${activeDayKey}`)
-                  }
-                >
-                  {dayTitle(activeDayKey)}
-                </Link>
-                <FilterChips
+            {/* At the desk the rail is always in reach: it says what the
+                pile holds and narrows it, and the Lens re-stacks whatever
+                it lets through. Inside a day, both speak for that day. */}
+            {atTheDesk ? (
+              <div className="desk-browse">
+                <DeskRail
                   base={basePath}
-                  active={filter}
-                  counts={dayFilterCounts}
-                  onNavigate={onLinkClick}
+                  selection={facets}
+                  lens={lens}
+                  counts={counts}
+                  projects={projects}
                 />
-                {filter === "attention" ? (
-                  <button
-                    type="button"
-                    className="capture-retry"
-                    onClick={() => void retryAttention()}
-                    disabled={retryBusy}
-                  >
-                    {retryBusy ? "Retrying…" : "Retry sync"}
-                  </button>
-                ) : null}
-                <ul
-                  className="threads-day-list"
-                  aria-label={`Threads from ${dayTitle(activeDayKey)}`}
-                >
-                  {visibleDayThreads.map((view) => (
-                    <ThreadRow
-                      key={view.thread.id}
-                      view={view}
-                      selected={view.thread.id === selectedThreadId}
-                      projects={projects}
-                      artifact={artifacts.get(view.thread.id)}
-                      onOpenReport={setOpenReport}
-                      onOpenMedia={setOpenMedia}
-                      onFiled={() => void load()}
-                      onProjectCreated={onProjectCreated}
-                    />
-                  ))}
-                </ul>
-                {filter && visibleDayThreads.length === 0 ? (
-                  <p className="trail-thread-empty">
-                    Nothing in this day matches that filter.
-                  </p>
-                ) : null}
-              </nav>
-            ) : filter && !activeDayKey ? (
-              <div className="desk-queue" aria-label="Filtered Threads">
-                <FilterChips
-                  base="/days"
-                  active={filter}
-                  counts={allFilterCounts}
-                  onNavigate={onLinkClick}
-                />
-                {filter === "attention" ? (
-                  <button
-                    type="button"
-                    className="capture-retry"
-                    onClick={() => void retryAttention()}
-                    disabled={retryBusy}
-                  >
-                    {retryBusy ? "Retrying…" : "Retry sync"}
-                  </button>
-                ) : null}
-                <ul className="threads-day-list" aria-label="Filtered Threads">
-                  {queueThreads.map((view) => (
-                    <ThreadRow
-                      key={view.thread.id}
-                      view={view}
-                      showDay
-                      selected={false}
-                      projects={projects}
-                      artifact={artifacts.get(view.thread.id)}
-                      onOpenReport={atTheDesk ? setOpenReport : undefined}
-                      onOpenMedia={atTheDesk ? setOpenMedia : undefined}
-                      onFiled={() => void load()}
-                      onProjectCreated={onProjectCreated}
-                    />
-                  ))}
-                </ul>
-                {queueThreads.length === 0 ? (
-                  <p className="trail-thread-empty">
-                    Nothing matches that filter right now.
-                  </p>
-                ) : null}
+                <div className="desk-browse-main">
+                  {activeDayKey ? (
+                    <nav
+                      className="desk-sidebar-day"
+                      aria-label="This day's Threads"
+                    >
+                      <Link
+                        className="desk-sidebar-back"
+                        href="/days"
+                        onClick={(event) => onLinkClick(event, "/days")}
+                      >
+                        ← Days
+                      </Link>
+                      <Link
+                        className="desk-sidebar-day-title"
+                        data-testid="desk-sidebar-day"
+                        href={`/days/${activeDayKey}`}
+                        onClick={(event) =>
+                          onLinkClick(event, `/days/${activeDayKey}`)
+                        }
+                      >
+                        {dayTitle(activeDayKey)}
+                      </Link>
+                    </nav>
+                  ) : null}
+                  <LensControl
+                    base={basePath}
+                    selection={facets}
+                    lens={lens}
+                  />
+                  {retrySync}
+                  {!activeDayKey && lens === "days" && !filtering ? (
+                    dayCards
+                  ) : (
+                    <div className="desk-stacks">
+                      {stacks.map((stack) => (
+                        <section className="desk-stack" key={stack.key}>
+                          {/* Inside a day under the Days Lens the sidebar
+                              already names it; saying it twice is noise. */}
+                          {activeDayKey && lens === "days" ? null : (
+                          <h2 className="desk-stack-title">
+                            {stack.href ? (
+                              <Link
+                                href={stack.href}
+                                onClick={(event) =>
+                                  onLinkClick(event, stack.href!)
+                                }
+                              >
+                                {stack.title}
+                              </Link>
+                            ) : (
+                              stack.title
+                            )}
+                            <span className="desk-stack-count">
+                              {stack.views.length}
+                            </span>
+                          </h2>
+                          )}
+                          <ul
+                            className="threads-day-list"
+                            aria-label={`Threads: ${stack.title}`}
+                          >
+                            {stack.views.map((view) => (
+                              <ThreadRow
+                                key={view.thread.id}
+                                view={view}
+                                expandable
+                                selected={
+                                  view.thread.id === selectedThreadId
+                                }
+                                projects={projects}
+                                artifact={artifacts.get(view.thread.id)}
+                                onOpenReport={setOpenReport}
+                                onOpenMedia={setOpenMedia}
+                                onFiled={() => void load()}
+                                onProjectCreated={onProjectCreated}
+                              />
+                            ))}
+                          </ul>
+                        </section>
+                      ))}
+                      {stacks.length === 0 ? (
+                        <p className="trail-thread-empty">
+                          Nothing matches that filter right now.
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-            <>
-            <FilterChips
-              base="/days"
-              active={null}
-              counts={allFilterCounts}
-              onNavigate={onLinkClick}
-            />
-            <ul className="desk-days" aria-label="Days">
-              {byDay.map(([dayKey, views]) => {
-                const sheet = summarizeDay({
-                  dayKey,
-                  threads: views.map((view) => view.thread),
-                  captures: views.flatMap((view) => view.captures),
-                  threadsWithReports: reportThreadIds,
-                });
-                const waiting = sheet.threadCount - sheet.reviewed;
-                const stuck = views.some((view) =>
-                  view.captures.some(
-                    (capture) => capture.status === "needs_attention",
-                  ),
-                );
-                // A day says the most specific true thing about itself: a
-                // Thread stuck on a question first, then reports waiting to
-                // be read, then work merely unfiled.
-                const state =
-                  sheet.needsWord.length > 0
-                    ? `${sheet.needsWord.length} need${
-                        sheet.needsWord.length === 1 ? "s" : ""
-                      } a word`
-                    : sheet.toRead.length > 0
-                      ? `${sheet.toRead.length} report${
-                          sheet.toRead.length === 1 ? "" : "s"
-                        } to read`
-                      : waiting > 0
-                        ? `${waiting} waiting`
-                        : "All filed";
-                return (
-                  <li
-                    key={dayKey}
-                    className={[
-                      "desk-day",
-                      selectedDayKey === dayKey ? "desk-day-selected" : "",
-                      stuck || sheet.needsWord.length > 0
-                        ? "desk-day-attention"
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <Link
-                      className="desk-day-open"
-                      href={`/days/${dayKey}`}
-                      data-testid={`open-day-${dayKey}`}
-                      onClick={(event) =>
-                        onLinkClick(event, `/days/${dayKey}`)
-                      }
+              <>
+                <FilterChips
+                  base={basePath}
+                  selection={facets}
+                  counts={counts}
+                  onNavigate={onLinkClick}
+                />
+                {retrySync}
+                {filtering ? (
+                  <>
+                    <ul
+                      className="threads-day-list"
+                      aria-label="Filtered Threads"
                     >
-                      <span className="desk-day-title">{dayTitle(dayKey)}</span>
-                      <span className="desk-day-tally">
-                        {sheet.threadCount}{" "}
-                        {sheet.threadCount === 1 ? "Thread" : "Threads"} ·{" "}
-                        {sheet.captureCount}{" "}
-                        {sheet.captureCount === 1 ? "Capture" : "Captures"}
-                        {sheet.photoCount > 0
-                          ? ` · ${sheet.photoCount} media`
-                          : ""}
-                      </span>
-                      <span
-                        className={[
-                          "desk-day-state",
-                          waiting > 0 || sheet.needsWord.length > 0
-                            ? "desk-day-state-open"
-                            : "",
-                          // A day with reading waiting says so in the
-                          // machine's sky, the same voice as the reports.
-                          sheet.needsWord.length === 0 && sheet.toRead.length > 0
-                            ? "desk-day-state-reports"
-                            : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
-                        {state}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-            </>
+                      {visibleViews.map((view) => (
+                        <ThreadRow
+                          key={view.thread.id}
+                          view={view}
+                          showDay
+                          selected={false}
+                          projects={projects}
+                          artifact={artifacts.get(view.thread.id)}
+                          onFiled={() => void load()}
+                          onProjectCreated={onProjectCreated}
+                        />
+                      ))}
+                    </ul>
+                    {visibleViews.length === 0 ? (
+                      <p className="trail-thread-empty">
+                        Nothing matches that filter right now.
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  dayCards
+                )}
+              </>
             )}
           </>
         )}
@@ -1096,27 +1247,18 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
               <section className="day-threads" aria-label="Threads from this day">
                 <FilterChips
                   base={basePath}
-                  active={filter}
-                  counts={dayFilterCounts}
+                  selection={facets}
+                  counts={counts}
                   onNavigate={onLinkClick}
                 />
-                {filter === "attention" ? (
-                  <button
-                    type="button"
-                    className="capture-retry"
-                    onClick={() => void retryAttention()}
-                    disabled={retryBusy}
-                  >
-                    {retryBusy ? "Retrying…" : "Retry sync"}
-                  </button>
-                ) : null}
-                {filter && visibleDayThreads.length === 0 ? (
+                {retrySync}
+                {filtering && visibleViews.length === 0 ? (
                   <p className="trail-thread-empty">
                     Nothing in this day matches that filter.
                   </p>
                 ) : null}
                 <ul className="threads-day-list">
-                  {visibleDayThreads.map((view) => (
+                  {visibleViews.map((view) => (
                     <ThreadRow
                       key={view.thread.id}
                       view={view}
