@@ -81,6 +81,8 @@ const CHIPS: Array<{
   group: FacetGroup;
   value: string;
 }> = [
+  { key: "open", label: "Open", group: "state", value: "open" },
+  { key: "kept", label: "Research kept", group: "state", value: "kept" },
   { key: "word", label: "Needs a word", group: "attention", value: "word" },
   {
     key: "attention",
