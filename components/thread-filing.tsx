@@ -20,15 +20,18 @@ import type { Project } from "@/lib/sync/types";
 export function ThreadFiling({
   thread,
   projects,
+  defaultOpen,
   onFiled,
   onProjectCreated,
 }: {
   thread: LocalThread;
   projects: Project[];
+  /** Set where the row is already open and filing is the point of it. */
+  defaultOpen?: boolean;
   onFiled: () => void;
   onProjectCreated: (project: Project) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(defaultOpen));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newProject, setNewProject] = useState("");
@@ -68,7 +71,7 @@ export function ThreadFiling({
             ? undefined
             : (result.researchVerdict ?? filing.researchVerdict ?? null),
       });
-      setOpen(false);
+      if (!defaultOpen) setOpen(false);
       onFiled();
     } finally {
       setBusy(false);
@@ -240,14 +243,16 @@ export function ThreadFiling({
         >
           Just read it
         </button>
-        <button
-          type="button"
-          className="thread-filing-cancel"
-          disabled={busy}
-          onClick={() => setOpen(false)}
-        >
-          Cancel
-        </button>
+        {defaultOpen ? null : (
+          <button
+            type="button"
+            className="thread-filing-cancel"
+            disabled={busy}
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   );
