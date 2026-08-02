@@ -30,6 +30,7 @@ type StoredThread = {
   topics?: string[];
   ask?: string | null;
   projectId?: string | null;
+  researchVerdict?: "kept" | "dismissed" | null;
 };
 
 type StoredProject = {
@@ -394,6 +395,7 @@ export function createMemoryThreadRepository(
             projectName: thread.projectId
               ? (db.projects.get(`${userId}:${thread.projectId}`)?.name ?? null)
               : null,
+            researchVerdict: thread.researchVerdict ?? null,
             captures,
           } satisfies ServerThread;
         })
@@ -621,6 +623,10 @@ export function createMemoryThreadRepository(
           filing.projectId === undefined
             ? (existing.projectId ?? null)
             : filing.projectId,
+        researchVerdict:
+          filing.researchVerdict === undefined
+            ? (existing.researchVerdict ?? null)
+            : filing.researchVerdict,
       });
       const threads = await this.listThreads(userId);
       return threads.find((thread) => thread.id === threadId) ?? null;
@@ -644,6 +650,11 @@ export function createMemoryThreadRepository(
             : (existing.topics ?? []),
         ask: classification.ask,
       });
+    },
+
+    async getThreadResearchVerdict(userId, threadId) {
+      const existing = state().threads.get(`${userId}:${threadId}`);
+      return existing?.researchVerdict ?? null;
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

@@ -1,4 +1,4 @@
-import { asThreadKind } from "@/lib/local-capture/types";
+import { asResearchVerdict, asThreadKind } from "@/lib/local-capture/types";
 import { requireSyncAccess } from "@/lib/sync/access";
 import { getThreadRepository } from "@/lib/sync/repository";
 
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     reviewed?: boolean;
     kind?: string | null;
     projectId?: string | null;
+    researchVerdict?: string | null;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -33,6 +34,12 @@ export async function POST(request: Request) {
   // An unknown kind is dropped rather than stored: the walker's filing is the
   // one place a kind outranks the model, so it has to be a real one.
   const kind = body.kind === undefined ? undefined : asThreadKind(body.kind);
+  // Same shape as kind: an unknown verdict clears rather than stores — only
+  // the two words the glossary names (kept, dismissed) are worth keeping.
+  const researchVerdict =
+    body.researchVerdict === undefined
+      ? undefined
+      : asResearchVerdict(body.researchVerdict);
 
   try {
     const repository = getThreadRepository();
@@ -40,6 +47,7 @@ export async function POST(request: Request) {
       kind,
       projectId: body.projectId,
       reviewedAt,
+      researchVerdict,
     });
     if (!thread) {
       return Response.json({ error: "thread_not_found" }, { status: 404 });
@@ -50,6 +58,7 @@ export async function POST(request: Request) {
       kind: thread.kind ?? null,
       projectId: thread.projectId ?? null,
       projectName: thread.projectName ?? null,
+      researchVerdict: thread.researchVerdict ?? null,
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "review_failed";

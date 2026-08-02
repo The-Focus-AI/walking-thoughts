@@ -66,6 +66,19 @@ export function asThreadKind(value: unknown): ThreadKind | null {
     : null;
 }
 
+/**
+ * The Research Verdict the walker settled while Filing: kept (worth
+ * returning to) or dismissed (read and let go). Absent/null = unset — the
+ * Thread may be Reviewed either way; the verdict only says whether its
+ * research stays in reach. Dismissing retracts the Thread's Artifact page;
+ * keeping again restores it at the same address (ADR 0016).
+ */
+export type ResearchVerdict = "kept" | "dismissed";
+
+export function asResearchVerdict(value: unknown): ResearchVerdict | null {
+  return value === "kept" || value === "dismissed" ? value : null;
+}
+
 export type LocalThread = {
   id: string;
   title: string;
@@ -85,6 +98,8 @@ export type LocalThread = {
   /** The Project this Thread is filed into; a guess until it is Reviewed. */
   projectId?: string | null;
   projectName?: string | null;
+  /** The walker's Research Verdict from Filing; absent/null = unset. */
+  researchVerdict?: ResearchVerdict | null;
 };
 
 export type CaptureSyncStatus =
@@ -237,6 +252,8 @@ export type CaptureStore = {
     kind?: ThreadKind | null;
     projectId?: string | null;
     projectName?: string | null;
+    /** Omitted keeps the current verdict; null clears it. */
+    researchVerdict?: ResearchVerdict | null;
   }): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
@@ -282,6 +299,7 @@ export type CaptureStore = {
       ask?: string | null;
       projectId?: string | null;
       projectName?: string | null;
+      researchVerdict?: ResearchVerdict | null;
       captures: Array<{
         id: string;
         text: string;

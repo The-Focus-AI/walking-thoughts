@@ -73,3 +73,61 @@ test("filing a Thread clears it from New", async ({ page }) => {
     "All filed",
   );
 });
+
+/**
+ * The Research Verdict is part of Filing: keeping the research files the
+ * Thread and reads back settled; the note is processed either way.
+ */
+test("keeping the research files the Thread and reads back settled", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (globalThis as typeof globalThis & { __WT_REVIEW_TRANSPORT__?: unknown }).__WT_REVIEW_TRANSPORT__ =
+      {
+        async setReviewed(threadId: string) {
+          return { threadId, reviewedAt: new Date().toISOString() };
+        },
+        async listProjects() {
+          return [];
+        },
+        async fileThread(
+          threadId: string,
+          filing: {
+            kind?: string | null;
+            researchVerdict?: "kept" | "dismissed" | null;
+          },
+        ) {
+          return {
+            threadId,
+            reviewedAt: new Date().toISOString(),
+            kind: filing.kind ?? null,
+            projectId: null,
+            projectName: null,
+            researchVerdict: filing.researchVerdict ?? null,
+          };
+        },
+      };
+  });
+
+  await openCaptureShell(page);
+  await commitCapture(page, "Second wall meets the first at a corner");
+
+  await page.goto("/days");
+  await page.locator(".desk-day-open").first().click();
+  await page.locator(".thread-file-open").first().click();
+  await expect(page.getByTestId("thread-filing")).toBeVisible();
+
+  await page.getByTestId("file-keep-research").click();
+
+  // Kept research files the Thread — Reviewed — and the verdict reads back.
+  await expect(page.getByTestId("thread-reviewed-chip")).toBeVisible();
+  await page.locator(".thread-file-open").first().click();
+  await expect(page.getByTestId("file-keep-research")).toHaveText(
+    "Research kept ✓",
+  );
+
+  await page.goto("/days");
+  await expect(page.locator(".desk-day-open").first()).toContainText(
+    "All filed",
+  );
+});

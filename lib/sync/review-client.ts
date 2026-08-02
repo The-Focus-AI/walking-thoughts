@@ -6,6 +6,8 @@ export type ThreadFiling = {
   reviewed: boolean;
   kind?: string | null;
   projectId?: string | null;
+  /** The Research Verdict: omitted keeps the current one, null clears it. */
+  researchVerdict?: "kept" | "dismissed" | null;
 };
 
 export type FiledThread = {
@@ -14,6 +16,7 @@ export type FiledThread = {
   kind?: string | null;
   projectId?: string | null;
   projectName?: string | null;
+  researchVerdict?: "kept" | "dismissed" | null;
 };
 
 export type ReviewTransport = {

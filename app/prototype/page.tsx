@@ -36,6 +36,17 @@ const THREAD_REVIEW = {
   ],
 } as const;
 
+const DESK_INBOX = [
+  { key: "A", label: "Triage rail", winner: false },
+  { key: "B", label: "Light table", winner: false },
+  { key: "C", label: "Batch ledger", winner: false },
+  { key: "D", label: "Lens desk", winner: true },
+  { key: "E", label: "Dialogue desk", winner: false },
+  { key: "F", label: "Filter bar", winner: false },
+  { key: "G", label: "Command desk", winner: false },
+  { key: "H", label: "Facet rail", winner: true },
+] as const;
+
 const DESIGN_DIRECTIONS = [
   { key: "a", label: "Forest Night", winner: true },
   { key: "b", label: "Field Notebook", winner: false },
@@ -83,6 +94,56 @@ export default function PrototypeIndexPage() {
           <Link href="/">← Back to Walking Thoughts</Link>
         </p>
       </header>
+
+      <section className="proto-index-card" aria-labelledby="desk-inbox-title">
+        <div className="proto-index-card-head">
+          <div>
+            <h2 id="desk-inbox-title">Desk inbox</h2>
+            <p>
+              Desktop processing: get through the unreviewed queue — keep or
+              dismiss research separately from marking the Thread reviewed,
+              see stored media, and see similar past Threads while filing.
+              Round 2 (D, E) adds regroupable lenses and per-Thread
+              back-and-forth; round 3 (F–H) adds filtering. Desktop-only.
+            </p>
+            <p className="proto-index-verdict" role="status">
+              Verdict: <strong>D + H</strong> — Lens desk structure with
+              counted facet filters from the Facet rail (see VERDICT.md).
+              Winners highlighted below.
+            </p>
+          </div>
+          <div className="proto-index-open-row">
+            <Link
+              className="proto-index-open"
+              href="/prototype/desk-inbox?variant=A"
+            >
+              Open desktop
+            </Link>
+          </div>
+        </div>
+        <div className="proto-index-areas">
+          <div className="proto-index-area">
+            <h3>process</h3>
+            <ul>
+              {DESK_INBOX.map((variant) => (
+                <li key={variant.key}>
+                  <div className="proto-index-variant">
+                    <span className="proto-index-key">{variant.key}</span>
+                    <span className="proto-index-variant-label">
+                      {variant.label}
+                    </span>
+                    <div className="proto-index-viewport-links">
+                      <Link href={`/prototype/desk-inbox?variant=${variant.key}`}>
+                        Desktop
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       <section
         className="proto-index-card"

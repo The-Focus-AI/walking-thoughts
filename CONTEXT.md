@@ -17,12 +17,16 @@ An AI-generated Thread entry based on that Thread's complete history at a record
 _Avoid_: Sync, processing, response
 
 **Artifact**:
-One Enrichment published as a page: the report laid out as a survey sheet, browsable on its own URL, kept whole. Only Enrichments that were reports earn one — a question researched or an idea sharpened — and the queue publishes them as it enriches, so the page is waiting at the desk. The Enrichment stays the Thread entry; the Artifact is the readable form of it.
+One Enrichment published as a page: the report laid out as a survey sheet, browsable on its own URL, kept whole. Only Enrichments that were reports earn one — a question researched or an idea sharpened — and the queue publishes them as it enriches, so the page is waiting at the desk. The Enrichment stays the Thread entry; the Artifact is the readable form of it. A dismissed Research Verdict retracts the page; keeping the research again restores it at the same address.
 _Avoid_: Document, export, share link, post
 
 **Day**:
-One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The unit of work at the desk — Threads are reached through the day they were walked, not through a flat list.
+One walk, addressed as a whole: every Thread whose first Capture landed on that civil day, plus what the day amounts to and an ongoing conversation with all of it. The default arrangement at the desk — Threads arrive stacked by the day they were walked, though a Lens may re-stack the same pile another way.
 _Avoid_: Session, entry, log, feed
+
+**Lens**:
+How the desk stacks the unreviewed pile: by Day (the default), Topic, Kind, Media, or Reports. A Lens only re-groups — it never changes which Threads are in the pile, and it is not a filter.
+_Avoid_: View, tab, sort, mode
 
 **Kind**:
 What a Thread turns out to be — question, idea, task, observation, place, media, or noise. A property the Enrichment reads off the Thread, not a thing in its own right: an idea is a Thread that is an idea, never a record of its own.
@@ -37,8 +41,12 @@ A name the Enrichment has floated for an effort it keeps seeing, carried in the 
 _Avoid_: Candidate, suggestion, draft project, cluster
 
 **Filing**:
-What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
+What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, settle the Research Verdict, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
 _Avoid_: Triage, sorting, processing
+
+**Research Verdict**:
+What the walker settled about a Thread's research while Filing: kept (worth returning to), dismissed (read and let go), or unset. One verdict per Thread, separate from Reviewed — a Thread is processed either way; the verdict says whether its research stays in reach.
+_Avoid_: Rating, like, star, archive
 
 **Reviewed**:
 A Thread state set when the walker has processed it back at the desk. Threads start new and sit in the review queue until marked Reviewed.
