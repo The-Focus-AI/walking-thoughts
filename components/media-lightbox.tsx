@@ -225,6 +225,9 @@ export function MediaLightbox({
               controls
               autoPlay
             />
+          ) : url && attachment.kind === "audio" ? (
+            // Without this a clip fell through to <img> and rendered broken.
+            <audio className="media-lightbox-media" src={url} controls />
           ) : url ? (
             // eslint-disable-next-line @next/next/no-img-element -- local blob or private media URL
             <img
