@@ -331,7 +331,7 @@ function ThreadRow({
   artifact?: ArtifactSummary;
   /** Set at the desk, where the report opens in place instead of a new tab. */
   onOpenReport?: (artifact: ArtifactSummary) => void;
-  /** Set at the desk, where a photo or clip opens in place over the day. */
+  /** A photo or clip opens in place, over the day, on either surface. */
   onOpenMedia?: (attachment: LocalAttachment) => void;
   onFiled: () => void;
   onProjectCreated: (project: Project) => void;
@@ -347,12 +347,16 @@ function ThreadRow({
     (count, capture) => count + capture.attachments.length,
     0,
   );
-  const lookable = view.captures
-    .flatMap((capture) => capture.attachments)
-    .filter(
-      (attachment) =>
-        attachment.kind === "image" || attachment.kind === "video",
-    );
+  const attachments = view.captures.flatMap((capture) => capture.attachments);
+  /** The quiet strip only shows what has a picture in it. */
+  const lookable = attachments.filter(
+    (attachment) => attachment.kind === "image" || attachment.kind === "video",
+  );
+  /**
+   * Asked for media, the row shows everything it holds — a clip that says
+   * "1 media" and draws nothing is the whole complaint.
+   */
+  const mediaItems = gallery ? attachments : lookable;
 
   return (
     <li
@@ -408,14 +412,14 @@ function ThreadRow({
           onAnswered={onFiled}
         />
       ) : null}
-      {onOpenMedia && lookable.length > 0 ? (
+      {onOpenMedia && mediaItems.length > 0 ? (
         gallery ? (
           <div
             className="thread-row-gallery"
             data-testid="thread-row-gallery"
             aria-label="Media from this Thread"
           >
-            {lookable.map((attachment) => (
+            {mediaItems.map((attachment) => (
               <AttachmentTile
                 key={attachment.id}
                 attachment={attachment}
@@ -1348,7 +1352,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   projects={projects}
                   artifact={artifacts.get(view.thread.id)}
                   onOpenReport={atTheDesk ? setOpenReport : undefined}
-                  onOpenMedia={atTheDesk ? setOpenMedia : undefined}
+                  onOpenMedia={setOpenMedia}
                   onFiled={() => void load()}
                   onProjectCreated={onProjectCreated}
                 />
@@ -1530,9 +1534,11 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                           key={view.thread.id}
                           view={view}
                           showDay
+                          gallery={gallery}
                           selected={false}
                           projects={projects}
                           artifact={artifacts.get(view.thread.id)}
+                          onOpenMedia={setOpenMedia}
                           onFiled={() => void load()}
                           onProjectCreated={onProjectCreated}
                         />
@@ -1596,10 +1602,12 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                     <ThreadRow
                       key={view.thread.id}
                       view={view}
+                      gallery={gallery}
                       selected={false}
                       projects={projects}
                       artifact={artifacts.get(view.thread.id)}
                       onOpenReport={atTheDesk ? setOpenReport : undefined}
+                      onOpenMedia={setOpenMedia}
                       onFiled={() => void load()}
                       onProjectCreated={onProjectCreated}
                     />
