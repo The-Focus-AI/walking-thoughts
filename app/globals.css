@@ -1404,6 +1404,76 @@ h1 {
   outline-offset: 1px;
 }
 
+/* Filing keeps, Trash removes — said where the two sit next to each other. */
+.thread-row-remove {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.thread-row-remove-note {
+  flex: 1 1 16rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.thread-row-trash {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.thread-row-trash:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.desk-trashed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--machine);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.desk-undo-trash {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.desk-undo-trash:hover {
+  border-color: var(--ink);
+}
+
 .desk-queue-done {
   margin: 0;
   padding: 0.5rem 0.7rem;
@@ -1571,6 +1641,60 @@ h1 {
 
 .thread-thumb:hover {
   border-color: var(--ink);
+}
+
+/* Asked to look at the media: a contact sheet, not four stamps on a row. */
+.thread-row-gallery {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.thread-tile {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.thread-tile:hover {
+  border-color: var(--ink);
+}
+
+.thread-tile img,
+.thread-tile video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.thread-tile-glyph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 1.6rem;
+}
+
+.thread-tile-name {
+  padding: 0 0.45rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .thread-thumb img {

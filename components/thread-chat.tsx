@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
@@ -313,6 +313,7 @@ export function ThreadChat({
   const atTheDesk = useDeskViewport();
   const onLinkClick = useLinkFallback();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [online, setOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -486,7 +487,10 @@ export function ThreadChat({
       const store = getCaptureStore();
       await store.trashThread(threadId);
       void runSyncCycle({ store });
-      router.push("/days");
+      // Back to the queue the walker was working, not to a bare day list:
+      // the facets and Lens they came in with are still in the URL.
+      const query = searchParams?.toString();
+      router.push(query ? `/days?${query}` : "/days");
     } catch {
       setError("Could not move this Thread to Trash");
     }

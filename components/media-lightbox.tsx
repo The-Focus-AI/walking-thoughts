@@ -13,42 +13,66 @@ import type { LocalAttachment } from "@/lib/local-capture/types";
 export function useAttachmentUrl(
   attachment: LocalAttachment,
   prefer: "thumbnail" | "original",
+  options?: {
+    /** Off where streaming the private copy would be too much for the size. */
+    allowRemote?: boolean;
+  },
 ): string | null {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const key =
+  const [noLocalCopy, setNoLocalCopy] = useState(false);
+  const allowRemote = options?.allowRemote ?? true;
+  // Both keys, best first. The retained "thumbnail" is not always a picture
+  // — Captures made before real thumbnails existed kept a placeholder — so
+  // a key alone is not an answer; the bytes have to be looked at.
+  const keys = (
     prefer === "thumbnail"
-      ? (attachment.thumbnailObjectKey ??
-        (attachment.kind === "image" ? attachment.localObjectKey : null))
-      : (attachment.localObjectKey ?? attachment.thumbnailObjectKey);
+      ? [attachment.thumbnailObjectKey, attachment.localObjectKey]
+      : [attachment.localObjectKey, attachment.thumbnailObjectKey]
+  ).filter((key): key is string => Boolean(key));
+  const keyList = keys.join("|");
 
   useEffect(() => {
-    if (!key) return;
     let objectUrl: string | null = null;
     let active = true;
-    void createIdbMediaStore()
-      .get(key)
-      .then((blob) => {
-        if (!blob || !active) return;
+    void (async () => {
+      const store = createIdbMediaStore();
+      for (const key of keyList ? keyList.split("|") : []) {
+        const blob = await store.get(key).catch(() => null);
+        if (!active) return;
+        // A blob of the wrong type would render as a broken image rather
+        // than as nothing, which reads as a bug to the walker.
+        if (!blob || !blob.type.startsWith(`${MEDIA_MIME[attachment.kind]}/`)) {
+          continue;
+        }
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
-      })
-      .catch(() => undefined);
+        return;
+      }
+      if (active) setNoLocalCopy(true);
+    })();
     return () => {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [key]);
+  }, [keyList, attachment.kind]);
 
   if (blobUrl) return blobUrl;
-  // Captured on another device: stream the private server copy. As a thumb
-  // that only makes sense for an image — the element would be an <img>.
-  if (!key && attachment.remoteObjectKey) {
+  // Nothing lookable on this device: stream the private server copy. As a
+  // thumb that only makes sense for an image — the element would be an
+  // <img> — and never where the caller says the bytes are too heavy.
+  if (noLocalCopy && allowRemote && attachment.remoteObjectKey) {
     if (prefer === "original" || attachment.kind === "image") {
       return `/api/media/${attachment.id}`;
     }
   }
   return null;
 }
+
+const MEDIA_MIME: Record<LocalAttachment["kind"], string> = {
+  image: "image",
+  video: "video",
+  audio: "audio",
+};
 
 /** A 44px tap target that says what the media is and opens it in place. */
 export function AttachmentThumb({
@@ -74,6 +98,50 @@ export function AttachmentThumb({
       ) : (
         <span aria-hidden="true">{attachment.kind === "video" ? "▶" : "▤"}</span>
       )}
+    </button>
+  );
+}
+
+/**
+ * The gallery's unit. Asking the desk for photos is asking to look at them,
+ * so a tile is big enough to be looked at and shows the picture itself: the
+ * retained thumbnail for a photo, the clip's own first frame for a video
+ * (local copies only — streaming the private original for a tile would cost
+ * the walker their data on a page full of them).
+ */
+export function AttachmentTile({
+  attachment,
+  onOpen,
+}: {
+  attachment: LocalAttachment;
+  onOpen: () => void;
+}) {
+  const video = attachment.kind === "video";
+  const url = useAttachmentUrl(
+    attachment,
+    video ? "original" : "thumbnail",
+    video ? { allowRemote: false } : undefined,
+  );
+  return (
+    <button
+      type="button"
+      className="thread-tile"
+      data-testid="thread-tile"
+      aria-label={`Open ${attachment.fileName}`}
+      title={attachment.fileName}
+      onClick={onOpen}
+    >
+      {url && video ? (
+        <video src={url} muted playsInline preload="metadata" />
+      ) : url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- local blob or private media URL
+        <img src={url} alt="" />
+      ) : (
+        <span className="thread-tile-glyph" aria-hidden="true">
+          {video ? "▶" : attachment.kind === "audio" ? "♪" : "▤"}
+        </span>
+      )}
+      <span className="thread-tile-name">{attachment.fileName}</span>
     </button>
   );
 }
