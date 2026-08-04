@@ -296,6 +296,29 @@ export type EnrichmentRepository = {
   /** Which Threads already carry an embedding for this model. */
   listEmbeddedThreadIds?(userId: string, model: string): Promise<string[]>;
   /**
+   * Every Thread as similarity sees it: what it is called, when it began,
+   * and the nouns its newest Enrichment met. Read before a report is written
+   * so the research can start from what the walk already knows.
+   */
+  listThreadMentionIndex?(userId: string): Promise<
+    Array<{
+      threadId: string;
+      title: string;
+      at: string;
+      mentions: EnrichmentMention[];
+    }>
+  >;
+  /**
+   * The nearest Threads to a vector the caller just made — for a Capture
+   * that has no stored embedding of its own yet, which is every Capture at
+   * the moment its report is being written.
+   */
+  findSimilarToVector?(
+    userId: string,
+    vector: number[],
+    options: { model: string; limit?: number; excludeThreadId?: string },
+  ): Promise<Array<{ threadId: string; score: number }>>;
+  /**
    * The nearest earlier Threads by cosine distance, most similar first.
    * Empty when this Thread has no embedding yet — a Thread the corpus has
    * never seen is a first sighting, not an error.

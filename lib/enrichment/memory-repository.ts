@@ -286,6 +286,44 @@ export function createMemoryEnrichmentRepository(
       return ids;
     },
 
+    async listThreadMentionIndex(userId) {
+      const db = state();
+      const threads = await threadRepository.listThreads(userId);
+      const newest = new Map<string, ThreadEnrichment>();
+      for (const [key, enrichment] of db.enrichments) {
+        if (!key.startsWith(`${userId}:`)) continue;
+        const current = newest.get(enrichment.threadId);
+        if (!current || current.createdAt < enrichment.createdAt) {
+          newest.set(enrichment.threadId, enrichment);
+        }
+      }
+      return threads.map((thread) => ({
+        threadId: thread.id,
+        title: thread.title,
+        at: thread.updatedAt,
+        mentions: newest.get(thread.id)?.mentions ?? [],
+      }));
+    },
+
+    async findSimilarToVector(userId, vector, options) {
+      if (vector.length === 0) return [];
+      const db = state();
+      const scored: Array<{ threadId: string; score: number }> = [];
+      for (const [key, embedding] of db.embeddings) {
+        if (!key.startsWith(`${userId}:`)) continue;
+        const otherId = key.slice(userId.length + 1);
+        if (otherId === options.excludeThreadId) continue;
+        if (embedding.model !== options.model) continue;
+        scored.push({
+          threadId: otherId,
+          score: cosineSimilarity(vector, embedding.vector),
+        });
+      }
+      return scored
+        .sort((a, b) => b.score - a.score)
+        .slice(0, options.limit ?? 5);
+    },
+
     async findSimilarThreads(userId, threadId, options) {
       const db = state();
       const mine = db.embeddings.get(`${userId}:${threadId}`);

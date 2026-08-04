@@ -26,6 +26,7 @@ import {
   type EmbeddingClient,
 } from "./embeddings";
 import { enrichmentSystemAndModel, getGatewayClient } from "./gateway";
+import { formatPriorThreads, retrievePriorThreads } from "./retrieval";
 import {
   getNearbyPlaceResolver,
   type NearbyPlace,
@@ -576,6 +577,22 @@ async function runJob(
     };
 
     const requestTitle = thread.enrichmentCount === 0;
+    // What this walk already worked out about the same things. Best-effort
+    // by construction: a retrieval that fails writes the cold-start report.
+    const priors = await retrievePriorThreads({
+      userId,
+      repository,
+      embeddings,
+      threadId: running.threadId,
+      captureTexts: frozenHistory
+        .filter((entry) => entry.kind === "capture")
+        .map((entry) => entry.text),
+      mentions:
+        (
+          await repository.listThreadEnrichments(userId, running.threadId)
+        ).at(-1)?.mentions ?? [],
+    });
+
     const prompt = buildEnrichmentPrompt({
       threadTitle: thread.title,
       history: frozenHistory,
@@ -587,6 +604,7 @@ async function runJob(
       proposedProjects: proposals.map((proposal) => proposal.name),
       rejectedProjects: rejectedProjectNames,
       transcripts,
+      priorThreads: formatPriorThreads(priors),
     });
     const generation = await gateway.generate({
       model: running.model,

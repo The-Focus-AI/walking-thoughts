@@ -3,6 +3,7 @@ import type { ThreadRepository } from "@/lib/sync/types";
 import { MAX_ENRICHMENT_ATTEMPTS } from "./failures";
 import type {
   EnrichmentJob,
+  EnrichmentMention,
   EnrichmentRepository,
   EnrichmentThreadSnapshot,
   ThreadEnrichment,
@@ -698,6 +699,50 @@ export function createNeonEnrichmentRepository(
         WHERE user_id = ${userId} AND model = ${model}
       `) as Array<{ thread_id: string }>;
       return rows.map((row) => row.thread_id);
+    },
+
+    async listThreadMentionIndex(userId) {
+      await ensure();
+      // One row per Thread: its newest Enrichment is the current reading of
+      // what the Thread is about.
+      const rows = (await sql`
+        SELECT DISTINCT ON (e.thread_id)
+               e.thread_id, e.mentions, t.title, t.created_at
+        FROM enrichments e
+        JOIN threads t ON t.id = e.thread_id AND t.user_id = e.user_id
+        WHERE e.user_id = ${userId}
+        ORDER BY e.thread_id, e.created_at DESC
+      `) as Array<{
+        thread_id: string;
+        mentions: EnrichmentMention[] | null;
+        title: string;
+        created_at: string;
+      }>;
+      return rows.map((row) => ({
+        threadId: row.thread_id,
+        title: row.title,
+        at: new Date(row.created_at).toISOString(),
+        mentions: row.mentions ?? [],
+      }));
+    },
+
+    async findSimilarToVector(userId, vector, options) {
+      await ensure();
+      if (!vectorReady || vector.length === 0) return [];
+      const literal = `[${vector.join(",")}]`;
+      const rows = (await sql`
+        SELECT thread_id, 1 - (embedding <=> ${literal}::vector) AS score
+        FROM thread_embeddings
+        WHERE user_id = ${userId}
+          AND model = ${options.model}
+          AND thread_id <> ${options.excludeThreadId ?? ""}
+        ORDER BY embedding <=> ${literal}::vector
+        LIMIT ${options.limit ?? 5}
+      `) as Array<{ thread_id: string; score: number }>;
+      return rows.map((row) => ({
+        threadId: row.thread_id,
+        score: Number(row.score),
+      }));
     },
 
     async findSimilarThreads(userId, threadId, options) {

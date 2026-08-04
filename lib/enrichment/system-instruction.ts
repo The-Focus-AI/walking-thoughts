@@ -84,6 +84,12 @@ export function buildEnrichmentPrompt(input: {
   rejectedProjects?: string[];
   /** Speech-to-text for audio attachments, produced before this call. */
   transcripts?: EnrichmentTranscript[];
+  /**
+   * What this walk already worked out about the same things, rendered by
+   * lib/enrichment/retrieval.ts. Absent for a Capture with no history, and
+   * the prompt is then exactly what it was before retrieval existed.
+   */
+  priorThreads?: string | null;
 }): string {
   const transcripts = input.transcripts ?? [];
   const transcriptsByCaptureId = new Map<string, EnrichmentTranscript[]>();
@@ -160,6 +166,9 @@ export function buildEnrichmentPrompt(input: {
     sections.push(
       "Audio Captures are supplied as transcripts under the Capture they belong to. They are the walker's spoken words, machine-transcribed, so names and jargon may be misheard — never invent a transcript the app did not supply.",
     );
+  }
+  if (input.priorThreads) {
+    sections.push(input.priorThreads);
   }
   sections.push(
     "Research with the web_search and read_page tools when identification, explanation, transcript lookup, or research would help. Distinguish sourced findings from interpretation.",
