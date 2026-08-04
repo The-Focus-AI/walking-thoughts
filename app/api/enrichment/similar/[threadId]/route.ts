@@ -31,13 +31,24 @@ export async function GET(request: Request, context: RouteContext) {
     return Response.json({ similar: [] });
   }
 
-  const index = await repository.listThreadMentionIndex(access.userId);
+  // Continuity is an extra the desk offers. A similarity index that is
+  // unavailable — no pgvector, nothing embedded yet, a query that fails —
+  // means this Thread has no known past, not that the request was bad.
+  let index;
+  let embeddingMatches: Array<{ threadId: string; score: number }> = [];
+  try {
+    index = await repository.listThreadMentionIndex(access.userId);
+    embeddingMatches = repository.findSimilarThreads
+      ? await repository.findSimilarThreads(access.userId, threadId, {
+          limit: 5,
+        })
+      : [];
+  } catch {
+    return Response.json({ similar: [] });
+  }
+
   const mine = index.find((entry) => entry.threadId === threadId);
   if (!mine) return Response.json({ similar: [] });
-
-  const embeddingMatches = repository.findSimilarThreads
-    ? await repository.findSimilarThreads(access.userId, threadId, { limit: 5 })
-    : [];
 
   const similar = priorThreads({
     thread: {
