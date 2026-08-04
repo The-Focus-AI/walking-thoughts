@@ -30,6 +30,11 @@ import {
 import { fileThread } from "@/lib/desk/file-thread";
 import { matchesQuery, searchSnippet } from "@/lib/desk/search";
 import {
+  priorThreads,
+  type PriorThread,
+  type SimilarityCandidate,
+} from "@/lib/desk/similarity";
+import {
   artifactHref,
   artifactsByThread,
   loadArtifacts,
@@ -193,6 +198,92 @@ function FilterChips({
 }
 
 /**
+ * What came before this Thread. The shared-mention links are already on the
+ * device and render at once; the embedding matches are asked for when the
+ * row opens, because a queue of them would be a request per row for a
+ * ranking the walker may never look at.
+ *
+ * A Thread with nothing behind it says so — the first sighting of a thing
+ * is worth knowing, and is not an error.
+ */
+function PriorThreads({
+  threadId,
+  shared,
+}: {
+  threadId: string;
+  shared: PriorThread[];
+}) {
+  const onLinkClick = useLinkFallback();
+  const [alike, setAlike] = useState<PriorThread[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/enrichment/similar/${threadId}`);
+        if (!response.ok) return;
+        const body = (await response.json()) as {
+          similar?: Array<{ threadId: string; score: number }>;
+        };
+        if (!active) return;
+        const linked = new Set(shared.map((prior) => prior.threadId));
+        setAlike(
+          (body.similar ?? [])
+            .filter((match) => !linked.has(match.threadId))
+            .map((match) => ({
+              threadId: match.threadId,
+              title: "Reads like this one",
+              dayKey: "",
+              via: "embedding" as const,
+              sharedMentions: [],
+              score: match.score,
+            })),
+        );
+      } catch {
+        // Offline, or no similarity stored: the shared mentions stand alone.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [threadId, shared]);
+
+  const all = [...shared, ...alike];
+  if (all.length === 0) {
+    return (
+      <p className="thread-row-priors-none" data-testid="thread-priors-none">
+        First time this has come up.
+      </p>
+    );
+  }
+  return (
+    <ul
+      className="thread-row-priors"
+      aria-label="Prior Threads"
+      data-testid="thread-priors"
+    >
+      {all.map((prior) => (
+        <li key={prior.threadId}>
+          <Link
+            href={`/threads/${prior.threadId}`}
+            onClick={(event) =>
+              onLinkClick(event, `/threads/${prior.threadId}`)
+            }
+          >
+            {prior.title}
+          </Link>
+          <span className="thread-row-prior-why">
+            {prior.via === "mention"
+              ? `${prior.dayKey} · ${prior.sharedMentions.join(", ")}`
+              : "reads alike"}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
  * The Enrichment met a name it could not place and asked. The question and
  * its answer box live on the row itself — answering must not depend on
  * opening the chat.
@@ -310,6 +401,7 @@ function ThreadRow({
   projects,
   showDay,
   snippet,
+  priors,
   expandable,
   focused,
   query,
@@ -327,6 +419,8 @@ function ThreadRow({
   showDay?: boolean;
   /** The line a search matched on, shown so the result answers something. */
   snippet?: string | null;
+  /** Earlier Threads that share a mention with this one. */
+  priors?: PriorThread[];
   /** At the desk a row opens in place instead of sending the walker away. */
   expandable?: boolean;
   /** The row the desk's keyboard is on. */
@@ -527,6 +621,19 @@ function ThreadRow({
             {KIND_LABELS[view.thread.kind]}
           </span>
         ) : null}
+        {/* The walk has been here before, and the row says so before it is
+            opened — that is the whole reason to open it. */}
+        {priors && priors.length > 0 ? (
+          <span
+            className="thread-row-prior"
+            data-testid={`thread-prior-${view.thread.id}`}
+            title={priors
+              .map((prior) => prior.title)
+              .join(" · ")}
+          >
+            {priors.length} prior
+          </span>
+        ) : null}
         {view.thread.reviewedAt ? (
           <span
             className="thread-row-status thread-status-reviewed"
@@ -582,6 +689,7 @@ function ThreadRow({
               ))}
             </div>
           ) : null}
+          <PriorThreads threadId={view.thread.id} shared={priors ?? []} />
           <ThreadFiling
             thread={view.thread}
             projects={projects}
@@ -770,6 +878,42 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         : [...current, project],
     );
   }, []);
+
+  /**
+   * Every Thread as similarity sees it. Mentions come from the newest
+   * Enrichment, and the Thread's own start decides what counts as prior.
+   */
+  const candidates = useMemo<SimilarityCandidate[]>(
+    () =>
+      threads.map((view) => ({
+        threadId: view.thread.id,
+        title: view.thread.title,
+        dayKey: view.dayKey,
+        at: view.captures[0]?.createdAt ?? view.thread.updatedAt,
+        mentions:
+          view.enrichments[view.enrichments.length - 1]?.mentions?.map(
+            (mention) => ({ slug: mention.slug, name: mention.name }),
+          ) ?? [],
+      })),
+    [threads],
+  );
+
+  /**
+   * The shared-mention priors for every Thread, computed on the device from
+   * what it already holds — so the "N prior" chip needs no request and works
+   * offline. Embedding matches are asked for one row at a time, when a row
+   * is actually opened.
+   */
+  const priorsByThread = useMemo(() => {
+    const map = new Map<string, PriorThread[]>();
+    for (const candidate of candidates) {
+      map.set(
+        candidate.threadId,
+        priorThreads({ thread: candidate, candidates }),
+      );
+    }
+    return map;
+  }, [candidates]);
 
   /** Which Threads have a published page, for the day sheets to count. */
   const reportThreadIds = useMemo(
@@ -1555,6 +1699,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                                 focused={view.thread.id === focused}
                                 query={urlQuery}
                                 gallery={gallery}
+                                priors={priorsByThread.get(view.thread.id)}
                                 onTrash={(id) => void trashRow(id)}
                                 selected={
                                   view.thread.id === selectedThreadId

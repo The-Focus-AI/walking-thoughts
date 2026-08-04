@@ -14,6 +14,8 @@ export function createNeonEnrichmentRepository(
 ): EnrichmentRepository {
   const sql = neon(databaseUrl);
   let ready: Promise<void> | null = null;
+  /** False when pgvector is unavailable; similarity then simply has none. */
+  let vectorReady = false;
   const ensure = () => {
     ready ??= (async () => {
       await sql`
@@ -94,6 +96,26 @@ export function createNeonEnrichmentRepository(
         ALTER TABLE enrichments
         ADD COLUMN IF NOT EXISTS suggested_questions JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
+      // Similarity storage. pgvector may be unavailable (an older branch, a
+      // role without CREATE privileges); that costs the desk its "prior
+      // Threads" fallback and nothing else, so it must not take the whole
+      // schema down with it.
+      try {
+        await sql`CREATE EXTENSION IF NOT EXISTS vector`;
+        await sql`
+          CREATE TABLE IF NOT EXISTS thread_embeddings (
+            user_id TEXT NOT NULL,
+            thread_id TEXT NOT NULL,
+            model TEXT NOT NULL,
+            embedding vector NOT NULL,
+            embedded_at TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (user_id, thread_id)
+          )
+        `;
+        vectorReady = true;
+      } catch {
+        vectorReady = false;
+      }
       await sql`
         CREATE TABLE IF NOT EXISTS enrichment_inclusions (
           user_id TEXT NOT NULL,
@@ -646,6 +668,63 @@ export function createNeonEnrichmentRepository(
         RETURNING id
       `) as Array<{ id: string }>;
       return updated.length;
+    },
+
+    async storeThreadEmbedding(userId, threadId, embedding) {
+      await ensure();
+      if (!vectorReady || embedding.vector.length === 0) return;
+      const literal = `[${embedding.vector.join(",")}]`;
+      const embeddedAt = embedding.embeddedAt ?? new Date().toISOString();
+      // Re-embedding replaces: one row per Thread, always the current model.
+      await sql`
+        INSERT INTO thread_embeddings (
+          user_id, thread_id, model, embedding, embedded_at
+        ) VALUES (
+          ${userId}, ${threadId}, ${embedding.model}, ${literal}::vector,
+          ${embeddedAt}
+        )
+        ON CONFLICT (user_id, thread_id) DO UPDATE
+        SET model = EXCLUDED.model,
+            embedding = EXCLUDED.embedding,
+            embedded_at = EXCLUDED.embedded_at
+      `;
+    },
+
+    async listEmbeddedThreadIds(userId, model) {
+      await ensure();
+      if (!vectorReady) return [];
+      const rows = (await sql`
+        SELECT thread_id FROM thread_embeddings
+        WHERE user_id = ${userId} AND model = ${model}
+      `) as Array<{ thread_id: string }>;
+      return rows.map((row) => row.thread_id);
+    },
+
+    async findSimilarThreads(userId, threadId, options) {
+      await ensure();
+      if (!vectorReady) return [];
+      const limit = options?.limit ?? 5;
+      const mine = (await sql`
+        SELECT model, embedding::text AS embedding FROM thread_embeddings
+        WHERE user_id = ${userId} AND thread_id = ${threadId}
+      `) as Array<{ model: string; embedding: string }>;
+      // No embedding yet is a first sighting, not a failure.
+      if (mine.length === 0) return [];
+      // Only ever compared against its own model: two models do not share a
+      // vector space, so a cross-model neighbour is noise wearing a number.
+      const rows = (await sql`
+        SELECT thread_id, 1 - (embedding <=> ${mine[0].embedding}::vector) AS score
+        FROM thread_embeddings
+        WHERE user_id = ${userId}
+          AND model = ${mine[0].model}
+          AND thread_id <> ${threadId}
+        ORDER BY embedding <=> ${mine[0].embedding}::vector
+        LIMIT ${limit}
+      `) as Array<{ thread_id: string; score: number }>;
+      return rows.map((row) => ({
+        threadId: row.thread_id,
+        score: Number(row.score),
+      }));
     },
   };
 }
