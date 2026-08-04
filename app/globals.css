@@ -1626,6 +1626,49 @@ h1 {
   color: var(--muted);
 }
 
+/* Threads this device never held the text of, found by asking the server. */
+.search-elsewhere {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.search-elsewhere > h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-elsewhere ul {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-elsewhere li {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.search-elsewhere a {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.search-elsewhere a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* The line a search matched on — the answer, not just the address of it. */
 .thread-row-snippet {
   display: block;
