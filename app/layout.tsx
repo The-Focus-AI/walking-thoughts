@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { InstallAppPrompt } from "@/components/install-app-prompt";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { authConfiguration } from "@/lib/auth-config";
 import "./globals.css";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ServiceWorkerRegister />
+        <InstallAppPrompt />
         {children}
       </body>
     </html>

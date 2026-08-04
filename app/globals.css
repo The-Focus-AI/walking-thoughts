@@ -678,6 +678,79 @@ footer {
   background: var(--moss);
 }
 
+.install-prompt {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.install-prompt-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: min(100%, 16rem);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.install-prompt-copy strong {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.install-prompt-copy span {
+  color: var(--muted);
+}
+
+.install-prompt-copy em {
+  font-style: normal;
+  color: var(--ink);
+}
+
+.install-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.install-prompt-primary,
+.install-prompt-dismiss {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.install-prompt-primary {
+  background: var(--action);
+  color: var(--action-text);
+}
+
+.install-prompt-primary:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.install-prompt-dismiss {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
 .hero {
   align-self: center;
   padding: 4rem 0;
