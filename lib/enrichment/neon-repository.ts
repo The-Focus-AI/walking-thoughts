@@ -705,23 +705,26 @@ export function createNeonEnrichmentRepository(
       await ensure();
       // One row per Thread: its newest Enrichment is the current reading of
       // what the Thread is about.
+      // sync_threads is the production surface — `threads` never existed —
+      // and it dates a Thread by updated_at, which is the only timestamp it
+      // keeps.
       const rows = (await sql`
         SELECT DISTINCT ON (e.thread_id)
-               e.thread_id, e.mentions, t.title, t.created_at
+               e.thread_id, e.mentions, t.title, t.updated_at
         FROM enrichments e
-        JOIN threads t ON t.id = e.thread_id AND t.user_id = e.user_id
+        JOIN sync_threads t ON t.id = e.thread_id AND t.user_id = e.user_id
         WHERE e.user_id = ${userId}
         ORDER BY e.thread_id, e.created_at DESC
       `) as Array<{
         thread_id: string;
         mentions: EnrichmentMention[] | null;
         title: string;
-        created_at: string;
+        updated_at: string;
       }>;
       return rows.map((row) => ({
         threadId: row.thread_id,
         title: row.title,
-        at: new Date(row.created_at).toISOString(),
+        at: new Date(row.updated_at).toISOString(),
         mentions: row.mentions ?? [],
       }));
     },
