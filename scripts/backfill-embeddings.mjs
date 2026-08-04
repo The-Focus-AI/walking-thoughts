@@ -1,17 +1,19 @@
 /**
  * Backfill Thread embeddings over Threads enriched before similarity existed.
  *
- * Reads each Thread's Captures and its latest Enrichment, embeds the two
- * together, and writes the vector into thread_embeddings. Idempotent: a
- * Thread already embedded under the current model is skipped unless --force,
- * which is also how you re-embed after changing the model (two models do not
- * share a vector space, so a mixed table is a table of nonsense).
+ * Reads each Thread's Captures (sync_captures) and its latest Enrichment,
+ * embeds the two together, and writes the vector into thread_embeddings.
+ * Idempotent: a Thread already embedded under the current model is skipped
+ * unless --force, which is also how you re-embed after changing the model
+ * (two models do not share a vector space, so a mixed table is a table of
+ * nonsense).
  *
  * Check the model against the gateway's live /v1/models table before running
  * this; AI_GATEWAY_EMBEDDING_MODEL names it, and the default mirrors
  * lib/enrichment/embeddings.ts — that file is canonical, this copy exists
  * because a plain-JS script cannot import the TypeScript module.
  *
+ *   # Source .fnox/env first so OP_SERVICE_ACCOUNT_TOKEN is set, then:
  *   fnox exec --profile prod -- node scripts/backfill-embeddings.mjs --dry-run
  *   fnox exec --profile prod -- node scripts/backfill-embeddings.mjs
  *   fnox exec --profile prod -- node scripts/backfill-embeddings.mjs --force
@@ -49,8 +51,10 @@ async function main() {
     )
   `;
 
+  // Live schema uses the sync_* tables (see lib/sync/neon-repository.ts).
+  // Older names (threads / captures) were never the production surface.
   const threads = await sql`
-    SELECT id, user_id, title FROM threads ORDER BY created_at ASC
+    SELECT id, user_id, title FROM sync_threads ORDER BY updated_at ASC
   `;
   const done = force
     ? new Set()
@@ -81,7 +85,7 @@ async function main() {
     }
 
     const captures = await sql`
-      SELECT text FROM captures
+      SELECT text FROM sync_captures
       WHERE user_id = ${thread.user_id} AND thread_id = ${thread.id}
       ORDER BY sequence ASC
     `;
