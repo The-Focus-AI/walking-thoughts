@@ -1,5 +1,5 @@
 // Keep in sync with SHELL_CACHE_NAME in lib/offline-shell.ts.
-const CACHE_NAME = "walking-thoughts-shell-v13";
+const CACHE_NAME = "walking-thoughts-shell-v14";
 
 // Every screen the bottom tab bar can reach, plus the app chrome. Each of
 // these keeps a cached copy so a tab tap always lands on a page, with or
@@ -13,8 +13,8 @@ const SHELL = [
   "/offline-maps",
   "/region-tracer",
   "/manifest.webmanifest",
-  "/icon-192.svg",
-  "/icon-512.svg",
+  "/icon-192.png",
+  "/icon-512.png",
   "/fonts/barlow-condensed-500.woff2",
   "/fonts/barlow-condensed-600.woff2",
 ];

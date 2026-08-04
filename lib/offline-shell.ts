@@ -1,4 +1,4 @@
-export const SHELL_CACHE_NAME = "walking-thoughts-shell-v13";
+export const SHELL_CACHE_NAME = "walking-thoughts-shell-v14";
 
 /** Matches the script and style paths a Next page HTML references. */
 const STATIC_ASSET_PATTERN = /["'](\/_next\/static\/[^"'\s\\]+)["']/g;

@@ -19,8 +19,8 @@ export function OfflineReadiness() {
       "/journal",
       "/interview",
       "/manifest.webmanifest",
-      "/icon-192.svg",
-      "/icon-512.svg",
+      "/icon-192.png",
+      "/icon-512.png",
     ])
       .then(() => {
         if (active) setReady(true);
