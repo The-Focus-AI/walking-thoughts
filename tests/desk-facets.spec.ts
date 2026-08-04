@@ -22,6 +22,7 @@ function thread(overrides: Partial<FacetThread> & { id: string }): FacetThread {
     needsAttention: false,
     projectId: null,
     projectName: null,
+    mentions: [],
     mediaKinds: [],
     hasReport: false,
     hasEnrichment: false,

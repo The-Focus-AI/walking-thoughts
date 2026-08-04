@@ -203,6 +203,8 @@ export function createMemoryEnrichmentRepository(
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
           transcripts: enrichment.transcripts ?? [],
+          mentions: enrichment.mentions ?? [],
+          suggestedQuestions: enrichment.suggestedQuestions ?? [],
         };
         db.enrichments.set(`${userId}:${enrichmentId}`, stored);
         if (enrichment.title && threadRepository.updateThreadTitle) {

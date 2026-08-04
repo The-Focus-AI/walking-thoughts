@@ -1,7 +1,10 @@
 import type { CaptureLocation } from "@/lib/local-capture/types";
 import type { NearbyPlace } from "./place";
 import {
+  MENTION_KINDS,
   THREAD_KINDS,
+  asMentionKind,
+  type EnrichmentMention,
   type EnrichmentTranscript,
   type FrozenHistoryEntry,
   type ThreadKind,
@@ -131,6 +134,8 @@ export function buildEnrichmentPrompt(input: {
       : null,
     `\`KIND: \` exactly one of ${THREAD_KINDS.join(", ")} — the kind this Thread is now, judged from its whole history. Write \`unclear\` instead of guessing`,
     "`TOPICS: ` up to four lowercase hyphenated topic slugs, comma separated, that would group this Thread with others about the same subject",
+    `\`MENTIONS: \` up to six recurring nouns this Thread is actually about, comma separated, each written \`kind:Name\` where kind is one of ${MENTION_KINDS.join(", ")} — for example \`species:Barred owl, place:Cornwall Market\`. Name them as the walker would say them. Leave the header out when the Thread turns on nothing nameable`,
+    "`QUESTIONS: ` up to three follow-up questions the walker might want to ask next about this Thread, separated by ` | `. Offer them; do not answer them. Leave the header out when nothing obvious follows",
     "`ASK: ` one specific question when a name, reference, or intent in the Capture is genuinely unknown to you — otherwise leave this header out entirely",
     knownProjects.length > 0
       ? `\`PROJECT: \` the Project this Thread belongs to, copied exactly from this list — ${knownProjects.join(", ")} — or left out when none of them fits. Never invent a name here; prefer joining one of these over proposing a new one`
@@ -165,7 +170,8 @@ export function buildEnrichmentPrompt(input: {
   return sections.join("\n\n");
 }
 
-const HEADER_LINE = /^\s*(TITLE|KIND|TOPICS|ASK|PROJECT|PROPOSE)\s*:\s*(.*)$/i;
+const HEADER_LINE =
+  /^\s*(TITLE|KIND|TOPICS|MENTIONS|QUESTIONS|ASK|PROJECT|PROPOSE)\s*:\s*(.*)$/i;
 
 /** A Project name is one line of prose at most; keep the store tidy. */
 export const MAX_PROJECT_NAME_LENGTH = 60;
@@ -187,6 +193,55 @@ function readTopics(value: string): string[] {
   ].slice(0, 4);
 }
 
+/** A mention's stable key: what makes two sightings of a thing the same. */
+export function mentionSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * `kind:Name` pairs, comma separated. A bare name is kept with no kind
+ * rather than dropped — the noun is the useful part, and a model that
+ * forgets the prefix has still told the truth about what the walk was
+ * about. Same-slug mentions collapse to the first spelling.
+ */
+function readMentions(value: string): EnrichmentMention[] {
+  const seen = new Map<string, EnrichmentMention>();
+  for (const entry of value.split(",")) {
+    const raw = entry.trim();
+    if (!raw) continue;
+    const separator = raw.indexOf(":");
+    const kind =
+      separator === -1
+        ? null
+        : asMentionKind(raw.slice(0, separator).trim().toLowerCase());
+    const name = (
+      separator === -1 || kind === null ? raw : raw.slice(separator + 1)
+    )
+      .trim()
+      .slice(0, 60);
+    const slug = mentionSlug(name);
+    if (!slug || seen.has(slug)) continue;
+    seen.set(slug, { name, slug, kind });
+  }
+  return [...seen.values()].slice(0, 6);
+}
+
+/** Pipe separated, because a question may well contain a comma. */
+function readSuggestedQuestions(value: string): string[] {
+  return [
+    ...new Set(
+      value
+        .split("|")
+        .map((question) => question.trim().slice(0, 200))
+        .filter((question) => question.length > 0),
+    ),
+  ].slice(0, 3);
+}
+
 /**
  * Split the model's header lines from the Enrichment body. Headers the model
  * omits, and anything it invents, are simply absent — a missing KIND leaves
@@ -206,6 +261,10 @@ export function parseGatewayText(
   project: string | null;
   /** A name for an effort absent from that list; becomes a Proposed Project. */
   propose: string | null;
+  /** The recurring nouns this Thread is about. */
+  mentions: EnrichmentMention[];
+  /** Follow-ups offered to the walker, never answered here. */
+  suggestedQuestions: string[];
 } {
   const lines = raw.split("\n");
   const headers = new Map<string, string>();
@@ -235,6 +294,8 @@ export function parseGatewayText(
     title,
     kind,
     topics,
+    mentions: readMentions(headers.get("MENTIONS") ?? ""),
+    suggestedQuestions: readSuggestedQuestions(headers.get("QUESTIONS") ?? ""),
     ask: headers.get("ASK")?.trim().slice(0, 240) || null,
     project:
       headers.get("PROJECT")?.trim().slice(0, MAX_PROJECT_NAME_LENGTH) || null,

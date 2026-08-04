@@ -4,12 +4,14 @@ import type { ThreadEnrichment } from "./types";
 const CACHE_PREFIX = "wt-thread-enrichments:";
 
 function normalize(enrichments: ThreadEnrichment[]): ThreadEnrichment[] {
-  // Older cached payloads predate `sources`; `research` and `transcripts`
-  // stay optional.
+  // Older cached payloads predate `sources`; `research`, `transcripts`,
+  // `mentions`, and `suggestedQuestions` stay optional.
   return enrichments.map((enrichment) => ({
     ...enrichment,
     sources: enrichment.sources ?? [],
     transcripts: enrichment.transcripts ?? [],
+    mentions: enrichment.mentions ?? [],
+    suggestedQuestions: enrichment.suggestedQuestions ?? [],
   }));
 }
 

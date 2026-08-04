@@ -172,6 +172,34 @@ export function EnrichmentReport({
           ))}
         </ul>
       ) : null}
+      {(enrichment.mentions ?? []).length > 0 ? (
+        <ul
+          className="enrichment-mentions"
+          aria-label="Mentions"
+          data-testid="enrichment-mentions"
+        >
+          {(enrichment.mentions ?? []).map((mention) => (
+            <li key={mention.slug} className="enrichment-mention">
+              {mention.kind ? (
+                <span className="enrichment-mention-kind">{mention.kind}</span>
+              ) : null}
+              {mention.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {/* Offered, never answered: the walker asks by replying in the Thread. */}
+      {(enrichment.suggestedQuestions ?? []).length > 0 ? (
+        <ul
+          className="enrichment-questions"
+          aria-label="Questions you might ask next"
+          data-testid="enrichment-questions"
+        >
+          {(enrichment.suggestedQuestions ?? []).map((question) => (
+            <li key={question}>{question}</li>
+          ))}
+        </ul>
+      ) : null}
       <ResearchTrace steps={enrichment.research ?? []} />
       <MemoryPatchFooter patches={enrichment.memoryPatches ?? []} />
     </article>

@@ -627,6 +627,8 @@ async function runJob(
       kind: generation.kind,
       topics: generation.topics,
       ask: generation.ask,
+      mentions: generation.mentions,
+      suggestedQuestions: generation.suggestedQuestions,
       sources: generation.sources,
       research: generation.research,
       memoryPatches: appliedPatches,
