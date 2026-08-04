@@ -222,22 +222,15 @@ function PriorThreads({
       try {
         const response = await fetch(`/api/enrichment/similar/${threadId}`);
         if (!response.ok) return;
-        const body = (await response.json()) as {
-          similar?: Array<{ threadId: string; score: number }>;
-        };
+        const body = (await response.json()) as { similar?: PriorThread[] };
         if (!active) return;
+        // The device knows only its own Threads, so the corpus-wide answer
+        // arrives already named; anything it repeats is dropped.
         const linked = new Set(shared.map((prior) => prior.threadId));
         setAlike(
-          (body.similar ?? [])
-            .filter((match) => !linked.has(match.threadId))
-            .map((match) => ({
-              threadId: match.threadId,
-              title: "Reads like this one",
-              dayKey: "",
-              via: "embedding" as const,
-              sharedMentions: [],
-              score: match.score,
-            })),
+          (body.similar ?? []).filter(
+            (match) => !linked.has(match.threadId),
+          ),
         );
       } catch {
         // Offline, or no similarity stored: the shared mentions stand alone.

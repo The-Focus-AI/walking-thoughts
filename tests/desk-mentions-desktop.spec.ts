@@ -13,8 +13,8 @@ test("the Mentions rail counts the nouns the pile keeps returning to", async ({
 }) => {
   await seedPile(page);
   await page.goto("/days?state=open");
-  // The Mentions rows do not exist until the Enrichments they are read from
-  // have loaded, so wait for the queue itself before asking the rail.
+  // The Mentions rows are read off the Enrichments, so wait for the queue
+  // they come with before asking the rail anything.
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
 
   // Two of the three open Threads mention the reservoir; one names the
@@ -22,23 +22,35 @@ test("the Mentions rail counts the nouns the pile keeps returning to", async ({
   await expect(railRow(page, "mention", "the-reservoir")).toContainText("2");
   await expect(railRow(page, "mention", "frost-heave")).toContainText("1");
 
+  // The row is a link into that working set. This is the one client
+  // navigation the test makes — under two browser projects at once a
+  // query-only route change can outlast the default deadline, and the rest
+  // of the behaviour is provable without paying for it again.
   await railRow(page, "mention", "the-reservoir").click();
-  // A rail row only changes the query, so the router still fetches — on a
-  // machine running both browser projects at once that can outlast the
-  // default deadline, and a lost second here is not a lost facet.
   await expect(page).toHaveURL(/mention=the-reservoir/, { timeout: 20_000 });
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(2);
+});
 
-  // Mentions combine with the other groups like any facet.
-  await railRow(page, "kind", "question").click();
-  await expect(page).toHaveURL(/kind=question/, { timeout: 20_000 });
-  await expect(page).toHaveURL(/mention=the-reservoir/);
+test("a Mentions facet combines with the other groups and survives reload", async ({
+  page,
+}) => {
+  await seedPile(page);
+  await page.goto("/days?state=open&mention=the-reservoir&kind=question");
+
   const rows = page.locator(".desk-stack .thread-row");
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText("reservoir wall");
+  await expect(railRow(page, "mention", "the-reservoir")).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(railRow(page, "kind", "question")).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
 
-  // The selection round-trips like every other facet.
   await page.reload();
+  await expect(page.locator(".desk-stack .thread-row")).toHaveCount(1);
   await expect(railRow(page, "mention", "the-reservoir")).toHaveAttribute(
     "aria-current",
     "true",

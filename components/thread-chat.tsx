@@ -7,6 +7,13 @@ import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import { statusLabel } from "@/components/thread-entries";
+import {
+  DIALOGUE_ROLE_LABELS,
+  dialogueRoles,
+  type DialogueRole,
+} from "@/lib/desk/dialogue";
+import { fileThread } from "@/lib/desk/file-thread";
+import type { PriorThread } from "@/lib/desk/similarity";
 import { useLinkFallback } from "@/components/use-link-fallback";
 import {
   artifactHref,
@@ -195,6 +202,7 @@ function CaptureHero({
       data-testid="thread-capture-hero"
       aria-label={capture.text || "Capture"}
     >
+      <TurnRole role="trail" />
       {capture.text ? <p className="thread-capture-words">{capture.text}</p> : null}
       {capture.attachments.length > 0 ? (
         <ul className="thread-capture-media">
@@ -238,12 +246,27 @@ function CaptureHero({
  * (time over status) with the walker's words in italic serif — the italic
  * itself says "you said this"; no speaker labels, no bubbles.
  */
+/**
+ * The voice a turn is in. The Thread is a conversation between the walker
+ * and the machine across two places — the trail and the desk — and saying
+ * which is which is most of what makes it read as one.
+ */
+function TurnRole({ role }: { role: DialogueRole }) {
+  return (
+    <p className={`thread-turn-role role-${role}`} data-testid={`role-${role}`}>
+      {DIALOGUE_ROLE_LABELS[role]}
+    </p>
+  );
+}
+
 function ConversationCapture({
   capture,
   retention,
+  role,
 }: {
   capture: LocalCapture;
   retention?: MediaRetention;
+  role?: DialogueRole;
 }) {
   return (
     <article
@@ -264,6 +287,7 @@ function ConversationCapture({
         </span>
       </div>
       <div className="thread-entry-body">
+        {role ? <TurnRole role={role} /> : null}
         {capture.text ? (
           <p className="capture-words">{capture.text}</p>
         ) : null}
@@ -306,6 +330,9 @@ export function ThreadChat({
   const [reviewBusy, setReviewBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+  /** What the walk already knew, folded into the turn that used it. */
+  const [priors, setPriors] = useState<PriorThread[]>([]);
+  const [filingBusy, setFilingBusy] = useState(false);
   const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
   const [publishing, setPublishing] = useState(false);
   /** The report being read over the Thread; desk only. */
@@ -473,6 +500,28 @@ export function ThreadChat({
     }
   }
 
+  /**
+   * Keeping the research is Filing, so it marks the Thread Reviewed too —
+   * the same act the desk row performs, through the same path.
+   */
+  async function keepResearch() {
+    if (filingBusy) return;
+    setFilingBusy(true);
+    setError(null);
+    try {
+      if (!(await fileThread(threadId, { researchVerdict: "kept" }))) {
+        setError("Filing needs a connection");
+        return;
+      }
+      await refresh();
+      onReviewedChange?.(true);
+    } catch {
+      setError("Could not keep the research");
+    } finally {
+      setFilingBusy(false);
+    }
+  }
+
   /** Local-first trash: hides immediately, syncs on the next cycle. */
   async function moveToTrash() {
     if (
@@ -556,13 +605,14 @@ export function ThreadChat({
     }
   }
 
-  async function send() {
-    if (busy || (!draft.trim() && media.length === 0)) return;
+  async function send(question?: string) {
+    const words = (question ?? draft).trim();
+    if (busy || (!words && media.length === 0)) return;
     setBusy(true);
     setError(null);
     try {
       const store = getCaptureStore();
-      await store.commit(draft.trim(), readAvailableLocation(), {
+      await store.commit(words, readAvailableLocation(), {
         destination: { type: "thread", threadId },
         attachments: media,
       });
@@ -585,9 +635,42 @@ export function ThreadChat({
     }
   }
 
+  useEffect(() => {
+    // The compact embed does not show continuity, so it must not pay a
+    // request for it — every Thread opened on the map would.
+    if (embedded) return;
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/enrichment/similar/${threadId}`);
+        if (!response.ok) return;
+        const body = (await response.json()) as { similar?: PriorThread[] };
+        if (active) setPriors(body.similar ?? []);
+      } catch {
+        // The report stands on its own; continuity is the extra.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [threadId, embedded]);
+
   const timeline = chronologicalThreadEntries(captures, enrichments);
+  const firstReportIndex = timeline
+    .filter((entry) => entry !== timeline.find((first) => first.kind === "capture"))
+    .findIndex((entry) => entry.kind === "enrichment");
   const baseCapture = timeline.find((entry) => entry.kind === "capture");
   const conversation = timeline.filter((entry) => entry !== baseCapture);
+  /**
+   * Which voice each turn is in. The base Capture is always the trail, so
+   * the roles are read over the whole timeline and the conversation's share
+   * of them is taken from the same list — the reading cannot drift.
+   */
+  const roles = dialogueRoles(timeline.map((entry) => entry.kind));
+  const conversationRoles = roles.slice(baseCapture ? 1 : 0);
+  /** The newest report's offered follow-ups, as one-tap chips. */
+  const suggested =
+    enrichments[enrichments.length - 1]?.suggestedQuestions ?? [];
 
   // Back goes to the day this Thread belongs to, not the whole Days list —
   // the walker was reading one day and should land back inside it.
@@ -625,6 +708,24 @@ export function ThreadChat({
           </p>
         </div>
         <div className="thread-chat-tools">
+          {!embedded ? (
+            <button
+              type="button"
+              className={
+                thread?.researchVerdict === "kept"
+                  ? "thread-copy-markdown thread-keep-research is-kept"
+                  : "thread-copy-markdown thread-keep-research"
+              }
+              data-testid="thread-keep-research"
+              onClick={() => void keepResearch()}
+              disabled={filingBusy || !thread || !online}
+              title="Worth returning to — keeps the research and files the Thread"
+            >
+              {thread?.researchVerdict === "kept"
+                ? "Research kept"
+                : "Keep research"}
+            </button>
+          ) : null}
           {!embedded ? (
             <button
               type="button"
@@ -760,12 +861,13 @@ export function ThreadChat({
         {baseCapture?.kind === "capture" ? (
           <CaptureHero capture={baseCapture.capture} retention={retention} />
         ) : null}
-        {conversation.map((entry) =>
+        {conversation.map((entry, index) =>
           entry.kind === "capture" ? (
             <ConversationCapture
               key={entry.capture.id}
               capture={entry.capture}
               retention={retention}
+              role={conversationRoles[index]}
             />
           ) : thread?.researchVerdict === "dismissed" ? (
             // Dismissed research renders collapsed, never deleted: the
@@ -782,6 +884,8 @@ export function ThreadChat({
             <EnrichmentReport
               key={entry.enrichment.id}
               enrichment={entry.enrichment}
+              role={DIALOGUE_ROLE_LABELS[conversationRoles[index] ?? "enrichment"]}
+              priors={index === firstReportIndex ? priors : undefined}
             />
           ),
         )}
@@ -826,6 +930,28 @@ export function ThreadChat({
       ) : null}
 
       <footer className="thread-chat-composer">
+        {/* The report's own offered follow-ups. Asking one is not a special
+            kind of act: the chip commits an ordinary Capture into the
+            Thread, exactly as typing the question would. */}
+        {suggested.length > 0 ? (
+          <div
+            className="thread-suggested"
+            data-testid="thread-suggested"
+            aria-label="Questions you might ask next"
+          >
+            {suggested.map((question) => (
+              <button
+                key={question}
+                type="button"
+                className="thread-suggested-chip"
+                disabled={busy}
+                onClick={() => void send(question)}
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <label className="capture-field-label" htmlFor="thread-chat-followup">
           Reply in this Thread
         </label>
