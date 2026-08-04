@@ -64,11 +64,17 @@ test("installed shell remains useful when the network disappears", async ({
 
   const response = await page.request.get("/manifest.webmanifest");
   expect(response.ok()).toBeTruthy();
-  await expect(response.json()).resolves.toMatchObject({
+  const manifestBody = await response.json();
+  expect(manifestBody).toMatchObject({
     name: "Walking Thoughts",
     display: "standalone",
     start_url: "/",
   });
+  // Chrome's "Install app" menu needs purpose "any" at both 192 and 512.
+  const anyIcons = (manifestBody.icons as Array<{ sizes: string; purpose?: string }>)
+    .filter((icon) => (icon.purpose ?? "any").split(/\s+/).includes("any"))
+    .map((icon) => icon.sizes);
+  expect(anyIcons).toEqual(expect.arrayContaining(["192x192", "512x512"]));
 
   await expect
     .poll(() =>
