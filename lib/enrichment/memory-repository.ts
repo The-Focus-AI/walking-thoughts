@@ -1,5 +1,6 @@
 import { createMemoryThreadRepository } from "@/lib/sync/memory-repository";
 import type { ThreadRepository } from "@/lib/sync/types";
+import { cosineSimilarity } from "@/lib/desk/similarity";
 import {
   isPermanentEnrichmentError,
   MAX_ENRICHMENT_ATTEMPTS,
@@ -18,6 +19,8 @@ type MemoryEnrichmentState = {
   includedBy: Map<string, string>;
   /** userId:idempotencyKey -> job id */
   jobKeys: Map<string, string>;
+  /** userId:threadId -> what the Thread reads like. */
+  embeddings: Map<string, { model: string; vector: number[] }>;
 };
 
 const states = new Map<string, MemoryEnrichmentState>();
@@ -28,6 +31,7 @@ function createState(): MemoryEnrichmentState {
     enrichments: new Map(),
     includedBy: new Map(),
     jobKeys: new Map(),
+    embeddings: new Map(),
   };
 }
 
@@ -262,6 +266,47 @@ export function createMemoryEnrichmentRepository(
         count += 1;
       }
       return count;
+    },
+
+    async storeThreadEmbedding(userId, threadId, embedding) {
+      if (embedding.vector.length === 0) return;
+      state().embeddings.set(`${userId}:${threadId}`, {
+        model: embedding.model,
+        vector: [...embedding.vector],
+      });
+    },
+
+    async listEmbeddedThreadIds(userId, model) {
+      const ids: string[] = [];
+      for (const [key, embedding] of state().embeddings) {
+        if (!key.startsWith(`${userId}:`)) continue;
+        if (embedding.model !== model) continue;
+        ids.push(key.slice(userId.length + 1));
+      }
+      return ids;
+    },
+
+    async findSimilarThreads(userId, threadId, options) {
+      const db = state();
+      const mine = db.embeddings.get(`${userId}:${threadId}`);
+      // A Thread the corpus has never embedded is a first sighting.
+      if (!mine) return [];
+      const scored: Array<{ threadId: string; score: number }> = [];
+      for (const [key, embedding] of db.embeddings) {
+        if (!key.startsWith(`${userId}:`)) continue;
+        const otherId = key.slice(userId.length + 1);
+        if (otherId === threadId) continue;
+        // Only ever against its own model — vectors from two models are not
+        // in the same space, so a number across them means nothing.
+        if (embedding.model !== mine.model) continue;
+        scored.push({
+          threadId: otherId,
+          score: cosineSimilarity(mine.vector, embedding.vector),
+        });
+      }
+      return scored
+        .sort((a, b) => b.score - a.score)
+        .slice(0, options?.limit ?? 5);
     },
   };
 }

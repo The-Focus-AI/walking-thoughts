@@ -20,6 +20,11 @@ import {
   isTranscribableAudioFailure,
   MAX_ENRICHMENT_ATTEMPTS,
 } from "./failures";
+import {
+  embeddableText,
+  getEmbeddingClient,
+  type EmbeddingClient,
+} from "./embeddings";
 import { enrichmentSystemAndModel, getGatewayClient } from "./gateway";
 import {
   getNearbyPlaceResolver,
@@ -435,6 +440,7 @@ async function runJob(
   threadRepository: ThreadRepository | undefined,
   push?: PushHooks,
   artifacts?: ArtifactHooks,
+  embeddings?: EmbeddingClient,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
     return job.targetCaptureIds.map((id) => ({
@@ -650,6 +656,13 @@ async function runJob(
     }
 
     if (completed.created) {
+      if (embeddings) {
+        await rememberThreadShape(userId, repository, embeddings, {
+          threadId: running.threadId,
+          history: frozenHistory,
+          enrichmentText: completed.enrichment.text,
+        });
+      }
       await maybePublishArtifact(userId, artifacts, {
         threadTitle: thread.title,
         enrichment: completed.enrichment,
@@ -694,6 +707,43 @@ async function runJob(
   }
 }
 
+/**
+ * Remember what a Thread reads like, so a later walk can find it. This runs
+ * after the report is already stored and published, and swallows everything:
+ * an embedding is a convenience the desk offers, never a reason to lose a
+ * report the walker is waiting for. A Thread that fails to embed simply has
+ * no priors until the backfill catches it.
+ */
+async function rememberThreadShape(
+  userId: string,
+  repository: EnrichmentRepository,
+  embeddings: EmbeddingClient,
+  input: {
+    threadId: string;
+    history: FrozenHistoryEntry[];
+    enrichmentText: string;
+  },
+): Promise<void> {
+  if (!repository.storeThreadEmbedding) return;
+  try {
+    const text = embeddableText({
+      captureTexts: input.history
+        .filter((entry) => entry.kind === "capture")
+        .map((entry) => entry.text),
+      enrichmentText: input.enrichmentText,
+    });
+    if (!text) return;
+    const vector = await embeddings.embed(text);
+    await repository.storeThreadEmbedding(userId, input.threadId, {
+      model: embeddings.model,
+      vector,
+    });
+  } catch {
+    // The report stands; similarity is what is missing, and the backfill
+    // is how it is recovered.
+  }
+}
+
 export async function processPendingEnrichments(
   userId: string,
   repository: EnrichmentRepository,
@@ -717,11 +767,14 @@ export async function processPendingEnrichments(
     artifactRepository?: ArtifactRepository;
     /** Gateway for the publish pass; defaults to the configured client. */
     artifactGateway?: GatewayClient;
+    /** How a Thread is remembered for similarity; defaults to the gateway. */
+    embeddings?: EmbeddingClient;
   } = {},
 ): Promise<EnrichmentBatchResponse> {
   const environment = options.environment ?? process.env;
   const { system, model } = enrichmentSystemAndModel(environment);
   const gateway = options.gateway ?? getGatewayClient(environment);
+  const embeddings = options.embeddings ?? getEmbeddingClient(environment);
   const blobStore =
     options.blobStore ??
     getPrivateBlobStore(environment as NodeJS.ProcessEnv);
@@ -808,6 +861,7 @@ export async function processPendingEnrichments(
       options.threadRepository,
       push,
       artifacts,
+      embeddings,
     );
     results.push(...jobResults);
   }

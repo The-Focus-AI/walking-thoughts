@@ -1382,6 +1382,58 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+/* The walk has been here before. */
+.thread-row-prior {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--machine);
+}
+
+.thread-row-priors {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+}
+
+.thread-row-priors li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.thread-row-priors a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.thread-row-priors a:hover {
+  border-color: var(--ink);
+}
+
+.thread-row-prior-why {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
+.thread-row-priors-none {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 /* What the Enrichment met, and what it offers to ask next. */
 .enrichment-mentions {
   display: flex;

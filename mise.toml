@@ -204,6 +204,12 @@ run = "node scripts/offline-region/publish-region.mjs"
 description = "Measure a built Offline Region through /region-tracer on a Pixel-9 viewport"
 run = "node scripts/offline-region/measure-region.mjs"
 
+[tasks."embeddings:backfill"]
+description = "Embed every Thread once so the desk can show prior Threads"
+# The model must be checked against the gateway's live /v1/models table
+# first; --force re-embeds everything, which is what changing it requires.
+run = "fnox exec --profile prod -- node scripts/backfill-embeddings.mjs"
+
 [tasks."issue:ensure-labels"]
 description = "Create triage and in-progress labels if missing"
 run = "bash scripts/issue.sh ensure-labels"

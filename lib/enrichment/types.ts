@@ -284,6 +284,28 @@ export type EnrichmentRepository = {
   ): Promise<{ job: EnrichmentJob; enrichment: ThreadEnrichment; created: boolean }>;
   requeueFailed(userId: string, jobId?: string): Promise<number>;
   /**
+   * Remember what a Thread reads like, so later Threads can find it. The
+   * model is stored beside the vector because two models do not share a
+   * space — a comparison across them is meaningless, never merely worse.
+   */
+  storeThreadEmbedding?(
+    userId: string,
+    threadId: string,
+    embedding: { model: string; vector: number[]; embeddedAt?: string },
+  ): Promise<void>;
+  /** Which Threads already carry an embedding for this model. */
+  listEmbeddedThreadIds?(userId: string, model: string): Promise<string[]>;
+  /**
+   * The nearest earlier Threads by cosine distance, most similar first.
+   * Empty when this Thread has no embedding yet — a Thread the corpus has
+   * never seen is a first sighting, not an error.
+   */
+  findSimilarThreads?(
+    userId: string,
+    threadId: string,
+    options?: { limit?: number },
+  ): Promise<Array<{ threadId: string; score: number }>>;
+  /**
    * Forget which Enrichment included these Captures so the queue researches
    * them again — used after a Thread split moves them into fresh Threads.
    */

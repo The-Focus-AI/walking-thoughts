@@ -13,6 +13,9 @@ test("the Mentions rail counts the nouns the pile keeps returning to", async ({
 }) => {
   await seedPile(page);
   await page.goto("/days?state=open");
+  // The Mentions rows do not exist until the Enrichments they are read from
+  // have loaded, so wait for the queue itself before asking the rail.
+  await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
 
   // Two of the three open Threads mention the reservoir; one names the
   // frost heave. The rail says so.
@@ -20,11 +23,15 @@ test("the Mentions rail counts the nouns the pile keeps returning to", async ({
   await expect(railRow(page, "mention", "frost-heave")).toContainText("1");
 
   await railRow(page, "mention", "the-reservoir").click();
-  await expect(page).toHaveURL(/mention=the-reservoir/);
+  // A rail row only changes the query, so the router still fetches — on a
+  // machine running both browser projects at once that can outlast the
+  // default deadline, and a lost second here is not a lost facet.
+  await expect(page).toHaveURL(/mention=the-reservoir/, { timeout: 20_000 });
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(2);
 
   // Mentions combine with the other groups like any facet.
   await railRow(page, "kind", "question").click();
+  await expect(page).toHaveURL(/kind=question/, { timeout: 20_000 });
   await expect(page).toHaveURL(/mention=the-reservoir/);
   const rows = page.locator(".desk-stack .thread-row");
   await expect(rows).toHaveCount(1);
