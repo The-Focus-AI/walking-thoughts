@@ -1382,6 +1382,86 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+/* The Thread as a transcript: who is speaking, and from where. */
+.thread-turn-role {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.thread-turn-role.role-trail,
+.thread-turn-role.role-desk-you {
+  color: var(--ink);
+}
+
+/* Context for the report, folded because it is not the report. */
+.enrichment-priors {
+  margin-top: 0.7rem;
+  font-size: 0.82rem;
+}
+
+.enrichment-priors > summary {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--machine);
+  cursor: pointer;
+}
+
+.enrichment-priors ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enrichment-priors li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.enrichment-prior-why {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+/* One tap to ask what the report itself thought was worth asking. */
+.thread-suggested {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.thread-suggested-chip {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thread-suggested-chip:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.thread-suggested-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* The walk has been here before. */
 .thread-row-prior {
   padding: 0.2rem 0.5rem;

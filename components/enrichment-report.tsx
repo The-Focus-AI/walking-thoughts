@@ -138,8 +138,20 @@ function MemoryPatchFooter({ patches }: { patches: EnrichmentMemoryPatch[] }) {
  */
 export function EnrichmentReport({
   enrichment,
+  role,
+  priors,
 }: {
   enrichment: ThreadEnrichment;
+  /** The transcript voice this report is in, on the Dialogue view. */
+  role?: string;
+  /** What the walk already knew, folded into the turn that used it. */
+  priors?: Array<{
+    threadId: string;
+    title: string;
+    dayKey: string;
+    via: "mention" | "embedding";
+    sharedMentions: string[];
+  }>;
 }) {
   return (
     <article
@@ -148,7 +160,7 @@ export function EnrichmentReport({
       aria-label={`Annotation · ${enrichment.model}`}
     >
       <header className="enrichment-report-head">
-        <span>Annotation</span>
+        <span>{role ?? "Annotation"}</span>
         <time dateTime={enrichment.createdAt}>
           {new Date(enrichment.createdAt).toLocaleTimeString(undefined, {
             hour: "2-digit",
@@ -171,6 +183,25 @@ export function EnrichmentReport({
             </li>
           ))}
         </ul>
+      ) : null}
+      {priors && priors.length > 0 ? (
+        <details className="enrichment-priors" data-testid="enrichment-priors">
+          <summary>
+            {priors.length} prior {priors.length === 1 ? "Thread" : "Threads"}
+          </summary>
+          <ul>
+            {priors.map((prior) => (
+              <li key={prior.threadId}>
+                <Link href={`/threads/${prior.threadId}`}>{prior.title}</Link>
+                <span className="enrichment-prior-why">
+                  {prior.via === "mention"
+                    ? `${prior.dayKey} · ${prior.sharedMentions.join(", ")}`
+                    : "reads alike"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
       {(enrichment.mentions ?? []).length > 0 ? (
         <ul
