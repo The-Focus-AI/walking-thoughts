@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedPile } from "./helpers/desk-pile";
+import { railRow, seedPile } from "./helpers/desk-pile";
 
 /**
  * The walk has been here before, and the row says so before it is opened.
@@ -13,6 +13,10 @@ test("a row that shares a mention with an earlier Thread says how many", async (
   const ids = await seedPile(page);
   await page.goto("/days?state=open");
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
+  // Rows paint from the store before their Enrichments land, and a prior is
+  // read off a mention — so wait for something only the Enrichments can
+  // produce before asking whether the chip is there.
+  await expect(railRow(page, "mention", "the-reservoir")).toBeVisible();
 
   // The photo Thread came after the wall Thread and names the same place,
   // so the later one carries the chip and the earlier one does not.
@@ -34,6 +38,7 @@ test("a Thread with nothing behind it says so rather than showing an error", asy
   const ids = await seedPile(page);
   await page.goto("/days?state=open");
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
+  await expect(railRow(page, "mention", "the-reservoir")).toBeVisible();
 
   // The Goldin Thread mentions nothing, so nothing came before it.
   await page.getByTestId(`expand-thread-${ids.goldin}`).click();
