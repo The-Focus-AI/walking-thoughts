@@ -28,6 +28,7 @@ import {
   type FacetThread,
 } from "@/lib/desk/facets";
 import { fileThread } from "@/lib/desk/file-thread";
+import { matchesQuery, searchSnippet } from "@/lib/desk/search";
 import {
   artifactHref,
   artifactsByThread,
@@ -302,6 +303,7 @@ function ThreadRow({
   selected,
   projects,
   showDay,
+  snippet,
   expandable,
   focused,
   query,
@@ -317,6 +319,8 @@ function ThreadRow({
   selected: boolean;
   projects: Project[];
   showDay?: boolean;
+  /** The line a search matched on, shown so the result answers something. */
+  snippet?: string | null;
   /** At the desk a row opens in place instead of sending the walker away. */
   expandable?: boolean;
   /** The row the desk's keyboard is on. */
@@ -395,6 +399,11 @@ function ThreadRow({
             data-testid="thread-standfirst"
           >
             {artifact.standfirst}
+          </span>
+        ) : null}
+        {snippet ? (
+          <span className="thread-row-snippet" data-testid="thread-row-snippet">
+            {snippet}
           </span>
         ) : null}
         <span className="thread-row-meta">
@@ -773,20 +782,31 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     return [...groups.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   }, [threads]);
 
-  /** Search cuts across every day — the one way past the day-by-day frame. */
+  /**
+   * Search cuts across every day — the one way past the day-by-day frame,
+   * and the only way to ask the whole desk a question. It reads what the
+   * Enrichment wrote as well as what the walker said, because the answer to
+   * "what did we find out about X" is almost always in the report, and it
+   * shows the line it matched so the search answers rather than just points.
+   */
   const query = search.trim().toLowerCase();
   const searchResults = useMemo(() => {
     if (!query) return [];
-    return threads.filter((view) => {
-      const haystack = [
-        view.thread.title,
-        ...view.captures.map((capture) => capture.text),
-        ...(view.thread.topics ?? []),
-      ]
-        .join("\n")
-        .toLowerCase();
-      return haystack.includes(query);
-    });
+    return threads
+      .map((view) => ({
+        view,
+        texts: [
+          view.thread.title,
+          ...view.captures.map((capture) => capture.text),
+          ...(view.thread.topics ?? []),
+          ...view.enrichments.map((enrichment) => enrichment.text),
+        ].filter(Boolean),
+      }))
+      .filter((entry) => matchesQuery(entry.texts, query))
+      .map((entry) => ({
+        view: entry.view,
+        snippet: searchSnippet(entry.texts, query),
+      }));
   }, [threads, query]);
 
   /**
@@ -829,15 +849,28 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
   );
 
   /**
-   * What the facets are asked about. Inside a day the scope is that day —
-   * the rail then says what this day holds; outside it, the whole pile.
+   * The walker is working a set when they have chosen a facet or a Lens
+   * other than Days. That set is the frame they are in, and opening a
+   * Thread from it must not quietly swap the pane to that Thread's day —
+   * the day was inferred, never asked for, and the swap reads as the desk
+   * losing the topic view out from under them.
+   *
+   * A day the walker actually opened still frames everything inside it.
+   */
+  const workingSet = filtering || lens !== "days";
+  const dayScoped =
+    Boolean(selectedDayKey) || (Boolean(activeDayKey) && !workingSet);
+
+  /**
+   * What the facets are asked about: the day when the walker is inside one,
+   * otherwise the whole pile.
    */
   const scopeViews = useMemo(
     () =>
-      activeDayKey
+      dayScoped && activeDayKey
         ? orderedDayThreads
         : byDay.flatMap(([, views]) => views),
-    [activeDayKey, orderedDayThreads, byDay],
+    [dayScoped, activeDayKey, orderedDayThreads, byDay],
   );
 
   const facetThreads = useMemo(
@@ -932,9 +965,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
 
   /** The keys are live wherever the rows themselves are. */
   const stacksVisible =
-    atTheDesk &&
-    !query &&
-    !(!activeDayKey && lens === "days" && !filtering);
+    atTheDesk && !query && !(!dayScoped && lens === "days" && !filtering);
 
   /** A row the facets have since taken away cannot hold focus. */
   const focused =
@@ -1343,11 +1374,13 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         {query ? (
           searchResults.length > 0 ? (
             <ul className="threads-day-list" aria-label="Search results">
-              {searchResults.map((view) => (
+              {searchResults.map(({ view, snippet }) => (
                 <ThreadRow
                   key={view.thread.id}
                   view={view}
                   showDay
+                  snippet={snippet}
+                  query={urlQuery}
                   selected={view.thread.id === selectedThreadId}
                   projects={projects}
                   artifact={artifacts.get(view.thread.id)}
@@ -1383,7 +1416,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   projects={projects}
                 />
                 <div className="desk-browse-main">
-                  {activeDayKey ? (
+                  {dayScoped && activeDayKey ? (
                     <nav
                       className="desk-sidebar-day"
                       aria-label="This day's Threads"
@@ -1451,7 +1484,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                       Nothing open left here.
                     </p>
                   ) : null}
-                  {!activeDayKey && lens === "days" && !filtering ? (
+                  {!dayScoped && lens === "days" && !filtering ? (
                     dayCards
                   ) : (
                     <div className="desk-stacks">
@@ -1459,7 +1492,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                         <section className="desk-stack" key={stack.key}>
                           {/* Inside a day under the Days Lens the sidebar
                               already names it; saying it twice is noise. */}
-                          {activeDayKey && lens === "days" ? null : (
+                          {dayScoped && activeDayKey && lens === "days" ? null : (
                           <h2 className="desk-stack-title">
                             {stack.href ? (
                               <Link
