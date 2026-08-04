@@ -7,6 +7,7 @@ import {
 } from "./system-instruction";
 import type {
   ThreadKind,
+  EnrichmentMention,
   EnrichmentSource,
   GatewayClient,
   GatewayGenerateInput,
@@ -60,6 +61,8 @@ export function createFakeGatewayClient(
     ask?: string | null;
     project?: string | null;
     propose?: string | null;
+    mentions?: EnrichmentMention[];
+    suggestedQuestions?: string[];
     sources?: EnrichmentSource[];
     research?: ResearchStep[];
   }>,
@@ -77,6 +80,8 @@ export function createFakeGatewayClient(
           ask: result.ask ?? null,
           project: result.project ?? null,
           propose: result.propose ?? null,
+          mentions: result.mentions ?? [],
+          suggestedQuestions: result.suggestedQuestions ?? [],
           sources: result.sources ?? [],
           research: result.research ?? [],
         };
@@ -118,6 +123,8 @@ export function createFakeGatewayClient(
         ask: null,
         project: null,
         propose: null,
+        mentions: [],
+        suggestedQuestions: [],
         sources,
         research,
       } satisfies GatewayGeneration;
@@ -295,6 +302,8 @@ function createAiSdkGatewayClient(): GatewayClient {
         ask: parsed.ask,
         project: parsed.project,
         propose: parsed.propose,
+        mentions: parsed.mentions,
+        suggestedQuestions: parsed.suggestedQuestions,
         sources,
         research,
       };

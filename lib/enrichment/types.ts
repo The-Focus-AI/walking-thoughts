@@ -21,6 +21,33 @@ export type EnrichmentSource = {
   retrievedAt: string;
 };
 
+/**
+ * What sort of noun a mention is. The walk keeps returning to the same
+ * handful of places, species, people, and ideas; naming which kind a
+ * mention is lets the desk stack them without guessing from the word.
+ */
+export const MENTION_KINDS = ["place", "species", "person", "idea"] as const;
+
+export type MentionKind = (typeof MENTION_KINDS)[number];
+
+/**
+ * A recurring noun of the walk, as the Enrichment met it. `slug` is what
+ * groups two mentions of the same thing across Threads; `name` is what the
+ * walker reads. The kind is absent when the model would only be guessing.
+ */
+export type EnrichmentMention = {
+  name: string;
+  slug: string;
+  kind: MentionKind | null;
+};
+
+export function asMentionKind(value: unknown): MentionKind | null {
+  return typeof value === "string" &&
+    (MENTION_KINDS as readonly string[]).includes(value)
+    ? (value as MentionKind)
+    : null;
+}
+
 export type FrozenHistoryEntry = {
   id: string;
   kind: "capture" | "enrichment";
@@ -94,6 +121,10 @@ export type ThreadEnrichment = {
   /** One question the walker must answer before this Thread can go further. */
   ask?: string | null;
   sources: EnrichmentSource[];
+  /** The recurring nouns this Enrichment met — places, species, people, ideas. */
+  mentions?: EnrichmentMention[];
+  /** Follow-ups the walker might ask next, offered rather than answered. */
+  suggestedQuestions?: string[];
   /** Tool calls (searches, page reads) the model made while researching. */
   research?: ResearchStep[];
   /** Walker-profile changes this Enrichment made via memory_patch. */
@@ -138,6 +169,10 @@ export type GatewayGeneration = {
   project: string | null;
   /** A name for an effort absent from that list; becomes a Proposed Project. */
   propose: string | null;
+  /** The recurring nouns of the walk this Enrichment met. */
+  mentions: EnrichmentMention[];
+  /** Follow-ups the walker might ask next. */
+  suggestedQuestions: string[];
   sources: EnrichmentSource[];
   research: ResearchStep[];
 };
@@ -239,6 +274,8 @@ export type EnrichmentRepository = {
       kind?: ThreadKind | null;
       topics?: string[];
       ask?: string | null;
+      mentions?: EnrichmentMention[];
+      suggestedQuestions?: string[];
       sources: EnrichmentSource[];
       research?: ResearchStep[];
       memoryPatches?: EnrichmentMemoryPatch[];

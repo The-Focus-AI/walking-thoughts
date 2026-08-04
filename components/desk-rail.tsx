@@ -40,12 +40,15 @@ export function DeskRail({
   lens,
   counts,
   projects,
+  mentions,
 }: {
   base: string;
   selection: FacetSelection;
   lens: Lens;
   counts: Record<FacetGroup, Record<string, number>>;
   projects: Project[];
+  /** Every noun the visible pile mentions, most mentioned first. */
+  mentions: FacetOption[];
 }) {
   const groups: Array<{ group: FacetGroup; options: FacetOption[] }> = [
     { group: "state", options: STATE_OPTIONS },
@@ -61,6 +64,7 @@ export function DeskRail({
         { value: UNFILED, label: "Unfiled" },
       ],
     },
+    { group: "mention", options: mentions },
     { group: "media", options: MEDIA_OPTIONS },
     { group: "reports", options: REPORT_OPTIONS },
   ];

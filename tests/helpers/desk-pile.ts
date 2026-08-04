@@ -110,6 +110,44 @@ export async function seedPile(page: Page): Promise<DeskPile> {
     grate: await threadIdByTitle(page, "culvert grate"),
   };
 
+  const ENRICHMENTS: Record<string, unknown[]> = {
+    [ids.question]: [
+      {
+        id: "enrichment:job-wall",
+        threadId: ids.question,
+        text: "Frost heave behind the wall pushes the courses outward.",
+        model: "anthropic/claude-sonnet-5",
+        basisRevision: 1,
+        basisEntryIds: [],
+        targetCaptureIds: [],
+        createdAt: "2026-08-01T19:00:00.000Z",
+        sources: [],
+        mentions: [
+          { name: "The reservoir", slug: "the-reservoir", kind: "place" },
+          { name: "Frost heave", slug: "frost-heave", kind: "idea" },
+        ],
+        suggestedQuestions: ["How deep does the frost line run here?"],
+      },
+    ],
+    [ids.grate]: [
+      {
+        id: "enrichment:job-grate",
+        threadId: ids.grate,
+        text: "The grate below the reservoir outflow is silting up.",
+        model: "anthropic/claude-sonnet-5",
+        basisRevision: 1,
+        basisEntryIds: [],
+        targetCaptureIds: [],
+        createdAt: "2026-08-01T19:10:00.000Z",
+        sources: [],
+        mentions: [
+          { name: "The reservoir", slug: "the-reservoir", kind: "place" },
+        ],
+        suggestedQuestions: [],
+      },
+    ],
+  };
+
   // The kinds and verdicts the Enrichment and the walker would have settled.
   await page.evaluate(async (seeded) => {
     const store = (
@@ -152,6 +190,34 @@ export async function seedPile(page: Page): Promise<DeskPile> {
           targetCaptureIds: [],
           createdAt: "2026-08-01T19:00:00.000Z",
           sources: [],
+          mentions: [
+            { name: "The reservoir", slug: "the-reservoir", kind: "place" },
+            { name: "Frost heave", slug: "frost-heave", kind: "idea" },
+          ],
+          suggestedQuestions: ["How deep does the frost line run here?"],
+        },
+      ]),
+    );
+
+    // A second Thread mentioning the same place, so a Mentions row counts
+    // more than one and the Topics Lens has something to stack.
+    localStorage.setItem(
+      `wt-thread-enrichments:${seeded.grate}`,
+      JSON.stringify([
+        {
+          id: "enrichment:job-grate",
+          threadId: seeded.grate,
+          text: "The grate below the reservoir outflow is silting up.",
+          model: "anthropic/claude-sonnet-5",
+          basisRevision: 1,
+          basisEntryIds: [],
+          targetCaptureIds: [],
+          createdAt: "2026-08-01T19:10:00.000Z",
+          sources: [],
+          mentions: [
+            { name: "The reservoir", slug: "the-reservoir", kind: "place" },
+          ],
+          suggestedQuestions: [],
         },
       ]),
     );
@@ -162,7 +228,16 @@ export async function seedPile(page: Page): Promise<DeskPile> {
   await page.route("**/api/sync/threads", (route) =>
     route.fulfill({ status: 503, body: "" }),
   );
-  await page.route("**/api/enrichment/threads/**", () => {});
+  await page.route("**/api/enrichment/threads/**", (route) => {
+    const threadId = new URL(route.request().url()).pathname.split("/").pop();
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        enrichments: threadId ? (ENRICHMENTS[threadId] ?? []) : [],
+      }),
+    });
+  });
   await page.route("**/api/artifacts", (route) =>
     route.fulfill({
       status: 200,
