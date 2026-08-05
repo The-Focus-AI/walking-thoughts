@@ -2196,14 +2196,34 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-.attachment-draft .media-preview,
-.chat-media {
+.attachment-draft .media-preview {
   display: block;
   width: 100%;
   max-height: 12rem;
   border-radius: 0;
   background: rgba(0, 0, 0, 0.35);
   object-fit: contain;
+}
+
+/* Viewing media is the point: give it the page, not a postage stamp. */
+.chat-media {
+  display: block;
+  width: 100%;
+  max-height: 68vh;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.35);
+  object-fit: contain;
+}
+
+/* The bare frame around a chat image that opens it in the lightbox. */
+.chat-media-open {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 
 .capture-add-media {
@@ -3812,6 +3832,23 @@ footer {
   display: block;
 }
 
+img.media-lightbox-media {
+  cursor: zoom-in;
+}
+
+/* Zoomed: the picture at full size, panned by scrolling the frame. */
+.media-lightbox-body.media-lightbox-zoomed {
+  place-items: start;
+  overflow: auto;
+}
+
+.media-lightbox-zoomed img.media-lightbox-media {
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  cursor: zoom-out;
+}
+
 .media-lightbox-empty {
   margin: 0;
   padding: 2rem;
@@ -3855,12 +3892,13 @@ footer {
 }
 
 .thread-capture-media li {
+  flex: 1 1 100%;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .thread-capture-media .chat-media {
-  max-width: min(100%, 16rem);
+  max-width: 100%;
   border-radius: 0;
 }
 

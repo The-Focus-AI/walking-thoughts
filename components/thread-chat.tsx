@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentDrafts } from "@/components/attachment-drafts";
 import { EnrichmentReport } from "@/components/enrichment-report";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
+import { MediaLightbox } from "@/components/media-lightbox";
 import { statusLabel } from "@/components/thread-entries";
 import {
   DIALOGUE_ROLE_LABELS,
@@ -63,7 +64,14 @@ type ThreadChatProps = {
   onReviewedChange?: (reviewed: boolean) => void;
 };
 
-function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
+function MediaPreview({
+  attachment,
+  onOpen,
+}: {
+  attachment: LocalAttachment;
+  /** Present on images: opens the picture in the lightbox to be looked at. */
+  onOpen?: () => void;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const [remoteFailed, setRemoteFailed] = useState(false);
   useEffect(() => {
@@ -98,7 +106,7 @@ function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
 
   const showUrl = remoteFailed ? null : url;
   if (showUrl && attachment.kind === "image") {
-    return (
+    const image = (
       // eslint-disable-next-line @next/next/no-img-element -- local blob or private media URL
       <img
         src={showUrl}
@@ -106,6 +114,18 @@ function MediaPreview({ attachment }: { attachment: LocalAttachment }) {
         className="chat-media"
         onError={() => setRemoteFailed(true)}
       />
+    );
+    if (!onOpen) return image;
+    return (
+      <button
+        type="button"
+        className="chat-media-open"
+        data-testid="chat-media-open"
+        aria-label={`Open ${attachment.fileName}`}
+        onClick={onOpen}
+      >
+        {image}
+      </button>
     );
   }
   if (showUrl && attachment.kind === "video") {
@@ -154,9 +174,23 @@ function MediaItem({
   retention?: MediaRetention;
 }) {
   const availability = mediaAvailability(attachment);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   return (
     <li>
-      <MediaPreview attachment={attachment} />
+      <MediaPreview
+        attachment={attachment}
+        onOpen={
+          attachment.kind === "image"
+            ? () => setLightboxOpen(true)
+            : undefined
+        }
+      />
+      {lightboxOpen ? (
+        <MediaLightbox
+          attachment={attachment}
+          onClose={() => setLightboxOpen(false)}
+        />
+      ) : null}
       <p className="thread-media-meta">
         <span>{attachment.fileName}</span>
         <span aria-hidden="true">·</span>

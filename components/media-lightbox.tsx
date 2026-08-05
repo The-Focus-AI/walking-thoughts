@@ -158,6 +158,7 @@ export function MediaLightbox({
   onClose: () => void;
 }) {
   const url = useAttachmentUrl(attachment, "original");
+  const [zoomed, setZoomed] = useState(false);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const restoreRef = useRef<Element | null>(null);
 
@@ -217,7 +218,9 @@ export function MediaLightbox({
             </svg>
           </button>
         </header>
-        <div className="media-lightbox-body">
+        <div
+          className={`media-lightbox-body${zoomed ? " media-lightbox-zoomed" : ""}`}
+        >
           {url && attachment.kind === "video" ? (
             <video
               className="media-lightbox-media"
@@ -234,6 +237,8 @@ export function MediaLightbox({
               className="media-lightbox-media"
               src={url}
               alt={attachment.fileName}
+              data-testid="media-lightbox-image"
+              onClick={() => setZoomed((current) => !current)}
             />
           ) : (
             <p className="media-lightbox-empty">
