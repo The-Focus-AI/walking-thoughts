@@ -933,6 +933,16 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
    * shows the line it matched so the search answers rather than just points.
    */
   const query = search.trim().toLowerCase();
+  /**
+   * What only the server can find. The device searches what it has cached,
+   * which on a phone is rarely the whole corpus — a report it never opened
+   * is invisible to it. These arrive as extra rows, marked as such.
+   */
+  const [remote, setRemote] = useState<{
+    query: string;
+    hits: Array<{ threadId: string; title: string; snippet: string | null }>;
+  }>({ query: "", hits: [] });
+
   const searchResults = useMemo(() => {
     if (!query) return [];
     return threads
@@ -951,6 +961,46 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         snippet: searchSnippet(entry.texts, query),
       }));
   }, [threads, query]);
+
+  useEffect(() => {
+    // Answers are tagged with the query that asked for them, so nothing has
+    // to be cleared here and last query's hits never flash under this one.
+    if (!query) return;
+    let active = true;
+    // Typing should not be a request per keystroke.
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(
+            `/api/search?q=${encodeURIComponent(query)}`,
+          );
+          if (!response.ok) return;
+          const body = (await response.json()) as {
+            results?: Array<{
+              threadId: string;
+              title: string;
+              snippet: string | null;
+            }>;
+          };
+          if (active) setRemote({ query, hits: body.results ?? [] });
+        } catch {
+          // Offline, or the corpus is unreachable: the device's own
+          // search is the answer, and it is already on screen.
+        }
+      })();
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query]);
+
+  /** Server hits the device did not already find for itself. */
+  const elsewhere = useMemo(() => {
+    if (!query || remote.query !== query) return [];
+    const here = new Set(searchResults.map(({ view }) => view.thread.id));
+    return remote.hits.filter((hit) => !here.has(hit.threadId));
+  }, [remote, query, searchResults]);
 
   /**
    * The day the walker is inside — opened directly, or the day of the
@@ -1540,7 +1590,8 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         ) : null}
 
         {query ? (
-          searchResults.length > 0 ? (
+          <>
+          {searchResults.length > 0 ? (
             <ul className="threads-day-list" aria-label="Search results">
               {searchResults.map(({ view, snippet }) => (
                 <ThreadRow
@@ -1559,9 +1610,36 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                 />
               ))}
             </ul>
-          ) : (
+          ) : null}
+          {/* Threads this device has never held the text of. The server can
+              see the whole corpus; the walker should not have to know which
+              reports their phone happens to have opened. */}
+          {elsewhere.length > 0 ? (
+            <section className="search-elsewhere" data-testid="search-elsewhere">
+              <h2>Found on the server</h2>
+              <ul>
+                {elsewhere.map((hit) => (
+                  <li key={hit.threadId}>
+                    <Link
+                      href={`/threads/${hit.threadId}`}
+                      onClick={(event) =>
+                        onLinkClick(event, `/threads/${hit.threadId}`)
+                      }
+                    >
+                      {hit.title}
+                    </Link>
+                    {hit.snippet ? (
+                      <span className="thread-row-snippet">{hit.snippet}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {searchResults.length === 0 && elsewhere.length === 0 ? (
             <p className="trail-thread-empty">No Threads match that search.</p>
-          )
+          ) : null}
+          </>
         ) : (
           <>
             {loaded && byDay.length === 0 && !error ? (

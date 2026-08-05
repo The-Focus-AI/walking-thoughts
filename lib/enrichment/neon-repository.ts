@@ -701,6 +701,48 @@ export function createNeonEnrichmentRepository(
       return rows.map((row) => row.thread_id);
     },
 
+    async searchThreads(userId, query, options) {
+      await ensure();
+      const needle = query.trim();
+      if (!needle) return [];
+      const like = `%${needle.replace(/[%_\\]/g, "\\$&")}%`;
+      // The walker's own words and what the Enrichment made of them, both
+      // searched; the first matching text is what the desk shows as the line
+      // it matched on.
+      const rows = (await sql`
+        SELECT t.id, t.title,
+               COALESCE(
+                 (SELECT c.text FROM sync_captures c
+                   WHERE c.user_id = t.user_id AND c.thread_id = t.id
+                     AND c.text ILIKE ${like}
+                   ORDER BY c.sequence ASC LIMIT 1),
+                 (SELECT e.text FROM enrichments e
+                   WHERE e.user_id = t.user_id AND e.thread_id = t.id
+                     AND e.text ILIKE ${like}
+                   ORDER BY e.created_at DESC LIMIT 1),
+                 t.title
+               ) AS matched_text
+        FROM sync_threads t
+        WHERE t.user_id = ${userId}
+          AND (
+            t.title ILIKE ${like}
+            OR EXISTS (SELECT 1 FROM sync_captures c
+                        WHERE c.user_id = t.user_id AND c.thread_id = t.id
+                          AND c.text ILIKE ${like})
+            OR EXISTS (SELECT 1 FROM enrichments e
+                        WHERE e.user_id = t.user_id AND e.thread_id = t.id
+                          AND e.text ILIKE ${like})
+          )
+        ORDER BY t.updated_at DESC
+        LIMIT ${options?.limit ?? 25}
+      `) as Array<{ id: string; title: string; matched_text: string }>;
+      return rows.map((row) => ({
+        threadId: row.id,
+        title: row.title,
+        matchedText: row.matched_text ?? "",
+      }));
+    },
+
     async listThreadMentionIndex(userId) {
       await ensure();
       // One row per Thread: its newest Enrichment is the current reading of

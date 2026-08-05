@@ -293,6 +293,19 @@ export type EnrichmentRepository = {
     threadId: string,
     embedding: { model: string; vector: number[]; embeddedAt?: string },
   ): Promise<void>;
+  /**
+   * Search every Thread this walker has, on the server, where the whole
+   * corpus lives. The desk's own search reads only what the device has
+   * cached, so a report the phone never opened is invisible to it — this is
+   * the same question asked somewhere that can answer it completely.
+   */
+  searchThreads?(
+    userId: string,
+    query: string,
+    options?: { limit?: number },
+  ): Promise<
+    Array<{ threadId: string; title: string; matchedText: string }>
+  >;
   /** Which Threads already carry an embedding for this model. */
   listEmbeddedThreadIds?(userId: string, model: string): Promise<string[]>;
   /**

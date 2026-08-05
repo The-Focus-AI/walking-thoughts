@@ -286,6 +286,41 @@ export function createMemoryEnrichmentRepository(
       return ids;
     },
 
+    async searchThreads(userId, query, options) {
+      const needle = query.trim().toLowerCase();
+      if (!needle) return [];
+      const db = state();
+      const threads = await threadRepository.listThreads(userId);
+      const found: Array<{
+        threadId: string;
+        title: string;
+        matchedText: string;
+      }> = [];
+      for (const thread of threads) {
+        // The title, the walker's own words, and every report written about
+        // them — the same three the desk searches, asked of the whole store.
+        const texts: string[] = [thread.title];
+        for (const entry of buildSnapshot(userId, thread, db).entries) {
+          texts.push(entry.text);
+        }
+        for (const [key, enrichment] of db.enrichments) {
+          if (!key.startsWith(`${userId}:`)) continue;
+          if (enrichment.threadId === thread.id) texts.push(enrichment.text);
+        }
+        const matched = texts.find((text) =>
+          text.toLowerCase().includes(needle),
+        );
+        if (matched) {
+          found.push({
+            threadId: thread.id,
+            title: thread.title,
+            matchedText: matched,
+          });
+        }
+      }
+      return found.slice(0, options?.limit ?? 25);
+    },
+
     async listThreadMentionIndex(userId) {
       const db = state();
       const threads = await threadRepository.listThreads(userId);
