@@ -1,12 +1,34 @@
 import { mergeRemoteThreads } from "@/lib/sync/hydrate";
-import { expiresAtFrom } from "@/lib/sync/trash";
 import type { ServerThread } from "@/lib/sync/types";
 import {
   createIdbMediaStore,
   createMemoryMediaStore,
   type MediaStore,
 } from "./media-store";
-import { resolveCommitDestination, titleFromText } from "./thread-destination";
+import { resolveCommitDestination } from "./thread-destination";
+import {
+  applyEnrichmentBatchTransition,
+  applyRemoteTrashTransition,
+  applySyncBatchTransition,
+  applyThreadSplitTransition,
+  applyTrashSyncBatchTransition,
+  fileThreadTransition,
+  isHiddenByTrash,
+  pendingTrashMutations,
+  recentThreads,
+  restoreFromTrashTransition,
+  setCaptureSyncState,
+  setThreadReviewedTransition,
+  setTrashSyncStatus,
+  threadCaptures,
+  trashCaptureTransition,
+  trashMapKey,
+  trashNewestFirst,
+  trashThreadTransition,
+  updateAttachmentTransition,
+  upsertThread,
+  visibleCaptures,
+} from "./transitions";
 import type {
   AttachmentInput,
   CaptureLocation,
@@ -16,7 +38,6 @@ import type {
   LocalAttachment,
   LocalCapture,
   LocalThread,
-  LocalTrashKind,
   LocalTrashRecord,
   SyncBatchApplication,
   TrashSyncApplication,
@@ -25,37 +46,6 @@ import type {
 const DB_NAME = "walking-thoughts";
 const DB_VERSION = 5;
 const DRAFT_KEY = "composer";
-
-function trashMapKey(kind: LocalTrashKind, targetId: string): string {
-  return `${kind}:${targetId}`;
-}
-
-function activeTrash(records: LocalTrashRecord[]): LocalTrashRecord[] {
-  return records.filter((record) => record.pendingAction !== "restore");
-}
-
-function isHiddenByTrash(
-  trash: LocalTrashRecord[],
-  kind: LocalTrashKind,
-  targetId: string,
-): boolean {
-  return activeTrash(trash).some(
-    (record) => record.kind === kind && record.targetId === targetId,
-  );
-}
-
-function attachmentIdsForCapture(capture: LocalCapture | undefined): string[] {
-  return capture?.attachments.map((attachment) => attachment.id) ?? [];
-}
-
-function attachmentIdsForThread(
-  captures: LocalCapture[],
-  threadId: string,
-): string[] {
-  return captures
-    .filter((capture) => capture.threadId === threadId)
-    .flatMap((capture) => attachmentIdsForCapture(capture));
-}
 
 type CaptureStoreGlobals = typeof globalThis & {
   __WT_CAPTURE_STORE__?: CaptureStore;
@@ -157,10 +147,6 @@ function buildCaptureBase(
   };
 }
 
-function upsertThread(threads: LocalThread[], thread: LocalThread): LocalThread[] {
-  return [thread, ...threads.filter((item) => item.id !== thread.id)];
-}
-
 export function createMemoryCaptureStore(
   seed: {
     draft?: string;
@@ -176,26 +162,6 @@ export function createMemoryCaptureStore(
   let trash = [...(seed.trash ?? [])];
   const mediaStore = seed.mediaStore ?? createMemoryMediaStore();
 
-  function visibleCaptures(): LocalCapture[] {
-    return captures.filter(
-      (capture) =>
-        !isHiddenByTrash(trash, "capture", capture.id) &&
-        !(
-          capture.threadId &&
-          isHiddenByTrash(trash, "thread", capture.threadId)
-        ),
-    );
-  }
-
-  function visibleThreads(): LocalThread[] {
-    const visible = visibleCaptures();
-    return threads.filter(
-      (thread) =>
-        !isHiddenByTrash(trash, "thread", thread.id) &&
-        visible.some((capture) => capture.threadId === thread.id),
-    );
-  }
-
   return {
     async getDraft() {
       return draft;
@@ -204,12 +170,10 @@ export function createMemoryCaptureStore(
       draft = text;
     },
     async list() {
-      return newestFirst(visibleCaptures());
+      return newestFirst(visibleCaptures(captures, trash));
     },
     async listRecentThreads() {
-      return [...visibleThreads()].sort((a, b) =>
-        a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
-      );
+      return recentThreads(threads, captures, trash);
     },
     async listThread(threadId) {
       if (isHiddenByTrash(trash, "thread", threadId)) {
@@ -221,9 +185,7 @@ export function createMemoryCaptureStore(
       }
       return {
         thread,
-        captures: oldestBySequence(
-          visibleCaptures().filter((capture) => capture.threadId === threadId),
-        ),
+        captures: oldestBySequence(threadCaptures(captures, trash, threadId)),
       };
     },
     async commit(text, location, options: CommitOptions = {}) {
@@ -255,328 +217,95 @@ export function createMemoryCaptureStore(
       return capture;
     },
     async applyThreadSplit(split) {
-      const moveByCapture = new Map(
-        split.moves.map((move) => [move.captureId, move]),
-      );
-      captures = captures.map((capture) => {
-        const move = moveByCapture.get(capture.id);
-        if (!move) return capture;
-        return {
-          ...capture,
-          threadId: move.threadId,
-          sequence: 1,
-          status: "enriching",
-          syncReason: null,
-          syncRetryable: undefined,
-        };
-      });
-      for (const move of split.moves) {
-        if (!threads.some((thread) => thread.id === move.threadId)) {
-          threads = upsertThread(threads, {
-            id: move.threadId,
-            title: move.title,
-            revision: 1,
-            updatedAt: move.createdAt,
-          });
-        }
-      }
-      if (split.trashedThreadId) {
-        threads = threads.filter(
-          (thread) => thread.id !== split.trashedThreadId,
-        );
-      }
+      const next = applyThreadSplitTransition({ captures, threads }, split);
+      captures = next.captures;
+      threads = next.threads;
     },
     async applyThreadFiling(filing) {
-      threads = threads.map((thread) =>
-        thread.id === filing.threadId
-          ? {
-              ...thread,
-              reviewedAt: filing.reviewedAt,
-              kind: filing.kind ?? thread.kind ?? null,
-              projectId:
-                filing.projectId === undefined
-                  ? (thread.projectId ?? null)
-                  : filing.projectId,
-              projectName:
-                filing.projectId === undefined
-                  ? (thread.projectName ?? null)
-                  : (filing.projectName ?? null),
-              researchVerdict:
-                filing.researchVerdict === undefined
-                  ? (thread.researchVerdict ?? null)
-                  : filing.researchVerdict,
-            }
-          : thread,
-      );
+      threads = fileThreadTransition(threads, filing);
     },
 
     async setThreadReviewed(threadId, reviewedAt) {
-      threads = threads.map((thread) =>
-        thread.id === threadId ? { ...thread, reviewedAt } : thread,
-      );
+      threads = setThreadReviewedTransition(threads, threadId, reviewedAt);
     },
     async markSyncing(ids) {
-      const idSet = new Set(ids);
-      captures = captures.map((capture) =>
-        idSet.has(capture.id)
-          ? {
-              ...capture,
-              status: "syncing",
-              syncReason: null,
-              syncRetryable: undefined,
-            }
-          : capture,
-      );
-    },
-    async restoreSavedLocally(ids) {
-      const idSet = new Set(ids);
-      captures = captures.map((capture) =>
-        idSet.has(capture.id)
-          ? {
-              ...capture,
-              status: "saved_locally",
-              syncReason: null,
-              syncRetryable: undefined,
-            }
-          : capture,
-      );
-    },
-    async applySyncBatch(batch: SyncBatchApplication) {
-      const byId = new Map(captures.map((capture) => [capture.id, capture]));
-      for (const result of batch.results) {
-        const current = byId.get(result.id);
-        if (!current) continue;
-        const next: LocalCapture = {
-          ...current,
-          status: "enriching",
-          threadId: result.threadId,
-          sequence: result.sequence,
-          syncReason: null,
-          syncRetryable: undefined,
-        };
-        byId.set(result.id, next);
-        if (!threads.some((thread) => thread.id === result.threadId)) {
-          threads = upsertThread(threads, {
-            id: result.threadId,
-            title: titleFromText(current.text),
-            revision: result.sequence,
-            updatedAt: current.createdAt,
-          });
-        } else {
-          threads = threads.map((thread) =>
-            thread.id === result.threadId
-              ? {
-                  ...thread,
-                  revision: Math.max(thread.revision, result.sequence),
-                  updatedAt: current.createdAt,
-                }
-              : thread,
-          );
-        }
-      }
-      for (const failure of batch.failures) {
-        const current = byId.get(failure.id);
-        if (!current) continue;
-        byId.set(failure.id, {
-          ...current,
-          status: "needs_attention",
-          syncReason: failure.reason,
-          syncRetryable: failure.retryable,
-        });
-      }
-      captures = [...byId.values()];
-    },
-    async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
-      const byId = new Map(captures.map((capture) => [capture.id, capture]));
-      for (const result of batch.results) {
-        const current = byId.get(result.id);
-        if (!current) continue;
-        byId.set(result.id, {
-          ...current,
-          status: result.status,
-          syncReason: result.reason ?? null,
-          syncRetryable: result.retryable,
-        });
-        if (result.threadTitle) {
-          threads = threads.map((thread) =>
-            thread.id === result.threadId
-              ? { ...thread, title: result.threadTitle as string }
-              : thread,
-          );
-        }
-      }
-      captures = [...byId.values()];
-    },
-    async updateAttachment(captureId, attachmentId, patch) {
-      captures = captures.map((capture) => {
-        if (capture.id !== captureId) return capture;
-        return {
-          ...capture,
-          attachments: capture.attachments.map((attachment) =>
-            attachment.id === attachmentId
-              ? { ...attachment, ...patch }
-              : attachment,
-          ),
-        };
+      captures = setCaptureSyncState(captures, ids, {
+        status: "syncing",
+        syncReason: null,
+        syncRetryable: undefined,
       });
     },
+    async restoreSavedLocally(ids) {
+      captures = setCaptureSyncState(captures, ids, {
+        status: "saved_locally",
+        syncReason: null,
+        syncRetryable: undefined,
+      });
+    },
+    async applySyncBatch(batch: SyncBatchApplication) {
+      const next = applySyncBatchTransition({ captures, threads }, batch);
+      captures = next.captures;
+      threads = next.threads;
+    },
+    async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
+      const next = applyEnrichmentBatchTransition({ captures, threads }, batch);
+      captures = next.captures;
+      threads = next.threads;
+    },
+    async updateAttachment(captureId, attachmentId, patch) {
+      captures = updateAttachmentTransition(
+        captures,
+        captureId,
+        attachmentId,
+        patch,
+      );
+    },
     async trashCapture(captureId, trashedAt = createTimestamp()) {
-      const capture = captures.find((item) => item.id === captureId);
-      if (!capture) throw new Error("Capture not found");
-      const record: LocalTrashRecord = {
-        kind: "capture",
-        targetId: captureId,
+      const next = trashCaptureTransition(
+        { captures, trash },
+        captureId,
         trashedAt,
-        expiresAt: expiresAtFrom(trashedAt),
-        attachmentIds: attachmentIdsForCapture(capture),
-        syncStatus: "saved_locally",
-        pendingAction: "trash",
-        idempotencyKey: `trash:capture:${captureId}:${trashedAt}`,
-      };
-      trash = [
-        record,
-        ...trash.filter(
-          (item) => !(item.kind === "capture" && item.targetId === captureId),
-        ),
-      ];
-      return record;
+      );
+      trash = next.trash;
+      return next.record;
     },
     async trashThread(threadId, trashedAt = createTimestamp()) {
-      if (!threads.some((thread) => thread.id === threadId)) {
-        throw new Error("Thread not found");
-      }
-      const record: LocalTrashRecord = {
-        kind: "thread",
-        targetId: threadId,
+      const next = trashThreadTransition(
+        { captures, threads, trash },
+        threadId,
         trashedAt,
-        expiresAt: expiresAtFrom(trashedAt),
-        attachmentIds: attachmentIdsForThread(captures, threadId),
-        syncStatus: "saved_locally",
-        pendingAction: "trash",
-        idempotencyKey: `trash:thread:${threadId}:${trashedAt}`,
-      };
-      trash = [
-        record,
-        ...trash.filter(
-          (item) => !(item.kind === "thread" && item.targetId === threadId),
-        ),
-      ];
-      return record;
+      );
+      trash = next.trash;
+      return next.record;
     },
     async restoreFromTrash(kind, targetId, now = createTimestamp()) {
-      const existing = trash.find(
-        (item) => item.kind === kind && item.targetId === targetId,
+      const next = restoreFromTrashTransition(
+        trash,
+        kind,
+        targetId,
+        now,
+        createTimestamp(),
       );
-      if (!existing) return null;
-      if (existing.expiresAt <= now) {
-        throw new Error("trash_expired");
-      }
-      if (existing.syncStatus === "saved_locally" && existing.pendingAction === "trash") {
-        trash = trash.filter(
-          (item) => !(item.kind === kind && item.targetId === targetId),
-        );
-        return null;
-      }
-      const record: LocalTrashRecord = {
-        ...existing,
-        syncStatus: "saved_locally",
-        pendingAction: "restore",
-        idempotencyKey: `restore:${kind}:${targetId}:${createTimestamp()}`,
-      };
-      trash = trash.map((item) =>
-        item.kind === kind && item.targetId === targetId ? record : item,
-      );
-      return record;
+      trash = next.trash;
+      return next.record;
     },
     async listTrash() {
-      return activeTrash(trash).sort((a, b) =>
-        a.trashedAt < b.trashedAt ? 1 : a.trashedAt > b.trashedAt ? -1 : 0,
-      );
+      return trashNewestFirst(trash);
     },
     async listPendingTrashMutations() {
-      return trash.filter(
-        (item) =>
-          item.pendingAction !== null &&
-          (item.syncStatus === "saved_locally" ||
-            item.syncStatus === "needs_attention"),
-      );
+      return pendingTrashMutations(trash);
     },
     async markTrashSyncing(idempotencyKeys) {
-      const keys = new Set(idempotencyKeys);
-      trash = trash.map((item) =>
-        keys.has(item.idempotencyKey)
-          ? { ...item, syncStatus: "syncing" }
-          : item,
-      );
+      trash = setTrashSyncStatus(trash, idempotencyKeys, "syncing");
     },
     async restoreTrashSavedLocally(idempotencyKeys) {
-      const keys = new Set(idempotencyKeys);
-      trash = trash.map((item) =>
-        keys.has(item.idempotencyKey)
-          ? { ...item, syncStatus: "saved_locally" }
-          : item,
-      );
+      trash = setTrashSyncStatus(trash, idempotencyKeys, "saved_locally");
     },
     async applyTrashSyncBatch(batch: TrashSyncApplication) {
-      for (const result of batch.results) {
-        if (result.record === null) {
-          trash = trash.filter(
-            (item) => item.idempotencyKey !== result.idempotencyKey,
-          );
-          continue;
-        }
-        const next: LocalTrashRecord = {
-          kind: result.record.kind,
-          targetId: result.record.targetId,
-          trashedAt: result.record.trashedAt,
-          expiresAt: result.record.expiresAt,
-          attachmentIds: result.record.attachmentIds,
-          syncStatus: "complete",
-          pendingAction: null,
-          idempotencyKey: result.idempotencyKey,
-        };
-        trash = [
-          next,
-          ...trash.filter(
-            (item) =>
-              item.idempotencyKey !== result.idempotencyKey &&
-              !(
-                item.kind === next.kind && item.targetId === next.targetId
-              ),
-          ),
-        ];
-      }
-      for (const failure of batch.failures) {
-        trash = trash.map((item) =>
-          item.idempotencyKey === failure.idempotencyKey
-            ? { ...item, syncStatus: "needs_attention" }
-            : item,
-        );
-      }
+      trash = applyTrashSyncBatchTransition(trash, batch);
     },
     async applyRemoteTrash(records) {
-      const remoteKeys = new Set(
-        records.map((record) => trashMapKey(record.kind, record.targetId)),
-      );
-      const pendingLocal = trash.filter(
-        (item) =>
-          item.pendingAction !== null &&
-          (item.syncStatus === "saved_locally" ||
-            item.syncStatus === "needs_attention" ||
-            item.syncStatus === "syncing"),
-      );
-      const remoteRecords: LocalTrashRecord[] = records.map((record) => ({
-        ...record,
-        syncStatus: "complete",
-        pendingAction: null,
-        idempotencyKey: `remote:${record.kind}:${record.targetId}:${record.trashedAt}`,
-      }));
-      trash = [
-        ...pendingLocal.filter(
-          (item) => !remoteKeys.has(trashMapKey(item.kind, item.targetId)),
-        ),
-        ...remoteRecords,
-      ];
+      trash = applyRemoteTrashTransition(trash, records);
     },
     async applyRemoteThreads(remoteThreads: ServerThread[]) {
       const merged = mergeRemoteThreads({
@@ -626,6 +355,15 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onerror = () =>
       reject(request.error ?? new Error("IndexedDB open failed"));
   });
+}
+
+async function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
+  const db = await openDatabase();
+  try {
+    return await fn(db);
+  } finally {
+    db.close();
+  }
 }
 
 type StoredLocalTrash = LocalTrashRecord & { id: string };
@@ -695,120 +433,98 @@ function normalizeCapture(value: LocalCapture): LocalCapture {
   };
 }
 
-async function rewriteCaptureStatuses(
-  ids: string[],
-  patch: Pick<LocalCapture, "status" | "syncReason" | "syncRetryable">,
+async function readAllCaptures(db: IDBDatabase): Promise<LocalCapture[]> {
+  const rows = (await requestToPromise(
+    db.transaction("captures", "readonly").objectStore("captures").getAll(),
+  )) as LocalCapture[];
+  return rows.map(normalizeCapture);
+}
+
+async function readAllThreads(db: IDBDatabase): Promise<LocalThread[]> {
+  return (await requestToPromise(
+    db.transaction("threads", "readonly").objectStore("threads").getAll(),
+  )) as LocalThread[];
+}
+
+async function writeAllThreads(
+  db: IDBDatabase,
+  threads: LocalThread[],
 ): Promise<void> {
-  const idSet = new Set(ids);
-  const db = await openDatabase();
-  try {
-    const existing = (
-      (await requestToPromise(
-        db.transaction("captures", "readonly").objectStore("captures").getAll(),
-      )) as LocalCapture[]
-    ).map(normalizeCapture);
-    const transaction = db.transaction("captures", "readwrite");
-    const store = transaction.objectStore("captures");
-    for (const capture of existing) {
-      if (!idSet.has(capture.id)) continue;
-      store.put({ ...capture, ...patch });
-    }
-    await transactionDone(transaction);
-  } finally {
-    db.close();
+  const transaction = db.transaction("threads", "readwrite");
+  const store = transaction.objectStore("threads");
+  for (const thread of threads) {
+    store.put(thread);
   }
+  await transactionDone(transaction);
+}
+
+async function writeCapturesAndThreads(
+  db: IDBDatabase,
+  next: { captures: LocalCapture[]; threads: LocalThread[] },
+  options: { deleteThreadId?: string | null } = {},
+): Promise<void> {
+  const transaction = db.transaction(["captures", "threads"], "readwrite");
+  const captureStore = transaction.objectStore("captures");
+  const threadStore = transaction.objectStore("threads");
+  for (const capture of next.captures) {
+    captureStore.put(capture);
+  }
+  for (const thread of next.threads) {
+    threadStore.put(thread);
+  }
+  if (options.deleteThreadId) {
+    threadStore.delete(options.deleteThreadId);
+  }
+  await transactionDone(transaction);
+}
+
+async function readCapturesAndThreads(
+  db: IDBDatabase,
+): Promise<{ captures: LocalCapture[]; threads: LocalThread[] }> {
+  return {
+    captures: await readAllCaptures(db),
+    threads: await readAllThreads(db),
+  };
 }
 
 export function createIdbCaptureStore(): CaptureStore {
   return {
     async getDraft() {
-      const db = await openDatabase();
-      try {
+      return withDb(async (db) => {
         const value = await requestToPromise(
           db.transaction("drafts", "readonly").objectStore("drafts").get(DRAFT_KEY),
         );
         return typeof value === "string" ? value : "";
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async setDraft(text) {
-      const db = await openDatabase();
-      try {
+      await withDb(async (db) => {
         const transaction = db.transaction("drafts", "readwrite");
         transaction.objectStore("drafts").put(text, DRAFT_KEY);
         await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async list() {
-      const db = await openDatabase();
-      try {
-        const captures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
+      return withDb(async (db) => {
+        const captures = await readAllCaptures(db);
         const trash = await readAllTrash(db);
-        const visible = captures.filter(
-          (capture) =>
-            !isHiddenByTrash(trash, "capture", capture.id) &&
-            !(
-              capture.threadId &&
-              isHiddenByTrash(trash, "thread", capture.threadId)
-            ),
-        );
-        return newestFirst(visible);
-      } finally {
-        db.close();
-      }
+        return newestFirst(visibleCaptures(captures, trash));
+      });
     },
 
     async listRecentThreads() {
-      const db = await openDatabase();
-      try {
-        const threads = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").getAll(),
-        )) as LocalThread[];
+      return withDb(async (db) => {
+        const threads = await readAllThreads(db);
         const trash = await readAllTrash(db);
-        const captures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
-        const visibleCaptureThreadIds = new Set(
-          captures
-            .filter(
-              (capture) =>
-                !isHiddenByTrash(trash, "capture", capture.id) &&
-                !(
-                  capture.threadId &&
-                  isHiddenByTrash(trash, "thread", capture.threadId)
-                ),
-            )
-            .map((capture) => capture.threadId)
-            .filter((threadId): threadId is string => threadId !== null),
-        );
-        return threads
-          .filter(
-            (thread) =>
-              !isHiddenByTrash(trash, "thread", thread.id) &&
-              visibleCaptureThreadIds.has(thread.id),
-          )
-          .sort((a, b) =>
-            a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
-          );
-      } finally {
-        db.close();
-      }
+        const captures = await readAllCaptures(db);
+        return recentThreads(threads, captures, trash);
+      });
     },
 
     async listThread(threadId) {
-      const db = await openDatabase();
-      try {
+      return withDb(async (db) => {
         const trash = await readAllTrash(db);
         if (isHiddenByTrash(trash, "thread", threadId)) {
           throw new Error("Thread not found");
@@ -819,24 +535,12 @@ export function createIdbCaptureStore(): CaptureStore {
         if (!thread) {
           throw new Error("Thread not found");
         }
-        const captures = await requestToPromise(
-          db.transaction("captures", "readonly").objectStore("captures").getAll(),
-        );
+        const captures = await readAllCaptures(db);
         return {
           thread,
-          captures: oldestBySequence(
-            (captures as LocalCapture[])
-              .map(normalizeCapture)
-              .filter(
-                (capture) =>
-                  capture.threadId === threadId &&
-                  !isHiddenByTrash(trash, "capture", capture.id),
-              ),
-          ),
+          captures: oldestBySequence(threadCaptures(captures, trash, threadId)),
         };
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async commit(text, location: CaptureLocation | null, options: CommitOptions = {}) {
@@ -844,596 +548,248 @@ export function createIdbCaptureStore(): CaptureStore {
       const base = buildCaptureBase(text, location, inputs.length);
       const mediaStore = createIdbMediaStore();
       const attachments = await persistAttachments(mediaStore, base.id, inputs);
-      const db = await openDatabase();
-      try {
-        const existingThreads = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").getAll(),
-        )) as LocalThread[];
+      return withDb(async (db) => {
+        try {
+          const existingThreads = await readAllThreads(db);
 
-        const resolved = resolveCommitDestination({
-          destination: options.destination ?? { type: "new_thread" },
-          text: base.text || attachments[0]?.fileName || "Capture",
-          threads: existingThreads,
-          createId,
-          now: createTimestamp,
-        });
+          const resolved = resolveCommitDestination({
+            destination: options.destination ?? { type: "new_thread" },
+            text: base.text || attachments[0]?.fileName || "Capture",
+            threads: existingThreads,
+            createId,
+            now: createTimestamp,
+          });
 
-        const capture: LocalCapture = {
-          ...base,
-          threadId: resolved.threadId,
-          sequence: resolved.sequence,
-          attachments,
-        };
+          const capture: LocalCapture = {
+            ...base,
+            threadId: resolved.threadId,
+            sequence: resolved.sequence,
+            attachments,
+          };
 
-        const transaction = db.transaction(
-          ["captures", "drafts", "threads"],
-          "readwrite",
-        );
-        transaction.objectStore("captures").put(capture);
-        transaction.objectStore("drafts").put("", DRAFT_KEY);
-        if (resolved.thread) {
-          transaction.objectStore("threads").put(resolved.thread);
+          const transaction = db.transaction(
+            ["captures", "drafts", "threads"],
+            "readwrite",
+          );
+          transaction.objectStore("captures").put(capture);
+          transaction.objectStore("drafts").put("", DRAFT_KEY);
+          if (resolved.thread) {
+            transaction.objectStore("threads").put(resolved.thread);
+          }
+          await transactionDone(transaction);
+          return capture;
+        } catch (error) {
+          await Promise.allSettled(
+            attachments.flatMap((attachment) => {
+              const keys = [
+                attachment.localObjectKey,
+                attachment.thumbnailObjectKey,
+              ].filter((key): key is string => Boolean(key));
+              return keys.map((key) => mediaStore.delete(key));
+            }),
+          );
+          throw error;
         }
-        await transactionDone(transaction);
-        return capture;
-      } catch (error) {
-        await Promise.allSettled(
-          attachments.flatMap((attachment) => {
-            const keys = [
-              attachment.localObjectKey,
-              attachment.thumbnailObjectKey,
-            ].filter((key): key is string => Boolean(key));
-            return keys.map((key) => mediaStore.delete(key));
-          }),
-        );
-        throw error;
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async applyThreadSplit(split) {
-      const db = await openDatabase();
-      try {
-        const existingCaptures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
-        const existingThreads = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").getAll(),
-        )) as LocalThread[];
-
-        const moveByCapture = new Map(
-          split.moves.map((move) => [move.captureId, move]),
-        );
-        const nextCaptures = existingCaptures.map((capture) => {
-          const move = moveByCapture.get(capture.id);
-          if (!move) return capture;
-          return {
-            ...capture,
-            threadId: move.threadId,
-            sequence: 1,
-            status: "enriching" as const,
-            syncReason: null,
-            syncRetryable: undefined,
-          };
+      await withDb(async (db) => {
+        const state = await readCapturesAndThreads(db);
+        const next = applyThreadSplitTransition(state, split);
+        await writeCapturesAndThreads(db, next, {
+          deleteThreadId: split.trashedThreadId,
         });
-        let nextThreads = [...existingThreads];
-        for (const move of split.moves) {
-          if (!nextThreads.some((thread) => thread.id === move.threadId)) {
-            nextThreads = upsertThread(nextThreads, {
-              id: move.threadId,
-              title: move.title,
-              revision: 1,
-              updatedAt: move.createdAt,
-            });
-          }
-        }
-
-        const transaction = db.transaction(["captures", "threads"], "readwrite");
-        const captureStore = transaction.objectStore("captures");
-        const threadStore = transaction.objectStore("threads");
-        for (const capture of nextCaptures) {
-          captureStore.put(capture);
-        }
-        for (const thread of nextThreads) {
-          threadStore.put(thread);
-        }
-        if (split.trashedThreadId) {
-          threadStore.delete(split.trashedThreadId);
-        }
-        await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async applyThreadFiling(filing) {
-      const db = await openDatabase();
-      try {
-        const existing = (await requestToPromise(
-          db
-            .transaction("threads", "readonly")
-            .objectStore("threads")
-            .get(filing.threadId),
-        )) as LocalThread | undefined;
-        if (!existing) return;
-        const transaction = db.transaction("threads", "readwrite");
-        transaction.objectStore("threads").put({
-          ...existing,
-          reviewedAt: filing.reviewedAt,
-          kind: filing.kind ?? existing.kind ?? null,
-          projectId:
-            filing.projectId === undefined
-              ? (existing.projectId ?? null)
-              : filing.projectId,
-          projectName:
-            filing.projectId === undefined
-              ? (existing.projectName ?? null)
-              : (filing.projectName ?? null),
-          researchVerdict:
-            filing.researchVerdict === undefined
-              ? (existing.researchVerdict ?? null)
-              : filing.researchVerdict,
-        });
-        await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      await withDb(async (db) => {
+        const threads = await readAllThreads(db);
+        await writeAllThreads(db, fileThreadTransition(threads, filing));
+      });
     },
 
     async setThreadReviewed(threadId, reviewedAt) {
-      const db = await openDatabase();
-      try {
-        const existing = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").get(threadId),
-        )) as LocalThread | undefined;
-        if (!existing) return;
-        const transaction = db.transaction("threads", "readwrite");
-        transaction.objectStore("threads").put({ ...existing, reviewedAt });
-        await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      await withDb(async (db) => {
+        const threads = await readAllThreads(db);
+        await writeAllThreads(
+          db,
+          setThreadReviewedTransition(threads, threadId, reviewedAt),
+        );
+      });
     },
 
     async markSyncing(ids) {
-      await rewriteCaptureStatuses(ids, {
-        status: "syncing",
-        syncReason: null,
-        syncRetryable: undefined,
+      await withDb(async (db) => {
+        const captures = await readAllCaptures(db);
+        const next = setCaptureSyncState(captures, ids, {
+          status: "syncing",
+          syncReason: null,
+          syncRetryable: undefined,
+        });
+        await writeCaptures(db, next);
       });
     },
 
     async restoreSavedLocally(ids) {
-      await rewriteCaptureStatuses(ids, {
-        status: "saved_locally",
-        syncReason: null,
-        syncRetryable: undefined,
+      await withDb(async (db) => {
+        const captures = await readAllCaptures(db);
+        const next = setCaptureSyncState(captures, ids, {
+          status: "saved_locally",
+          syncReason: null,
+          syncRetryable: undefined,
+        });
+        await writeCaptures(db, next);
       });
     },
 
     async applySyncBatch(batch: SyncBatchApplication) {
-      const db = await openDatabase();
-      try {
-        const existingCaptures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
-        const existingThreads = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").getAll(),
-        )) as LocalThread[];
-        const byId = new Map(
-          existingCaptures.map((capture) => [capture.id, capture]),
+      await withDb(async (db) => {
+        const state = await readCapturesAndThreads(db);
+        await writeCapturesAndThreads(
+          db,
+          applySyncBatchTransition(state, batch),
         );
-        let threads = [...existingThreads];
-
-        for (const result of batch.results) {
-          const current = byId.get(result.id);
-          if (!current) continue;
-          byId.set(result.id, {
-            ...current,
-            status: "enriching",
-            threadId: result.threadId,
-            sequence: result.sequence,
-            syncReason: null,
-            syncRetryable: undefined,
-          });
-          if (!threads.some((thread) => thread.id === result.threadId)) {
-            threads = upsertThread(threads, {
-              id: result.threadId,
-              title: titleFromText(current.text),
-              revision: result.sequence,
-              updatedAt: current.createdAt,
-            });
-          } else {
-            threads = threads.map((thread) =>
-              thread.id === result.threadId
-                ? {
-                    ...thread,
-                    revision: Math.max(thread.revision, result.sequence),
-                    updatedAt: current.createdAt,
-                  }
-                : thread,
-            );
-          }
-        }
-
-        for (const failure of batch.failures) {
-          const current = byId.get(failure.id);
-          if (!current) continue;
-          byId.set(failure.id, {
-            ...current,
-            status: "needs_attention",
-            syncReason: failure.reason,
-            syncRetryable: failure.retryable,
-          });
-        }
-
-        const transaction = db.transaction(["captures", "threads"], "readwrite");
-        const captureStore = transaction.objectStore("captures");
-        const threadStore = transaction.objectStore("threads");
-        for (const capture of byId.values()) {
-          captureStore.put(capture);
-        }
-        for (const thread of threads) {
-          threadStore.put(thread);
-        }
-        await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async applyEnrichmentBatch(batch: EnrichmentBatchApplication) {
-      const db = await openDatabase();
-      try {
-        const existingCaptures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
-        const existingThreads = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").getAll(),
-        )) as LocalThread[];
-        const byId = new Map(
-          existingCaptures.map((capture) => [capture.id, capture]),
+      await withDb(async (db) => {
+        const state = await readCapturesAndThreads(db);
+        await writeCapturesAndThreads(
+          db,
+          applyEnrichmentBatchTransition(state, batch),
         );
-        let threads = [...existingThreads];
-
-        for (const result of batch.results) {
-          const current = byId.get(result.id);
-          if (!current) continue;
-          byId.set(result.id, {
-            ...current,
-            status: result.status,
-            syncReason: result.reason ?? null,
-            syncRetryable: result.retryable,
-          });
-          if (result.threadTitle) {
-            threads = threads.map((thread) =>
-              thread.id === result.threadId
-                ? { ...thread, title: result.threadTitle as string }
-                : thread,
-            );
-          }
-        }
-
-        const transaction = db.transaction(["captures", "threads"], "readwrite");
-        const captureStore = transaction.objectStore("captures");
-        const threadStore = transaction.objectStore("threads");
-        for (const capture of byId.values()) {
-          captureStore.put(capture);
-        }
-        for (const thread of threads) {
-          threadStore.put(thread);
-        }
-        await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async updateAttachment(captureId, attachmentId, patch) {
-      const db = await openDatabase();
-      try {
-        const existing = (await requestToPromise(
-          db.transaction("captures", "readonly").objectStore("captures").get(captureId),
-        )) as LocalCapture | undefined;
-        if (!existing) return;
-        const next = normalizeCapture({
-          ...existing,
-          attachments: (existing.attachments ?? []).map((attachment) =>
-            attachment.id === attachmentId
-              ? { ...attachment, ...patch }
-              : attachment,
-          ),
-        });
-        const transaction = db.transaction("captures", "readwrite");
-        transaction.objectStore("captures").put(next);
-        await transactionDone(transaction);
-      } finally {
-        db.close();
-      }
+      await withDb(async (db) => {
+        const captures = await readAllCaptures(db);
+        await writeCaptures(
+          db,
+          updateAttachmentTransition(captures, captureId, attachmentId, patch),
+        );
+      });
     },
 
     async trashCapture(captureId, trashedAt = createTimestamp()) {
-      const db = await openDatabase();
-      try {
-        const capture = (await requestToPromise(
-          db.transaction("captures", "readonly").objectStore("captures").get(captureId),
-        )) as LocalCapture | undefined;
-        if (!capture) throw new Error("Capture not found");
+      return withDb(async (db) => {
+        const captures = await readAllCaptures(db);
         const trash = await readAllTrash(db);
-        const record: LocalTrashRecord = {
-          kind: "capture",
-          targetId: captureId,
+        const next = trashCaptureTransition(
+          { captures, trash },
+          captureId,
           trashedAt,
-          expiresAt: expiresAtFrom(trashedAt),
-          attachmentIds: attachmentIdsForCapture(normalizeCapture(capture)),
-          syncStatus: "saved_locally",
-          pendingAction: "trash",
-          idempotencyKey: `trash:capture:${captureId}:${trashedAt}`,
-        };
-        await writeAllTrash(db, [
-          record,
-          ...trash.filter(
-            (item) => !(item.kind === "capture" && item.targetId === captureId),
-          ),
-        ]);
-        return record;
-      } finally {
-        db.close();
-      }
+        );
+        await writeAllTrash(db, next.trash);
+        return next.record;
+      });
     },
 
     async trashThread(threadId, trashedAt = createTimestamp()) {
-      const db = await openDatabase();
-      try {
-        const thread = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").get(threadId),
-        )) as LocalThread | undefined;
-        if (!thread) throw new Error("Thread not found");
-        const captures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
+      return withDb(async (db) => {
+        const captures = await readAllCaptures(db);
+        const threads = await readAllThreads(db);
         const trash = await readAllTrash(db);
-        const record: LocalTrashRecord = {
-          kind: "thread",
-          targetId: threadId,
+        const next = trashThreadTransition(
+          { captures, threads, trash },
+          threadId,
           trashedAt,
-          expiresAt: expiresAtFrom(trashedAt),
-          attachmentIds: attachmentIdsForThread(captures, threadId),
-          syncStatus: "saved_locally",
-          pendingAction: "trash",
-          idempotencyKey: `trash:thread:${threadId}:${trashedAt}`,
-        };
-        await writeAllTrash(db, [
-          record,
-          ...trash.filter(
-            (item) => !(item.kind === "thread" && item.targetId === threadId),
-          ),
-        ]);
-        return record;
-      } finally {
-        db.close();
-      }
+        );
+        await writeAllTrash(db, next.trash);
+        return next.record;
+      });
     },
 
     async restoreFromTrash(kind, targetId, now = createTimestamp()) {
-      const db = await openDatabase();
-      try {
+      return withDb(async (db) => {
         const trash = await readAllTrash(db);
-        const existing = trash.find(
-          (item) => item.kind === kind && item.targetId === targetId,
+        const next = restoreFromTrashTransition(
+          trash,
+          kind,
+          targetId,
+          now,
+          createTimestamp(),
         );
-        if (!existing) return null;
-        if (existing.expiresAt <= now) {
-          throw new Error("trash_expired");
+        if (next.trash !== trash) {
+          await writeAllTrash(db, next.trash);
         }
-        if (
-          existing.syncStatus === "saved_locally" &&
-          existing.pendingAction === "trash"
-        ) {
-          await writeAllTrash(
-            db,
-            trash.filter(
-              (item) => !(item.kind === kind && item.targetId === targetId),
-            ),
-          );
-          return null;
-        }
-        const record: LocalTrashRecord = {
-          ...existing,
-          syncStatus: "saved_locally",
-          pendingAction: "restore",
-          idempotencyKey: `restore:${kind}:${targetId}:${createTimestamp()}`,
-        };
-        await writeAllTrash(
-          db,
-          trash.map((item) =>
-            item.kind === kind && item.targetId === targetId ? record : item,
-          ),
-        );
-        return record;
-      } finally {
-        db.close();
-      }
+        return next.record;
+      });
     },
 
     async listTrash() {
-      const db = await openDatabase();
-      try {
-        return activeTrash(await readAllTrash(db)).sort((a, b) =>
-          a.trashedAt < b.trashedAt ? 1 : a.trashedAt > b.trashedAt ? -1 : 0,
-        );
-      } finally {
-        db.close();
-      }
+      return withDb(async (db) => trashNewestFirst(await readAllTrash(db)));
     },
 
     async listPendingTrashMutations() {
-      const db = await openDatabase();
-      try {
-        return (await readAllTrash(db)).filter(
-          (item) =>
-            item.pendingAction !== null &&
-            (item.syncStatus === "saved_locally" ||
-              item.syncStatus === "needs_attention"),
-        );
-      } finally {
-        db.close();
-      }
+      return withDb(async (db) => pendingTrashMutations(await readAllTrash(db)));
     },
 
     async markTrashSyncing(idempotencyKeys) {
-      const db = await openDatabase();
-      try {
-        const keys = new Set(idempotencyKeys);
+      await withDb(async (db) => {
         const trash = await readAllTrash(db);
         await writeAllTrash(
           db,
-          trash.map((item) =>
-            keys.has(item.idempotencyKey)
-              ? { ...item, syncStatus: "syncing" }
-              : item,
-          ),
+          setTrashSyncStatus(trash, idempotencyKeys, "syncing"),
         );
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async restoreTrashSavedLocally(idempotencyKeys) {
-      const db = await openDatabase();
-      try {
-        const keys = new Set(idempotencyKeys);
+      await withDb(async (db) => {
         const trash = await readAllTrash(db);
         await writeAllTrash(
           db,
-          trash.map((item) =>
-            keys.has(item.idempotencyKey)
-              ? { ...item, syncStatus: "saved_locally" }
-              : item,
-          ),
+          setTrashSyncStatus(trash, idempotencyKeys, "saved_locally"),
         );
-      } finally {
-        db.close();
-      }
+      });
     },
 
     async applyTrashSyncBatch(batch: TrashSyncApplication) {
-      const db = await openDatabase();
-      try {
-        let trash = await readAllTrash(db);
-        for (const result of batch.results) {
-          if (result.record === null) {
-            trash = trash.filter(
-              (item) => item.idempotencyKey !== result.idempotencyKey,
-            );
-            continue;
-          }
-          const next: LocalTrashRecord = {
-            kind: result.record.kind,
-            targetId: result.record.targetId,
-            trashedAt: result.record.trashedAt,
-            expiresAt: result.record.expiresAt,
-            attachmentIds: result.record.attachmentIds,
-            syncStatus: "complete",
-            pendingAction: null,
-            idempotencyKey: result.idempotencyKey,
-          };
-          trash = [
-            next,
-            ...trash.filter(
-              (item) =>
-                item.idempotencyKey !== result.idempotencyKey &&
-                !(item.kind === next.kind && item.targetId === next.targetId),
-            ),
-          ];
-        }
-        for (const failure of batch.failures) {
-          trash = trash.map((item) =>
-            item.idempotencyKey === failure.idempotencyKey
-              ? { ...item, syncStatus: "needs_attention" }
-              : item,
-          );
-        }
-        await writeAllTrash(db, trash);
-      } finally {
-        db.close();
-      }
+      await withDb(async (db) => {
+        const trash = await readAllTrash(db);
+        await writeAllTrash(db, applyTrashSyncBatchTransition(trash, batch));
+      });
     },
 
     async applyRemoteTrash(records) {
-      const db = await openDatabase();
-      try {
+      await withDb(async (db) => {
         const trash = await readAllTrash(db);
-        const remoteKeys = new Set(
-          records.map((record) => trashMapKey(record.kind, record.targetId)),
-        );
-        const pendingLocal = trash.filter(
-          (item) =>
-            item.pendingAction !== null &&
-            (item.syncStatus === "saved_locally" ||
-              item.syncStatus === "needs_attention" ||
-              item.syncStatus === "syncing"),
-        );
-        const remoteRecords: LocalTrashRecord[] = records.map((record) => ({
-          ...record,
-          syncStatus: "complete",
-          pendingAction: null,
-          idempotencyKey: `remote:${record.kind}:${record.targetId}:${record.trashedAt}`,
-        }));
-        await writeAllTrash(db, [
-          ...pendingLocal.filter(
-            (item) => !remoteKeys.has(trashMapKey(item.kind, item.targetId)),
-          ),
-          ...remoteRecords,
-        ]);
-      } finally {
-        db.close();
-      }
+        await writeAllTrash(db, applyRemoteTrashTransition(trash, records));
+      });
     },
 
     async applyRemoteThreads(remoteThreads: ServerThread[]) {
-      const db = await openDatabase();
-      try {
-        const existingCaptures = (
-          (await requestToPromise(
-            db.transaction("captures", "readonly").objectStore("captures").getAll(),
-          )) as LocalCapture[]
-        ).map(normalizeCapture);
-        const existingThreads = (await requestToPromise(
-          db.transaction("threads", "readonly").objectStore("threads").getAll(),
-        )) as LocalThread[];
-
+      return withDb(async (db) => {
+        const state = await readCapturesAndThreads(db);
         const merged = mergeRemoteThreads({
-          localCaptures: existingCaptures,
-          localThreads: existingThreads,
+          localCaptures: state.captures,
+          localThreads: state.threads,
           remoteThreads,
         });
-
-        const transaction = db.transaction(["captures", "threads"], "readwrite");
-        const captureStore = transaction.objectStore("captures");
-        const threadStore = transaction.objectStore("threads");
-        for (const capture of merged.captures) {
-          captureStore.put(capture);
-        }
-        for (const thread of merged.threads) {
-          threadStore.put(thread);
-        }
-        await transactionDone(transaction);
+        await writeCapturesAndThreads(db, {
+          captures: merged.captures,
+          threads: merged.threads,
+        });
         return { importedCaptureIds: merged.importedCaptureIds };
-      } finally {
-        db.close();
-      }
+      });
     },
   };
+}
+
+async function writeCaptures(
+  db: IDBDatabase,
+  captures: LocalCapture[],
+): Promise<void> {
+  const transaction = db.transaction("captures", "readwrite");
+  const store = transaction.objectStore("captures");
+  for (const capture of captures) {
+    store.put(capture);
+  }
+  await transactionDone(transaction);
 }
 
 let defaultStore: CaptureStore | null = null;
