@@ -5,6 +5,13 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Walking Thoughts",
     short_name: "Walking",
     description: "Reliable offline Capture with online intelligence.",
+    // Pin the app's identity. Without `id`, Chrome derives it from
+    // start_url, so anything that changes how the app is reached can leave
+    // it holding a record of an app that is "installed" while the launcher
+    // has no icon for it — and Chrome never offers to install an app it
+    // believes is already there. Set to the current start_url so existing
+    // installs keep the identity they already have.
+    id: "/",
     start_url: "/",
     scope: "/",
     display: "standalone",

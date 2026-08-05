@@ -96,6 +96,11 @@ export function InstallAppPrompt() {
             Chrome menu (⋮) → <em>Cast, save &amp; share</em> →{" "}
             <em>Install app</em> or <em>Add to Home screen</em>. Stay on this
             page about half a minute after signing in if the item is missing.
+            If Chrome says it is already installed but no icon reached your
+            launcher, uninstall it first — Android Settings → Apps → Walking
+            Thoughts — then clear this site under Chrome → Settings → Site
+            settings. Chrome never offers to install an app it thinks is
+            already there.
           </span>
         )}
       </div>
