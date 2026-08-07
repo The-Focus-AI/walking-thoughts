@@ -36,6 +36,12 @@ const THREAD_REVIEW = {
   ],
 } as const;
 
+const DAY_ROUTING = [
+  { key: "A", label: "Dispatch deck", winner: false },
+  { key: "B", label: "Sorting lanes", winner: false },
+  { key: "C", label: "Day wrap sheet", winner: false },
+] as const;
+
 const DESK_INBOX = [
   { key: "A", label: "Triage rail", winner: false },
   { key: "B", label: "Light table", winner: false },
@@ -94,6 +100,56 @@ export default function PrototypeIndexPage() {
           <Link href="/">← Back to Walking Thoughts</Link>
         </p>
       </header>
+
+      <section className="proto-index-card" aria-labelledby="day-routing-title">
+        <div className="proto-index-card-head">
+          <div>
+            <h2 id="day-routing-title">Day routing</h2>
+            <p>
+              End-of-walk dispatch: filing&apos;s primary verb becomes
+              routing — Spec (hand to a repo agent) · To-do · Journal ·
+              Timeline · Drop — and Reviewed happens as a side effect. Three
+              shapes for cycling through the Day. Desktop-only.
+            </p>
+            <p className="proto-index-verdict" role="status">
+              Verdict: pending (see VERDICT.md and the decision log in the
+              folder README).
+            </p>
+          </div>
+          <div className="proto-index-open-row">
+            <Link
+              className="proto-index-open"
+              href="/prototype/day-routing?variant=A"
+            >
+              Open desktop
+            </Link>
+          </div>
+        </div>
+        <div className="proto-index-areas">
+          <div className="proto-index-area">
+            <h3>route</h3>
+            <ul>
+              {DAY_ROUTING.map((variant) => (
+                <li key={variant.key}>
+                  <div className="proto-index-variant">
+                    <span className="proto-index-key">{variant.key}</span>
+                    <span className="proto-index-variant-label">
+                      {variant.label}
+                    </span>
+                    <div className="proto-index-viewport-links">
+                      <Link
+                        href={`/prototype/day-routing?variant=${variant.key}`}
+                      >
+                        Desktop
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       <section className="proto-index-card" aria-labelledby="desk-inbox-title">
         <div className="proto-index-card-head">
