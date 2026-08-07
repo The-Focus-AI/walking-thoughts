@@ -34,5 +34,5 @@ The core decision — route, don't review — is walker-confirmed
 (2026-08-07). The Route set itself (Spec / To-do / Journal deliberate,
 Timeline automatic from GPS clustering, Drop for noise) is the current
 recommendation, recorded with the rest of the provenance in
-`docs/day-routing.md`; changing the set is a migration of one enum, not of
+`docs/desk.md`; changing the set is a migration of one enum, not of
 this decision.

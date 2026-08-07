@@ -235,7 +235,7 @@ Steps 1 and 2 of the order below are implemented:
 
 Still open: per-kind tool sets and step budgets, an all-days overview with
 real themes, and Memory dedup. The per-kind destinations (checklist, idea
-board, map) grew into their own effort — `docs/day-routing.md` makes the
+board, map) grew into their own effort — `docs/desk.md` makes the
 destination a first-class **Route** the walker settles at the desk
 (ADR 0017), rather than a surface each kind drains into. Topic linking is superseded for grouping: 238 free-form slugs
 across 70 Threads never clustered, and Projects are the walker's own answer to

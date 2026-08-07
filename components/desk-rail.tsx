@@ -23,7 +23,7 @@ import type { Project } from "@/lib/sync/types";
 /**
  * The desk's facet rail: every way of narrowing the pile, each row with the
  * count it would leave. Desktop only — the phone renders the same model as
- * chips (docs/desk-processing.md, S1).
+ * chips (docs/desk.md).
  *
  * Rows are links so the selection is URL-carried: reload, Back, and a link
  * pasted to the phone all land on the same working set. A row with nothing

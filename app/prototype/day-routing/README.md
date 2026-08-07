@@ -56,9 +56,10 @@ Keys are inert while a select/input is focused.
 
 ## Where the decisions landed
 
-- `docs/day-routing.md` — the spec (model, surface, slices R1–R3).
+- `docs/desk.md` — the one spec for the whole desk: the Route gesture,
+  the Day flow, the finder (rail/Lenses), slices D1–D3.
 - `docs/adr/0017-filing-routes-instead-of-reviewing.md` — the settled
-  core: route, don't review.
-- `CONTEXT.md` — **Route** and **Dispatch** in the glossary; **Filing**
-  reworded around them.
+  core: route, don't review; one gesture everywhere.
+- `CONTEXT.md` — **Route** in the glossary; **Filing**, **Reviewed**,
+  **Research Verdict**, and **Lens** reworded around it.
 - VERDICT.md here — the round-by-round record.
