@@ -1,5 +1,18 @@
 # Desk processing: the queue, the Research Verdict, and the rail
 
+> **Status (2026-08-07): partially superseded by `day-routing.md` /
+> ADR 0017.** There is one system, with one exit gesture. What stands
+> from this spec: the facet rail, the Lenses, the similarity work (S2–S3),
+> and the Dialogue view (S4) — the ways to *find and read* Threads. What
+> is superseded: `r`/`n`/`x` as the filing gestures and Reviewed as the
+> terminal state. A Thread's one exit is its **Route** (day-routing.md):
+> the rail finds Threads, routing settles them — today's walk through the
+> Day flow, the backlog through the same routing gesture on any row here.
+> The old verbs map: `x` dismiss → Drop (Artifact retraction per ADR 0016
+> unchanged) · `r` keep research → route to Journal · `n` just reviewed →
+> no longer exists, because "read it and nothing happens" was the dead
+> end being removed.
+
 The sitting-down-afterwards was cumbersome: unreviewed Threads were reached
 only through their Days, filing was a per-Thread detour, there was no way to
 say "the research was worth keeping but the note is processed," no way to see

@@ -30,7 +30,7 @@ Per the process in `docs/agents/design-md-process.md`: decisions are
 | **Spec** dispatch drafts a ticket-shaped issue in the Project's repo for a coding agent. | Derived recommendation |
 | **Journal** absorbs questions and observations; draft-worthy entries are flagged as post candidates; the Research Verdict keeps working inside it. | Derived recommendation |
 | **Timeline** spots are stable clusters of photo Captures within ~25 m across days; the walker only ever removes a frame. | Derived recommendation |
-| The end-of-walk surface is the **Day**; the facet-rail desk (`desk-processing.md`) remains the cross-day catch-up surface. | Derived recommendation |
+| **One system, one gesture.** The facet-rail desk (`desk-processing.md`) is not a second processing system: the rail and Lenses *find* Threads, routing *settles* them — the same Route gesture on a desk row as on a deck card. `r`/`n`/`x` filing is superseded (`x` → Drop, `r` → Journal, `n` → gone); the Day flow is just the default door, opened on today's walk. | Derived from the walker's question ("there should only be one of those things") |
 
 ## The model
 
@@ -122,6 +122,7 @@ whether Dispatch batches or streams the handoffs.
 
 - Re-routing after the Day is closed (undo lives while it's open at the
   desk; afterwards the destination surface owns the object).
-- Cross-day routing sweeps — the facet-rail desk keeps that job.
+- A separate cross-day batch mode — backlog Threads route one at a time
+  with the same gesture, from the facet-rail desk's rows.
 - Auto-routing without the walker's pass; the deck is deliberately a
   human moment.

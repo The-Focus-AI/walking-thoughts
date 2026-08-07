@@ -20,11 +20,15 @@ the round-1 prototype verdict ("a nice overview, but what are you supposed
 to do with it"). Deriving the destination purely from Kind with no
 per-Thread decision confuses the machine's reading with the walker's
 intent: "Find that Will Self post" parses as a task and is an idea; kind is
-what a Thread *is*, Route is what the walker *does* with it. The accepted
-costs, recorded so nobody rediscovers them: a second settle-gesture family
-beside the existing `r`/`n`/`x` until the desk converges on routes, and a
-Route enum on the filing seam that each destination surface (task list,
-journal, timeline, repo handoff) must grow into rather than find waiting.
+what a Thread *is*, Route is what the walker *does* with it. Routing is
+the only settle gesture — the desk's `r`/`n`/`x` filing is superseded, not
+run alongside (`x` dismiss → Drop, keeping ADR 0016's Artifact retraction;
+`r` keep research → route to Journal; `n` just-reviewed → removed, since
+"read it and nothing happens" was the dead end). The accepted costs,
+recorded so nobody rediscovers them: shipped desk keyboard habits break
+once, and a Route enum on the filing seam that each destination surface
+(task list, journal, timeline, repo handoff) must grow into rather than
+find waiting.
 
 The core decision — route, don't review — is walker-confirmed
 (2026-08-07). The Route set itself (Spec / To-do / Journal deliberate,
