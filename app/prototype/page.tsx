@@ -36,13 +36,6 @@ const THREAD_REVIEW = {
   ],
 } as const;
 
-const DAY_ROUTING = [
-  { key: "A", label: "Dispatch deck", winner: true },
-  { key: "B", label: "Sorting lanes", winner: false },
-  { key: "C", label: "Day wrap sheet", winner: false },
-  { key: "D", label: "Bookended deck", winner: false },
-] as const;
-
 const DESK_INBOX = [
   { key: "A", label: "Triage rail", winner: false },
   { key: "B", label: "Light table", winner: false },
@@ -105,60 +98,20 @@ export default function PrototypeIndexPage() {
       <section className="proto-index-card" aria-labelledby="day-routing-title">
         <div className="proto-index-card-head">
           <div>
-            <h2 id="day-routing-title">Day routing</h2>
+            <h2 id="day-routing-title">Day routing — the flow</h2>
             <p>
-              End-of-walk dispatch: filing&apos;s primary verb becomes
-              routing — Spec (hand to a repo agent) · To-do · Journal ·
-              Timeline · Drop — and Reviewed happens as a side effect. Three
-              shapes for cycling through the Day. Desktop-only.
-            </p>
-            <p className="proto-index-verdict" role="status">
-              Verdict: round 1 <strong>A</strong> — the deck is the pass; B
-              read well but gave nothing to do; C didn&apos;t parse. Round 2
-              (<strong>D</strong>) bookends the deck with B&apos;s overview —
-              pending.
+              The end-of-walk pass, one design: ① what came home (the
+              day&apos;s Threads with their proposed destinations) → ② route
+              each one, one card at a time (Enter accepts the guess, one key
+              redirects) → ③ where it goes, then Dispatch. Settling a route
+              is what marks a Thread reviewed. Earlier sketches (A–C) live in
+              git history; VERDICT.md in the folder records the rounds.
             </p>
           </div>
           <div className="proto-index-open-row">
-            <Link
-              className="proto-index-open"
-              href="/prototype/day-routing?variant=A"
-            >
-              Open desktop
+            <Link className="proto-index-open" href="/prototype/day-routing">
+              Open the flow
             </Link>
-          </div>
-        </div>
-        <div className="proto-index-areas">
-          <div className="proto-index-area">
-            <h3>route</h3>
-            <ul>
-              {DAY_ROUTING.map((variant) => (
-                <li key={variant.key}>
-                  <div
-                    className={
-                      variant.winner
-                        ? "proto-index-variant winner"
-                        : "proto-index-variant"
-                    }
-                  >
-                    <span className="proto-index-key">{variant.key}</span>
-                    <span className="proto-index-variant-label">
-                      {variant.label}
-                      {variant.winner ? (
-                        <em className="proto-index-winner-tag"> winner</em>
-                      ) : null}
-                    </span>
-                    <div className="proto-index-viewport-links">
-                      <Link
-                        href={`/prototype/day-routing?variant=${variant.key}`}
-                      >
-                        Desktop
-                      </Link>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </section>

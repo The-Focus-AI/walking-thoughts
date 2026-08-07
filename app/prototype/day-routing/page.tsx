@@ -1,42 +1,20 @@
 "use client";
 
 /**
- * PROTOTYPE — throwaway UI exploration for day routing (end-of-walk dispatch).
+ * PROTOTYPE — day routing (end-of-walk dispatch), single flow.
  *
- * Question: When filing's primary verb becomes "route this somewhere" —
- * Spec / To-do / Journal / Timeline / Drop — what shape makes the
- * end-of-walk pass through the Day fast and obvious?
+ * The question this settled: when filing's primary verb becomes "route
+ * this somewhere," what shape makes the end-of-walk pass fast and obvious?
+ * Earlier variants A–C and the first bookended cut live in git history on
+ * this branch; VERDICT.md records the rounds.
  *
- * Run: pnpm dev → http://127.0.0.1:3000/prototype
- * Params: ?variant=A|B|C (desktop-only surface)
+ * Run: pnpm dev → http://localhost:3000/prototype/day-routing
  */
 
-import { Suspense, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
-import { PrototypeSwitcher } from "@/components/prototype-switcher";
-import { DeckVariant } from "./deck-variant";
-import { LanesVariant } from "./lanes-variant";
-import { WrapVariant } from "./wrap-variant";
-import { BookendVariant } from "./bookend-variant";
+import { RoutingFlow } from "./flow";
 import "./prototype-route.css";
 
-const VARIANTS = [
-  { key: "A", label: "Dispatch deck" },
-  { key: "B", label: "Sorting lanes" },
-  { key: "C", label: "Day wrap sheet" },
-  { key: "D", label: "Bookended deck" },
-];
-
-function DayRoutingPrototype() {
-  const searchParams = useSearchParams();
-  const variant = (searchParams.get("variant") ?? "A").toUpperCase();
-
-  let body: ReactNode;
-  if (variant === "B") body = <LanesVariant />;
-  else if (variant === "C") body = <WrapVariant />;
-  else if (variant === "D") body = <BookendVariant />;
-  else body = <DeckVariant />;
-
+export default function DayRoutingPrototypePage() {
   return (
     <div
       className="proto-viewport-stage dr-stage viewport-desktop"
@@ -44,18 +22,11 @@ function DayRoutingPrototype() {
     >
       <div className="proto-viewport-chrome" aria-hidden="true">
         <span>Desktop · 1280×900</span>
-        <span>route · {variant}</span>
+        <span>day routing flow</span>
       </div>
-      <div className="proto-viewport-frame">{body}</div>
-      <PrototypeSwitcher param="variant" options={VARIANTS} />
+      <div className="proto-viewport-frame">
+        <RoutingFlow />
+      </div>
     </div>
-  );
-}
-
-export default function DayRoutingPrototypePage() {
-  return (
-    <Suspense fallback={<p className="proto-pad">Loading prototype…</p>}>
-      <DayRoutingPrototype />
-    </Suspense>
   );
 }

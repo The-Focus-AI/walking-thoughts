@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 const DISMISS_KEY = "wt-install-dismissed";
 
@@ -26,11 +27,15 @@ function alreadyInstalled(): boolean {
  * hunting the overflow menu.
  */
 export function InstallAppPrompt() {
+  const pathname = usePathname();
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
     null,
   );
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Throwaway prototype routes are reviewed in ordinary browsers — the
+  // install path has no business on them.
+  const isPrototype = pathname?.startsWith("/prototype") ?? false;
 
   useEffect(() => {
     if (alreadyInstalled()) return;
@@ -59,7 +64,7 @@ export function InstallAppPrompt() {
     };
   }, []);
 
-  if (!visible) return null;
+  if (isPrototype || !visible) return null;
 
   async function install() {
     if (!deferred || busy) return;
