@@ -37,9 +37,10 @@ const THREAD_REVIEW = {
 } as const;
 
 const DAY_ROUTING = [
-  { key: "A", label: "Dispatch deck", winner: false },
+  { key: "A", label: "Dispatch deck", winner: true },
   { key: "B", label: "Sorting lanes", winner: false },
   { key: "C", label: "Day wrap sheet", winner: false },
+  { key: "D", label: "Bookended deck", winner: false },
 ] as const;
 
 const DESK_INBOX = [
@@ -112,8 +113,10 @@ export default function PrototypeIndexPage() {
               shapes for cycling through the Day. Desktop-only.
             </p>
             <p className="proto-index-verdict" role="status">
-              Verdict: pending (see VERDICT.md and the decision log in the
-              folder README).
+              Verdict: round 1 <strong>A</strong> — the deck is the pass; B
+              read well but gave nothing to do; C didn&apos;t parse. Round 2
+              (<strong>D</strong>) bookends the deck with B&apos;s overview —
+              pending.
             </p>
           </div>
           <div className="proto-index-open-row">
@@ -131,10 +134,19 @@ export default function PrototypeIndexPage() {
             <ul>
               {DAY_ROUTING.map((variant) => (
                 <li key={variant.key}>
-                  <div className="proto-index-variant">
+                  <div
+                    className={
+                      variant.winner
+                        ? "proto-index-variant winner"
+                        : "proto-index-variant"
+                    }
+                  >
                     <span className="proto-index-key">{variant.key}</span>
                     <span className="proto-index-variant-label">
                       {variant.label}
+                      {variant.winner ? (
+                        <em className="proto-index-winner-tag"> winner</em>
+                      ) : null}
                     </span>
                     <div className="proto-index-viewport-links">
                       <Link

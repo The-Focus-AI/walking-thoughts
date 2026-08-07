@@ -17,12 +17,14 @@ import { PrototypeSwitcher } from "@/components/prototype-switcher";
 import { DeckVariant } from "./deck-variant";
 import { LanesVariant } from "./lanes-variant";
 import { WrapVariant } from "./wrap-variant";
+import { BookendVariant } from "./bookend-variant";
 import "./prototype-route.css";
 
 const VARIANTS = [
   { key: "A", label: "Dispatch deck" },
   { key: "B", label: "Sorting lanes" },
   { key: "C", label: "Day wrap sheet" },
+  { key: "D", label: "Bookended deck" },
 ];
 
 function DayRoutingPrototype() {
@@ -32,6 +34,7 @@ function DayRoutingPrototype() {
   let body: ReactNode;
   if (variant === "B") body = <LanesVariant />;
   else if (variant === "C") body = <WrapVariant />;
+  else if (variant === "D") body = <BookendVariant />;
   else body = <DeckVariant />;
 
   return (

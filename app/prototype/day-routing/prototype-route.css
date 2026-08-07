@@ -539,6 +539,69 @@
   padding: 0.6rem 1.1rem 0;
 }
 
+/* --- D · Bookended deck ------------------------------------------------------ */
+
+.dr-arrive {
+  width: min(94%, 60rem);
+  margin: 1.4rem auto 0;
+}
+
+.dr-arrive-sub {
+  margin: 0 0 1rem;
+  font-size: 0.86rem;
+  color: #b9bcae;
+  max-width: 44rem;
+}
+
+.dr-arrive-lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+}
+
+.dr-arrive-lane {
+  border: 1px solid rgba(242, 241, 232, 0.13);
+  border-radius: 0.7rem;
+  background: rgba(242, 241, 232, 0.03);
+  padding: 0.7rem 0.8rem 0.8rem;
+}
+
+.dr-arrive-lane h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dr-arrive-lane ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.dr-arrive-lane li {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #d9d8cb;
+}
+
+.dr-undo {
+  margin-left: 0.45rem;
+  border: 1px solid rgba(242, 241, 232, 0.25);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #b9bcae;
+  font-size: 0.64rem;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+}
+
 /* --- C · Day wrap sheet ------------------------------------------------------ */
 
 .dr-wrap-sub {

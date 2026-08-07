@@ -47,6 +47,12 @@ Open:
 | B | Sorting lanes | The whole day at once as five destination lanes, pre-sorted with "?" cards. Move the wrong ones, confirm the rest, dispatch when every card is settled. Batch posture. |
 | C | Day wrap sheet | The day arrives pre-written as a brief, sectioned by destination — "To spec out and hand off", "To get done", "For the notebook", "For the timeline". Reviewing is *reading*: veto or redirect the wrong lines, then "Accept the rest as written" and approve. |
 
+### Round 2 — from the round-1 verdict (A wins; see VERDICT.md)
+
+| Key | Name | Idea |
+| --- | --- | --- |
+| D | Bookended deck | A's deck stays the only working surface. B's lane view is demoted to the *bookends*: an arrival picture of what the day proposes ("Start routing →"), the one-at-a-time deck, then a departure picture of where everything goes, with undo per line and the Dispatch button. |
+
 ## Decision log (grilling session, 2026-08-07)
 
 Per `docs/agents/design-md-process.md`: decisions are **user-confirmed** or
