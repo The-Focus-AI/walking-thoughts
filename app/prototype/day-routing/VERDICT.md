@@ -3,7 +3,8 @@
 | Round | Question | Winner | Keep |
 | --- | --- | --- | --- |
 | 1 (A–C) | What shape is the end-of-walk routing pass? | **A** (Dispatch deck) | One Thread at a time with the proposal pre-armed is the pass. B read well as an overview but gave nothing to do — steal its lane summary as a *picture*, not a workspace. C's prose sheet didn't parse at all. |
-| 2 (D) | Does the deck want B's overview as bookends? | pending | D = arrival picture ("here's what the day proposes") → the deck → departure picture ("here's where it goes") with Dispatch. |
+| 2 (D) | Does the deck want B's overview as bookends? | **yes** | Confirmed as the direction ("Deck with overview bookends"); variants folded into one flow. |
+| 3 | Does "Dispatch" earn its place? What about the reports? | **no / show them** | The walker's own reaction settled both: "what does Dispatch the day mean?" — a commit gate that needs explaining is a failed concept, so routing a card now does it immediately and step ③ is a receipt (issue drafted with repo named, the list, the notebook). "It doesn't tell me the reports" — the full report is now readable in place on the card (`r`) and in the notebook receipt. |
 
 ## Round 1 in the walker's words (2026-08-07)
 

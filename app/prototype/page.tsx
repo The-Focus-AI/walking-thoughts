@@ -103,9 +103,10 @@ export default function PrototypeIndexPage() {
               The end-of-walk pass, one design: ① what came home (the
               day&apos;s Threads with their proposed destinations) → ② route
               each one, one card at a time (Enter accepts the guess, one key
-              redirects) → ③ where it goes, then Dispatch. Settling a route
-              is what marks a Thread reviewed. Earlier sketches (A–C) live in
-              git history; VERDICT.md in the folder records the rounds.
+              redirects, full report readable in place) → ③ what happened —
+              the receipts. Routing a card does it immediately; settling a
+              route is what marks a Thread reviewed. Earlier sketches (A–C)
+              live in git history; VERDICT.md records the rounds.
             </p>
           </div>
           <div className="proto-index-open-row">

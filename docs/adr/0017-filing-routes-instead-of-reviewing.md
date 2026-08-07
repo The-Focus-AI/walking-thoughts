@@ -8,8 +8,10 @@ repo that exists, a to-do to capture without ceremony, a notebook entry
 that might become a post, the same-spot morning photo — so Filing's primary
 verb becomes the **Route**: the Enrichment proposes one beside Kind and
 Project, the walker confirms or redirects it at the desk, and settling the
-Route is what marks the Thread Reviewed. **Dispatch** then commits a Day's
-routes so each Thread actually leaves the system.
+Route is one gesture that both marks the Thread Reviewed and makes the
+handoff happen — there is no separate commit step. (A batch "Dispatch"
+gate was tried in the prototype and cut: it needed explaining, which is a
+UI concept failing its one job. Undo covers the safety it was for.)
 
 Two alternatives were considered and rejected. Keeping Reviewed as the exit
 and adding destination surfaces that draw from Kind automatically leaves

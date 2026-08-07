@@ -25,6 +25,8 @@ Per the process in `docs/agents/design-md-process.md`: decisions are
 | Filing's primary verb is the **Route** — Reviewed becomes a side effect of settling it. | **User-confirmed** (grill Q1, 2026-08-07) |
 | The pass is **one Thread at a time** (prototype A), bookended by an arrival picture of what the day proposes and a departure picture of where it goes (variant D). A whole-day lane view is never a working surface. | **User-confirmed** (round-1 verdict + round-2 direction) |
 | The Route set: **Spec / To-do / Journal** deliberate, **Timeline** automatic for GPS-clustered photos, **Drop** for noise. "New project" is not a Route — Proposed Projects + the Interview already cover it. | Derived recommendation |
+| **No Dispatch gate.** Settling a Route does it immediately; the closing screen is a receipt (the drafted issue, the list, the notebook pages), not a confirmation. A commit button that needed explaining was cut in prototype round 3. | Derived from the walker's reaction ("what does Dispatch the day mean?") |
+| **Reports are readable in the flow** — in place on the routing card and again in the notebook receipt, not just a one-line summary. | Derived from the walker's reaction ("it doesn't tell me the reports") |
 | **Spec** dispatch drafts a ticket-shaped issue in the Project's repo for a coding agent. | Derived recommendation |
 | **Journal** absorbs questions and observations; draft-worthy entries are flagged as post candidates; the Research Verdict keeps working inside it. | Derived recommendation |
 | **Timeline** spots are stable clusters of photo Captures within ~25 m across days; the walker only ever removes a frame. | Derived recommendation |
@@ -40,12 +42,12 @@ exactly like Kind and Project today:
   server-side default from Kind: question → journal, idea → spec,
   task → todo, observation → journal, place → timeline, media → journal
   with its Needs-a-word question, noise → drop.
-- Settling a Route — confirming the proposal or redirecting it — is what
-  makes the Thread Reviewed. There is no separate "mark read" gesture.
-- **Dispatch** commits a Day's confirmed Routes: each Thread actually
-  leaves — the issue drafted, the task listed, the page filed, the frame
-  added, the noise buried. Until Dispatch, everything is undoable at the
-  departure picture.
+- Settling a Route — confirming the proposal or redirecting it — is one
+  gesture that both marks the Thread Reviewed and makes the handoff happen:
+  the issue drafted, the task listed, the page filed, the frame added, the
+  noise buried. There is no separate "mark read" and no separate commit.
+- Undo reverses a settled Route (and its handoff) for as long as the Day
+  is open at the desk; afterwards the destination surface owns the object.
 - A walker's Route, like the rest of Filing, is final — no later
   Enrichment overrules it.
 
@@ -57,13 +59,14 @@ The Day view becomes the bookended deck:
    Enrichment's proposals (counts and titles per Route, Needs-a-word
    flagged) and one action: Start routing.
 2. **The deck.** One Thread at a time: the walker's words, the Enrichment
-   summary, media with its GPS, the proposed Route pre-armed with its
-   handoff spelled out. Enter accepts; `s`/`t`/`n`/`p`/`x` redirect to
-   Spec / To-do / Journal (notebook) / Timeline (photo) / Drop; `j` skips.
-   Settling auto-advances. Spec routes carry the Project select.
-3. **Departure — "where it went."** The same lane picture, now settled:
-   every Thread under its Route with its concrete handoff
-   (Welton spec → `the-focus-ai/welton`), undo per line, and Dispatch.
+   summary, the full report readable in place (`r`), media with its GPS,
+   the proposed Route pre-armed with what settling it will do. Enter
+   accepts; `s`/`t`/`n`/`p`/`x` redirect; `j` skips. Settling does the
+   handoff and auto-advances. Spec routes carry the Project select.
+3. **Receipts — "what happened."** Not a gate: the drafted issues with
+   their repos named, the task list as it now looks, the notebook pages
+   with readable reports, the timeline strip, the dropped line — undo per
+   line, nothing left to press.
 
 ## Slices (strictly ordered, each ships alone)
 
@@ -79,9 +82,9 @@ Built only on data the app already holds, no prompt changes:
   proposal. (The `ROUTE:` front-matter header can replace the table later
   without touching the seam.)
 - The Day view (`/days/[dayKey]`) gains the three-phase deck for its
-  unrouted Threads. Dispatch in R1 records the routes — the per-Route
-  handoffs are R2/R3; the departure picture says plainly which handoffs
-  are live and which are "recorded, lands with a later slice."
+  unrouted Threads. In R1 settling a route records it — the per-Route
+  handoffs are R2/R3; the receipts screen says plainly which handoffs are
+  live and which are "recorded, lands with a later slice."
 
 Acceptance (public browser seam, per repo verification style):
 
@@ -90,9 +93,9 @@ Acceptance (public browser seam, per repo verification style):
   advances; the readout's unsettled count drops.
 - Redirecting with `t` files the Thread `todo` + Reviewed in one write;
   reload shows it settled.
-- The departure picture lists every Thread under its route; undo returns
-  one to the deck; Dispatch marks the Day dispatched and the queue's New
-  is empty for that Day.
+- The receipts screen lists every Thread under its route; undo returns
+  one to the deck; when nothing is left to route, the queue's New is
+  empty for that Day.
 
 ### R2 — The destinations that live in the app
 
@@ -117,8 +120,8 @@ whether Dispatch batches or streams the handoffs.
 
 ## Out of scope
 
-- Re-routing after Dispatch (undo lives before it; afterwards the
-  destination surface owns the object).
+- Re-routing after the Day is closed (undo lives while it's open at the
+  desk; afterwards the destination surface owns the object).
 - Cross-day routing sweeps — the facet-rail desk keeps that job.
-- Auto-dispatch without the walker's pass; the deck is deliberately a
+- Auto-routing without the walker's pass; the deck is deliberately a
   human moment.

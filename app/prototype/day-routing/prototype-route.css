@@ -175,6 +175,142 @@
   background: rgba(23, 35, 27, 0.12);
   font-size: 0.75rem;
 }
+.dr-report {
+  margin-top: 0.7rem;
+}
+
+.dr-report-toggle {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #9db4c0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dr-report-toggle kbd {
+  padding: 0 0.3rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(242, 241, 232, 0.3);
+  background: rgba(242, 241, 232, 0.08);
+  font-size: 0.68rem;
+  color: #b9bcae;
+}
+
+.dr-report-body {
+  margin-top: 0.55rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid rgba(157, 180, 192, 0.5);
+  background: rgba(157, 180, 192, 0.07);
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+
+.dr-report-body p {
+  margin: 0 0 0.6rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #d9d8cb;
+}
+
+.dr-report-body p:last-child {
+  margin-bottom: 0;
+}
+
+.dr-receipts .dr-receipt {
+  margin-bottom: 1.3rem;
+  border: 1px solid rgba(242, 241, 232, 0.13);
+  border-radius: 0.7rem;
+  background: rgba(242, 241, 232, 0.03);
+  padding: 0.8rem 0.95rem;
+  max-width: 50rem;
+}
+
+.dr-receipt h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dr-issue {
+  border: 1px solid rgba(244, 207, 114, 0.3);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+  background: rgba(244, 207, 114, 0.05);
+}
+
+.dr-issue-repo {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #f4cf72;
+}
+
+.dr-issue-title {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.dr-issue-body {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #b9bcae;
+}
+
+.dr-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.dr-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+}
+
+.dr-checkbox {
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 2px solid rgba(232, 168, 124, 0.7);
+  border-radius: 0.25rem;
+  flex: none;
+}
+
+.dr-journal-entry {
+  border-top: 1px solid rgba(242, 241, 232, 0.1);
+  padding: 0.6rem 0;
+}
+
+.dr-journal-entry:first-of-type {
+  border-top: 0;
+}
+
+.dr-receipt-line {
+  margin: 0.4rem 0 0;
+  font-size: 0.86rem;
+}
+
+.dr-receipt-dropped {
+  color: #8e958b;
+  text-decoration: line-through;
+}
+
+.dr-done-line {
+  margin: 0.4rem 0 2rem;
+  font-size: 0.9rem;
+  color: #a9d18f;
+  font-weight: 700;
+}
+
 .dr-readout {
   display: flex;
   flex-wrap: wrap;

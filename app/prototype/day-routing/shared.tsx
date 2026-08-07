@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * PROTOTYPE — shared state model for day-routing variants.
+ * PROTOTYPE — shared state model for the day-routing flow.
  *
- * The state model is the question under test: filing's primary verb becomes
- * a destination. A Thread starts with the Enrichment's *proposed* route and
- * the walker confirms or redirects it; confirming any route marks the Thread
- * reviewed as a side effect. "Dispatch" commits every confirmed route.
+ * The model under test: filing's primary verb is the Route, and settling a
+ * Route DOES it — the Thread is reviewed and its handoff happens right
+ * then (simulated here). There is no separate commit step; the final
+ * screen is a receipt, and undo pulls a Thread back into the deck.
  */
 
 import { useMemo, useState } from "react";
@@ -17,7 +17,7 @@ import {
   type ProtoThread,
 } from "./fixture";
 
-export type RouteStatus = "proposed" | "confirmed";
+export type RouteStatus = "proposed" | "settled";
 
 export type Route = {
   destination: ProtoDestination;
@@ -29,19 +29,17 @@ export type RoutingState = Record<string, Route>;
 
 export type RoutingActions = {
   state: RoutingState;
-  dispatched: boolean;
-  /** Confirm whatever is currently proposed for the Thread. */
+  /** Settle whatever is currently proposed for the Thread — it happens now. */
   accept(threadId: string): void;
-  /** Redirect to a different destination and confirm in one gesture. */
+  /** Redirect to a different destination and settle in one gesture. */
   routeTo(
     threadId: string,
     destination: ProtoDestination,
     projectId?: string | null,
   ): void;
   setProject(threadId: string, projectId: string | null): void;
-  /** Put a confirmed Thread back to proposed. */
+  /** Undo: pull a settled Thread back into the deck. */
   reopen(threadId: string): void;
-  dispatch(): void;
 };
 
 export function useRoutingState(): RoutingActions {
@@ -57,7 +55,6 @@ export function useRoutingState(): RoutingActions {
       ]),
     ),
   );
-  const [dispatched, setDispatched] = useState(false);
 
   return useMemo<RoutingActions>(() => {
     function patch(threadId: string, part: Partial<Route>) {
@@ -68,64 +65,55 @@ export function useRoutingState(): RoutingActions {
     }
     return {
       state,
-      dispatched,
-      accept: (id) => patch(id, { status: "confirmed" }),
+      accept: (id) => patch(id, { status: "settled" }),
       routeTo: (id, destination, projectId) =>
         patch(id, {
           destination,
-          status: "confirmed",
+          status: "settled",
           ...(projectId !== undefined ? { projectId } : {}),
         }),
       setProject: (id, projectId) => patch(id, { projectId }),
       reopen: (id) => patch(id, { status: "proposed" }),
-      dispatch: () => setDispatched(true),
     };
-  }, [state, dispatched]);
+  }, [state]);
 }
 
 export function countByDestination(
   state: RoutingState,
-): Record<ProtoDestination, { proposed: number; confirmed: number }> {
+): Record<ProtoDestination, { proposed: number; settled: number }> {
   const counts = {
-    spec: { proposed: 0, confirmed: 0 },
-    todo: { proposed: 0, confirmed: 0 },
-    journal: { proposed: 0, confirmed: 0 },
-    timeline: { proposed: 0, confirmed: 0 },
-    drop: { proposed: 0, confirmed: 0 },
+    spec: { proposed: 0, settled: 0 },
+    todo: { proposed: 0, settled: 0 },
+    journal: { proposed: 0, settled: 0 },
+    timeline: { proposed: 0, settled: 0 },
+    drop: { proposed: 0, settled: 0 },
   };
   for (const route of Object.values(state)) {
-    counts[route.destination][route.status === "confirmed" ? "confirmed" : "proposed"] += 1;
+    counts[route.destination][
+      route.status === "settled" ? "settled" : "proposed"
+    ] += 1;
   }
   return counts;
 }
 
-/** Skill rule: surface the state — running tally shown in every variant. */
-export function StateReadout({
-  state,
-  dispatched,
-}: {
-  state: RoutingState;
-  dispatched: boolean;
-}) {
+/** Skill rule: surface the state — running tally shown on every step. */
+export function StateReadout({ state }: { state: RoutingState }) {
   const routes = Object.values(state);
-  const unsettled = routes.filter((route) => route.status === "proposed").length;
+  const toRoute = routes.filter((route) => route.status === "proposed").length;
   const counts = countByDestination(state);
   return (
     <div className="dr-readout" role="status">
       <span>
-        <strong>{unsettled}</strong> unsettled
+        <strong>{toRoute}</strong> to route
       </span>
       {(Object.keys(counts) as ProtoDestination[]).map((destination) =>
-        counts[destination].confirmed > 0 ? (
+        counts[destination].settled > 0 ? (
           <span key={destination}>
-            <strong>{counts[destination].confirmed}</strong>{" "}
+            <strong>{counts[destination].settled}</strong>{" "}
             {DESTINATION_LABEL[destination].toLowerCase()}
           </span>
         ) : null,
       )}
-      <span className={dispatched ? "dr-readout-done" : undefined}>
-        {dispatched ? "day dispatched" : "not dispatched"}
-      </span>
     </div>
   );
 }

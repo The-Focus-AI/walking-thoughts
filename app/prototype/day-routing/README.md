@@ -24,8 +24,8 @@ Open `/prototype/day-routing` (or `/prototype` for the hub).
 | Step | Screen | What you do |
 | --- | --- | --- |
 | ① What came home | The day's Threads grouped by their proposed destination, with counts | Read it, hit **Start routing** (or `⏎`) |
-| ② Route each one | One Thread per card: your words, the Enrichment's summary, its guess pre-armed | `⏎` accept the guess · or redirect with one key · repeat ~9 times |
-| ③ Dispatch it | Everything under its destination with the concrete handoff spelled out | Undo anything wrong, then **Dispatch the day** (`⏎`) |
+| ② Route each one | One Thread per card: your words, the summary, the full report readable in place (`r`), the guess pre-armed | `⏎` accept the guess · or redirect with one key. Routing it **does it** — there is no later commit step |
+| ③ What happened | The receipts: issues drafted (repo named), your list as it now looks, notebook pages with readable reports, the timeline strip | Nothing — read it, undo anything wrong, close the tab |
 
 ## Keys
 
@@ -33,13 +33,13 @@ Open `/prototype/day-routing` (or `/prototype` for the hub).
 | --- | --- | --- |
 | `⏎` | step ① | Start routing |
 | `⏎` | step ② | Accept the proposed route (and advance) |
-| `s` | step ② | Route to **Spec** (hand to a repo agent) |
-| `t` | step ② | Route to **To-do** (task list, no ceremony) |
-| `n` | step ② | Route to **Journal** (the notebook) |
-| `p` | step ② | Route to **Timeline** (same-spot photo strip) |
+| `s` | step ② | Route to **Spec** (drafts an issue in the Project's repo) |
+| `t` | step ② | Route to **To-do** (puts it on the task list) |
+| `n` | step ② | Route to **Journal** (files it in the notebook) |
+| `p` | step ② | Route to **Timeline** (adds the frame to the strip) |
 | `x` | step ② | **Drop** (noise, buried) |
+| `r` | step ② | Read the full report in place |
 | `j` | step ② | Skip for now |
-| `⏎` | step ③ | Dispatch the day |
 
 Keys are inert while a select/input is focused.
 
@@ -47,10 +47,12 @@ Keys are inert while a select/input is focused.
 
 - Every Thread arrives with a **proposed Route** from the Enrichment, the
   way Kind and Project guesses ride today.
-- Confirming or redirecting a Route marks the Thread **Reviewed as a side
-  effect** — there is no separate "mark read" gesture.
-- **Dispatch** commits the day; until then every route is undoable at
-  step ③.
+- Settling a Route **does it immediately**: the Thread is Reviewed and the
+  handoff happens right then (simulated). No separate commit step —
+  "Dispatch" as a button was cut in round 3 after it needed explaining,
+  which is a UI concept failing its one job.
+- Step ③ is a **receipt**, not a gate; undo pulls a Thread back into the
+  deck.
 
 ## Where the decisions landed
 

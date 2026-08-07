@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * PROTOTYPE — the day-routing flow, single design (was "variant D").
- * Three steps, mapped on screen: ① What came home → ② Route each one →
- * ③ Where it goes / Dispatch. Settling a Route is what marks a Thread
- * reviewed; Dispatch commits the day.
+ * PROTOTYPE — the day-routing flow, single design.
+ * Three steps: ① What came home → ② Route each one → ③ What happened.
+ * Routing a card DOES it (simulated): the to-do lands on the list, the
+ * spec becomes a drafted issue, the journal page is filed. Step ③ is a
+ * receipt, not a confirmation gate; undo pulls a Thread back.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,6 +20,7 @@ import {
   projectName,
   projectRepo,
   type ProtoDestination,
+  type ProtoThread,
 } from "./fixture";
 import {
   DestinationChip,
@@ -38,7 +40,7 @@ const KEY_TO_DESTINATION: Record<string, ProtoDestination> = {
 const STEPS = [
   { n: 1, label: "What came home" },
   { n: 2, label: "Route each one" },
-  { n: 3, label: "Dispatch it" },
+  { n: 3, label: "What happened" },
 ];
 
 export function RoutingFlow() {
@@ -46,7 +48,7 @@ export function RoutingFlow() {
   const [started, setStarted] = useState(false);
   const [index, setIndex] = useState(0);
 
-  const unsettled = useMemo(
+  const toRoute = useMemo(
     () =>
       THREADS.filter(
         (thread) => routing.state[thread.id].status === "proposed",
@@ -54,7 +56,7 @@ export function RoutingFlow() {
     [routing.state],
   );
 
-  const step = !started ? 1 : unsettled > 0 ? 2 : 3;
+  const step = !started ? 1 : toRoute > 0 ? 2 : 3;
 
   return (
     <div className="dr-shell dr-flow">
@@ -79,7 +81,7 @@ export function RoutingFlow() {
             </span>
           ))}
         </nav>
-        <StateReadout state={routing.state} dispatched={routing.dispatched} />
+        <StateReadout state={routing.state} />
       </header>
 
       {step === 1 ? (
@@ -89,10 +91,10 @@ export function RoutingFlow() {
           routing={routing}
           index={index}
           setIndex={setIndex}
-          position={THREADS.length - unsettled + 1}
+          position={THREADS.length - toRoute + 1}
         />
       ) : (
-        <Departure routing={routing} />
+        <Receipts routing={routing} />
       )}
     </div>
   );
@@ -117,8 +119,8 @@ function Arrival({ onStart }: { onStart: () => void }) {
       <p className="dr-arrive-sub">
         {DAY.place} · {DAY.walkedMinutes} min · {THREADS.length} Threads,
         already enriched on the way home. Each one arrives with a guess about
-        where it should go — your job is only to confirm or redirect, one at
-        a time.
+        where it should go. Routing it makes it happen — accept the guess or
+        redirect it, one at a time.
       </p>
       <div className="dr-arrive-lanes">
         {DESTINATIONS.map((destination) => {
@@ -172,18 +174,23 @@ function Deck({
   setIndex: (updater: (prev: number) => number) => void;
   position: number;
 }) {
-  const thread = THREADS[Math.min(index, THREADS.length - 1)];
+  // Show the first still-proposed Thread at or after the cursor — an undo
+  // or a settle never leaves the deck pointing at a settled card.
+  const thread = useMemo(() => {
+    for (let step = 0; step < THREADS.length; step += 1) {
+      const candidate = THREADS[(index + step) % THREADS.length];
+      if (routing.state[candidate.id].status === "proposed") return candidate;
+    }
+    return THREADS[Math.min(index, THREADS.length - 1)];
+  }, [index, routing.state]);
   const route = routing.state[thread.id];
+  const [reportOpen, setReportOpen] = useState(false);
 
+  const shownIndex = THREADS.indexOf(thread);
   const advance = useCallback(() => {
-    setIndex((prev) => {
-      for (let step = 1; step <= THREADS.length; step += 1) {
-        const next = (prev + step) % THREADS.length;
-        if (routing.state[THREADS[next].id].status === "proposed") return next;
-      }
-      return prev;
-    });
-  }, [routing.state, setIndex]);
+    setReportOpen(false);
+    setIndex(() => (shownIndex + 1) % THREADS.length);
+  }, [setIndex, shownIndex]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -207,16 +214,14 @@ function Deck({
         advance();
       } else if (event.key === "j") {
         advance();
+      } else if (event.key === "r" && thread.report) {
+        event.preventDefault();
+        setReportOpen((open) => !open);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [advance, routing, thread.id]);
-
-  // An undo can land the deck on an already-settled index; move along.
-  useEffect(() => {
-    if (route.status !== "proposed") advance();
-  }, [route.status, advance]);
+  }, [advance, routing, thread.id, thread.report]);
 
   return (
     <>
@@ -225,7 +230,7 @@ function Deck({
         <span className="dr-keys">
           <kbd>⏎</kbd> accept the guess · <kbd>s</kbd> spec · <kbd>t</kbd>{" "}
           to-do · <kbd>n</kbd> journal · <kbd>p</kbd> timeline · <kbd>x</kbd>{" "}
-          drop · <kbd>j</kbd> skip
+          drop · <kbd>r</kbd> read report · <kbd>j</kbd> skip
         </span>
       </p>
       <article className="dr-card" key={thread.id}>
@@ -262,6 +267,25 @@ function Deck({
           </div>
         ) : null}
         <p className="dr-enrichment">{thread.enrichmentSummary}</p>
+        {thread.report ? (
+          <div className="dr-report">
+            <button
+              type="button"
+              className="dr-report-toggle"
+              onClick={() => setReportOpen((open) => !open)}
+            >
+              {reportOpen ? "▾ Hide the report" : "▸ Read the report"}{" "}
+              <kbd>r</kbd>
+            </button>
+            {reportOpen ? (
+              <div className="dr-report-body">
+                {thread.report.split("\n\n").map((paragraph, i) => (
+                  <p key={i}>{paragraph}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {thread.needsAWord ? (
           <p className="dr-needs-word">
             <strong>Needs a word:</strong> {thread.needsAWord}
@@ -291,7 +315,7 @@ function Deck({
             ) : null}
             <span className="dr-handoff">
               {" "}
-              — {DESTINATION_HANDOFF[route.destination]}
+              — routing it {DESTINATION_HANDOFF[route.destination]}
             </span>
           </p>
           <div className="dr-actions">
@@ -334,107 +358,186 @@ function Deck({
   );
 }
 
-/* --- Step 3 · Dispatch it --------------------------------------------------- */
+/* --- Step 3 · What happened (receipts) -------------------------------------- */
 
-function Departure({
+function Receipts({
   routing,
 }: {
   routing: ReturnType<typeof useRoutingState>;
 }) {
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Enter" && !routing.dispatched) {
-        event.preventDefault();
-        routing.dispatch();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [routing]);
-
-  const sections = DESTINATIONS.map((destination) => ({
-    destination,
-    threads: THREADS.filter(
+  const byDest = (destination: ProtoDestination) =>
+    THREADS.filter(
       (thread) => routing.state[thread.id].destination === destination,
-    ),
-  })).filter((section) => section.threads.length > 0);
+    );
+
+  const specs = byDest("spec");
+  const todos = byDest("todo");
+  const journal = byDest("journal");
+  const timeline = byDest("timeline");
+  const dropped = byDest("drop");
 
   return (
-    <div className="dr-arrive">
+    <div className="dr-arrive dr-receipts">
       <p className="dr-arrive-sub">
-        The pass is done — every Thread has a place to go. Dispatch commits
-        it: each handoff below actually happens (simulated here). Undo pulls
-        a Thread back into the deck.
+        Done — everything went somewhere. This is what happened (simulated
+        here; in the real app these are the actual issue, list, and pages).
+        Undo pulls a Thread back into the deck.
       </p>
-      <div className="dr-arrive-lanes">
-        {sections.map(({ destination, threads }) => (
-          <div
-            key={destination}
-            className={`dr-arrive-lane dr-lane-${destination}`}
-          >
-            <h2>
-              {DESTINATION_LABEL[destination]}
-              <span className="dr-lane-count">{threads.length}</span>
-            </h2>
-            <p className="dr-lane-handoff">
-              {DESTINATION_HANDOFF[destination]}
-            </p>
-            {destination === "timeline" ? (
-              <div className="dr-strip">
-                {TIMELINE_SPOT.recent.slice(0, 3).map((frame) => (
-                  <div
-                    key={frame.day}
-                    className="dr-strip-frame"
-                    style={{ background: frame.tone }}
-                  >
-                    <span>{frame.day}</span>
-                    <span>{frame.distanceMeters} m</span>
-                  </div>
-                ))}
-                <div className="dr-strip-frame today">
-                  <span>Today</span>
-                  <span>day {TIMELINE_SPOT.days}</span>
-                </div>
+
+      {specs.length > 0 ? (
+        <section className="dr-receipt dr-lane-spec">
+          <h2>Issues drafted · handed to a coding agent</h2>
+          {specs.map((thread) => {
+            const route = routing.state[thread.id];
+            return (
+              <div key={thread.id} className="dr-issue">
+                <p className="dr-issue-repo">
+                  {projectRepo(route.projectId) ??
+                    `${projectName(route.projectId) ?? "no Project"} (no repo)`}{" "}
+                  · issue drafted
+                </p>
+                <p className="dr-issue-title">{thread.title}</p>
+                {thread.report ? (
+                  <p className="dr-issue-body">
+                    {thread.report.split("\n\n")[0]} …full report as the issue
+                    body.
+                  </p>
+                ) : null}
+                <Undo onClick={() => routing.reopen(thread.id)} />
               </div>
-            ) : null}
-            <ul>
-              {threads.map((thread) => {
-                const route = routing.state[thread.id];
-                return (
-                  <li key={thread.id}>
-                    {thread.title}
-                    {destination === "spec" ? (
-                      <em className="dr-handoff">
-                        {" "}
-                        → {projectName(route.projectId) ?? "no Project"}
-                        {projectRepo(route.projectId)
-                          ? ` (${projectRepo(route.projectId)})`
-                          : ""}
-                      </em>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="dr-undo"
-                      onClick={() => routing.reopen(thread.id)}
-                    >
-                      undo
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            );
+          })}
+        </section>
+      ) : null}
+
+      {todos.length > 0 ? (
+        <section className="dr-receipt dr-lane-todo">
+          <h2>On your list now</h2>
+          <ul className="dr-checklist">
+            {todos.map((thread) => (
+              <li key={thread.id}>
+                <span className="dr-checkbox" aria-hidden="true" />
+                {thread.excerpt || thread.title}
+                <Undo onClick={() => routing.reopen(thread.id)} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {journal.length > 0 ? (
+        <section className="dr-receipt dr-lane-journal">
+          <h2>In the notebook</h2>
+          {journal.map((thread) => (
+            <JournalEntry
+              key={thread.id}
+              thread={thread}
+              onUndo={() => routing.reopen(thread.id)}
+            />
+          ))}
+        </section>
+      ) : null}
+
+      {timeline.length > 0 ? (
+        <section className="dr-receipt dr-lane-timeline">
+          <h2>
+            On the timeline · {TIMELINE_SPOT.name}, day {TIMELINE_SPOT.days}
+          </h2>
+          <div className="dr-strip">
+            {TIMELINE_SPOT.recent.slice(0, 4).map((frame) => (
+              <div
+                key={frame.day}
+                className="dr-strip-frame"
+                style={{ background: frame.tone }}
+              >
+                <span>{frame.day}</span>
+                <span>{frame.distanceMeters} m</span>
+              </div>
+            ))}
+            <div className="dr-strip-frame today">
+              <span>Today</span>
+              <span>day {TIMELINE_SPOT.days}</span>
+            </div>
           </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="dr-dispatch"
-        disabled={routing.dispatched}
-        onClick={routing.dispatch}
-      >
-        {routing.dispatched ? "Dispatched ✓ — the day is done" : "Dispatch the day"}
-        {!routing.dispatched ? <kbd>⏎</kbd> : null}
-      </button>
+          {timeline.map((thread) => (
+            <p key={thread.id} className="dr-receipt-line">
+              {thread.title}
+              <Undo onClick={() => routing.reopen(thread.id)} />
+            </p>
+          ))}
+        </section>
+      ) : null}
+
+      {dropped.length > 0 ? (
+        <section className="dr-receipt dr-lane-drop">
+          <h2>Let go</h2>
+          {dropped.map((thread) => (
+            <p key={thread.id} className="dr-receipt-line dr-receipt-dropped">
+              {thread.title}
+              <Undo onClick={() => routing.reopen(thread.id)} />
+            </p>
+          ))}
+        </section>
+      ) : null}
+
+      <p className="dr-done-line">
+        That&apos;s the day. Nothing left to press — close the tab, the walk
+        is filed.
+      </p>
     </div>
+  );
+}
+
+function JournalEntry({
+  thread,
+  onUndo,
+}: {
+  thread: ProtoThread;
+  onUndo: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="dr-journal-entry">
+      <p className="dr-issue-title">
+        {thread.title}
+        {thread.draftWorthy ? (
+          <em className="dr-draft"> · draft candidate</em>
+        ) : null}
+        <Undo onClick={onUndo} />
+      </p>
+      {thread.needsAWord ? (
+        <p className="dr-needs-word">
+          <strong>Still asking:</strong> {thread.needsAWord}
+        </p>
+      ) : null}
+      {thread.report ? (
+        <>
+          <button
+            type="button"
+            className="dr-report-toggle"
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            {open ? "▾ Hide the report" : "▸ Read the report"}
+          </button>
+          {open ? (
+            <div className="dr-report-body">
+              {thread.report.split("\n\n").map((paragraph, i) => (
+                <p key={i}>{paragraph}</p>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p className="dr-issue-body">{thread.enrichmentSummary}</p>
+      )}
+    </div>
+  );
+}
+
+function Undo({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="dr-undo" onClick={onClick}>
+      undo
+    </button>
   );
 }
