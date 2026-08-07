@@ -41,8 +41,16 @@ A name the Enrichment has floated for an effort it keeps seeing, carried in the 
 _Avoid_: Candidate, suggestion, draft project, cluster
 
 **Filing**:
-What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, settle the Research Verdict, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
+What the walker does at the desk to settle a Thread: confirm or redirect the Route the Enrichment proposed, adjusting the Kind, Project, or Research Verdict along the way. Settling the Route makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when the Day is Dispatched.
 _Avoid_: Triage, sorting, processing
+
+**Route**:
+Where a Thread goes when the walker settles it — Spec, To-do, Journal, Timeline, or Drop. Proposed by the Enrichment beside Kind and Project, settled at the desk, and final once the walker sets it. Kind is what a Thread is; Route is what the walker does with it.
+_Avoid_: Destination, bucket, action, category
+
+**Dispatch**:
+Committing a Day's settled Routes so each Thread actually leaves — the issue drafted, the task listed, the notebook page filed, the frame added, the noise buried. Until Dispatch every Route is undoable; after it, the destination owns the object.
+_Avoid_: Send, export, sync, publish
 
 **Research Verdict**:
 What the walker settled about a Thread's research while Filing: kept (worth returning to), dismissed (read and let go), or unset. One verdict per Thread, separate from Reviewed — a Thread is processed either way; the verdict says whether its research stays in reach.

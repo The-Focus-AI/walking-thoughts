@@ -69,14 +69,18 @@ Per `docs/agents/design-md-process.md`: decisions are **user-confirmed** or
 | 7 | The end-of-walk surface is the Day, not the whole queue — you cycle through *today*; the facet-rail desk (desk-processing.md) remains the cross-day catch-up surface. | Derived recommendation |
 | 8 | Which shape (A / B / C) wins | **Open — this prototype's question** |
 
-## Proposed glossary (NOT yet in CONTEXT.md — awaiting confirmation)
+## Where the decisions landed
 
-- **Route**: where a Thread goes when the walker settles it — Spec, To-do,
-  Journal, Timeline, or Drop. Proposed by the Enrichment, settled at the
-  desk; settling a Route makes the Thread Reviewed.
-- **Dispatch**: committing a Day's confirmed Routes so each Thread actually
-  leaves — the issue drafted, the task listed, the page filed, the frame
-  added.
+The round-1 verdict and the "go" that followed distilled into the repo's
+real documents — this folder stays the primary source, those carry the
+decisions:
+
+- `docs/day-routing.md` — the spec (model, surface, slices R1–R3), with
+  this decision log's provenance carried over.
+- `docs/adr/0017-filing-routes-instead-of-reviewing.md` — the settled
+  core: route, don't review.
+- `CONTEXT.md` — **Route** and **Dispatch** entered the glossary; **Filing**
+  reworded around them.
 
 ## What this implies for production (out of scope here)
 
