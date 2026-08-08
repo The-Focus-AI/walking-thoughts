@@ -146,6 +146,63 @@ export function verdictImpliedByRoute(
   return undefined;
 }
 
+/**
+ * What happened when this Thread was routed to Spec (ADR 0018). One record
+ * per Thread, overwritten as attempts settle: `drafted` is the permanent
+ * guard — an issue exists and is never drafted twice — while `skipped`
+ * (Project has no repository) and `failed` (the draft did not land) are
+ * visible states the next spec routing may retry past.
+ */
+export type SpecHandoffStatus = "drafted" | "skipped" | "failed";
+
+export type SpecHandoff = {
+  status: SpecHandoffStatus;
+  /** The `owner/repo` the draft targeted; null when the Project had none. */
+  repository: string | null;
+  issueUrl: string | null;
+  issueNumber: number | null;
+  /** Why the handoff is not live — set on skipped and failed records. */
+  reason: string | null;
+  at: string;
+  /**
+   * Set when the walker re-routed away after the issue was drafted: the
+   * issue stays in the repository (never delete external writes), and this
+   * marks that the Route no longer points at it.
+   */
+  orphanedAt?: string | null;
+};
+
+/**
+ * Narrow a stored value to a handoff record. Server-written JSON, so only
+ * the status is checked — an unknown status reads as no record at all.
+ */
+export function asSpecHandoff(value: unknown): SpecHandoff | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as SpecHandoff;
+  return record.status === "drafted" ||
+    record.status === "skipped" ||
+    record.status === "failed"
+    ? record
+    : null;
+}
+
+/**
+ * A Project's repository is a plain `owner/repo` — enough to address the
+ * issue drafter without carrying a whole URL through the seams. Dot-only
+ * segments are refused: `owner/..` splices into an API path as traversal.
+ */
+export function asProjectRepository(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const segments = trimmed.split("/");
+  const wellFormed =
+    segments.length === 2 &&
+    segments.every(
+      (segment) => /^[A-Za-z0-9_.-]+$/.test(segment) && !/^\.+$/.test(segment),
+    );
+  return wellFormed ? trimmed : null;
+}
+
 export type LocalThread = {
   id: string;
   title: string;
@@ -169,6 +226,8 @@ export type LocalThread = {
   researchVerdict?: ResearchVerdict | null;
   /** Where the walker routed this Thread; absent/null = not yet settled. */
   route?: ThreadRoute | null;
+  /** What spec routing did outside the system; absent/null = nothing yet. */
+  specHandoff?: SpecHandoff | null;
 };
 
 export type CaptureSyncStatus =
@@ -325,6 +384,8 @@ export type CaptureStore = {
     researchVerdict?: ResearchVerdict | null;
     /** Omitted keeps the current route; null clears it. */
     route?: ThreadRoute | null;
+    /** Omitted keeps the current handoff record; null clears it. */
+    specHandoff?: SpecHandoff | null;
   }): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
@@ -372,6 +433,7 @@ export type CaptureStore = {
       projectName?: string | null;
       researchVerdict?: ResearchVerdict | null;
       route?: ThreadRoute | null;
+      specHandoff?: SpecHandoff | null;
       captures: Array<{
         id: string;
         text: string;

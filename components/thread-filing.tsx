@@ -94,6 +94,7 @@ export function ThreadFiling({
   // otherwise the Enrichment's proposal — defaulted from Kind until a
   // ROUTE: header exists.
   const proposedRoute = thread.route ?? routeForKind(thread.kind);
+  const handoff = thread.specHandoff ?? null;
 
   return (
     <div className="thread-filing" data-testid="thread-filing">
@@ -102,6 +103,33 @@ export function ThreadFiling({
           ? `Routed to ${ROUTE_LABELS[thread.route]}`
           : "Where does this go?"}
       </p>
+      {/* The spec handoff's receipt (ADR 0018): the drafted issue with its
+          repo named, or plainly why the handoff is not live. */}
+      {handoff?.status === "drafted" && handoff.issueUrl ? (
+        <p className="thread-filing-handoff" data-testid="spec-handoff-note">
+          <a href={handoff.issueUrl} target="_blank" rel="noreferrer">
+            Issue drafted in {handoff.repository}
+          </a>
+          {handoff.orphanedAt
+            ? " — re-routed since; the issue remains."
+            : null}
+        </p>
+      ) : null}
+      {thread.route === "spec" && handoff?.status === "skipped" ? (
+        <p className="thread-filing-handoff" data-testid="spec-handoff-note">
+          {handoff.reason === "no_credential"
+            ? "Spec recorded — the repo handoff is not wired up yet, so no issue was drafted."
+            : thread.projectId
+              ? "Spec recorded — this Project has no repository, so the handoff is not live."
+              : "Spec recorded — no Project with a repository is attached, so the handoff is not live."}
+        </p>
+      ) : null}
+      {thread.route === "spec" && handoff?.status === "failed" ? (
+        <p className="thread-filing-handoff" data-testid="spec-handoff-note">
+          The issue draft failed ({handoff.reason ?? "unknown"}). Routing to
+          Spec again retries it.
+        </p>
+      ) : null}
       <div className="thread-filing-routes">
         {THREAD_ROUTES.map((route) => (
           <button

@@ -263,6 +263,10 @@ export function fileThreadTransition(
             filing.route === undefined
               ? (thread.route ?? null)
               : filing.route,
+          specHandoff:
+            filing.specHandoff === undefined
+              ? (thread.specHandoff ?? null)
+              : filing.specHandoff,
         }
       : thread,
   );

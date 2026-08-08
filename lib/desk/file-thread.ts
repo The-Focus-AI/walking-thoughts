@@ -61,6 +61,14 @@ export async function fileThread(
       filing.route === undefined
         ? undefined
         : (asThreadRoute(result.route) ?? filing.route ?? null),
+    // The server settles what spec routing did outside the system — adopt
+    // its record whenever a route was part of this filing and the server
+    // actually answered with the field (ADR 0018); an older server's
+    // silence must not clear a record we already hold.
+    specHandoff:
+      filing.route === undefined || result.specHandoff === undefined
+        ? undefined
+        : (result.specHandoff ?? null),
   });
   return true;
 }
