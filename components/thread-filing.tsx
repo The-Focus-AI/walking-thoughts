@@ -5,6 +5,9 @@ import { fileThread, type ThreadFilingInput } from "@/lib/desk/file-thread";
 import {
   KIND_DESK_ORDER,
   KIND_LABELS,
+  ROUTE_LABELS,
+  routeForKind,
+  THREAD_ROUTES,
   type LocalThread,
 } from "@/lib/local-capture/types";
 import { getReviewTransport } from "@/lib/sync/review-client";
@@ -87,8 +90,40 @@ export function ThreadFiling({
     );
   }
 
+  // The Route is the primary verb (ADR 0017): settled if the walker set one,
+  // otherwise the Enrichment's proposal — defaulted from Kind until a
+  // ROUTE: header exists.
+  const proposedRoute = thread.route ?? routeForKind(thread.kind);
+
   return (
     <div className="thread-filing" data-testid="thread-filing">
+      <p className="thread-filing-label">
+        {thread.route
+          ? `Routed to ${ROUTE_LABELS[thread.route]}`
+          : "Where does this go?"}
+      </p>
+      <div className="thread-filing-routes">
+        {THREAD_ROUTES.map((route) => (
+          <button
+            key={route}
+            type="button"
+            className={
+              thread.route === route
+                ? "thread-filing-route settled"
+                : proposedRoute === route
+                  ? "thread-filing-route guessed"
+                  : "thread-filing-route"
+            }
+            disabled={busy}
+            data-testid={`file-route-${route}`}
+            onClick={() => void file({ route })}
+          >
+            {ROUTE_LABELS[route]}
+            {thread.route === route ? " ✓" : proposedRoute === route ? "?" : ""}
+          </button>
+        ))}
+      </div>
+
       <p className="thread-filing-label">
         {thread.kind
           ? `Filed as ${KIND_LABELS[thread.kind]}?`

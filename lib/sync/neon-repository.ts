@@ -1,6 +1,10 @@
 import { neon } from "@neondatabase/serverless";
 import { titleFromText } from "@/lib/local-capture/thread-destination";
-import { asResearchVerdict, asThreadKind } from "@/lib/local-capture/types";
+import {
+  asResearchVerdict,
+  asThreadKind,
+  asThreadRoute,
+} from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   Project,
@@ -69,6 +73,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         ALTER TABLE sync_threads
         ADD COLUMN IF NOT EXISTS research_verdict TEXT
+      `;
+      await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS route TEXT
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_projects (
@@ -382,7 +390,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await ensure();
       const threads = (await sql`
         SELECT t.id, t.title, t.revision, t.updated_at, t.reviewed_at, t.kind,
-               t.topics, t.ask, t.project_id, t.research_verdict,
+               t.topics, t.ask, t.project_id, t.research_verdict, t.route,
                p.name AS project_name
         FROM sync_threads t
         LEFT JOIN sync_projects p ON p.id = t.project_id AND p.user_id = t.user_id
@@ -405,6 +413,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ask: string | null;
         project_id: string | null;
         research_verdict: string | null;
+        route: string | null;
         project_name: string | null;
       }>;
 
@@ -442,6 +451,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           projectId: thread.project_id ?? null,
           projectName: thread.project_name ?? null,
           researchVerdict: asResearchVerdict(thread.research_verdict),
+          route: asThreadRoute(thread.route),
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -572,6 +582,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
             research_verdict = CASE
               WHEN ${filing.researchVerdict === undefined} THEN research_verdict
               ELSE ${filing.researchVerdict ?? null}
+            END,
+            route = CASE
+              WHEN ${filing.route === undefined} THEN route
+              ELSE ${filing.route ?? null}
             END
         WHERE user_id = ${userId} AND id = ${threadId}
         RETURNING id

@@ -25,7 +25,7 @@ One walk, addressed as a whole: every Thread whose first Capture landed on that 
 _Avoid_: Session, entry, log, feed
 
 **Lens**:
-How the desk stacks the unreviewed pile: by Day (the default), Topic, Kind, Media, or Reports. A Lens only re-groups — it never changes which Threads are in the pile, and it is not a filter.
+How the desk stacks the unrouted pile: by Day (the default), Topic, Kind, Media, or Reports. A Lens only re-groups — it never changes which Threads are in the pile, and it is not a filter. Lenses and facets find Threads; only routing settles them.
 _Avoid_: View, tab, sort, mode
 
 **Kind**:
@@ -41,15 +41,19 @@ A name the Enrichment has floated for an effort it keeps seeing, carried in the 
 _Avoid_: Candidate, suggestion, draft project, cluster
 
 **Filing**:
-What the walker does at the desk to settle a Thread: confirm the kind the Enrichment guessed, put it in a Project, settle the Research Verdict, or simply mark that they read the report. Any of those makes the Thread Reviewed and clears it from the queue; the sitting-down-afterwards is done when nothing is left there.
+What the walker does at the desk to settle a Thread: confirm or redirect the Route the Enrichment proposed, adjusting the Kind or Project along the way. Settling the Route makes the Thread Reviewed and makes its handoff happen right then; the sitting-down-afterwards is done when nothing is left to route.
 _Avoid_: Triage, sorting, processing
 
+**Route**:
+Where a Thread goes when the walker settles it — Spec, To-do, Journal, Timeline, or Drop. Proposed by the Enrichment beside Kind and Project; settling it at the desk is one gesture that both marks the Thread Reviewed and does the thing — the issue drafted, the task listed, the page filed, the frame added. Kind is what a Thread is; Route is what the walker does with it.
+_Avoid_: Destination, bucket, action, category, dispatch
+
 **Research Verdict**:
-What the walker settled about a Thread's research while Filing: kept (worth returning to), dismissed (read and let go), or unset. One verdict per Thread, separate from Reviewed — a Thread is processed either way; the verdict says whether its research stays in reach.
+What a Thread's Route implies about its research: routing to the Journal keeps it (the Artifact page stays), Drop lets it go (the Artifact retracts), other Routes leave it unset. One verdict per Thread, recorded as before — no longer a gesture of its own.
 _Avoid_: Rating, like, star, archive
 
 **Reviewed**:
-A Thread state set when the walker has processed it back at the desk. Threads start new and sit in the review queue until marked Reviewed.
+A Thread state that follows from settling its Route — never set on its own. Threads start new and wait in the pile until routed.
 _Avoid_: Archived, done, read
 
 **Memory**:

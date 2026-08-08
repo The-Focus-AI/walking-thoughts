@@ -10,7 +10,7 @@ import {
  * The desk's filter model, in one place because two surfaces speak it: the
  * desktop facet rail and the phone's chip row. Both read and write the same
  * URL params, so a link made at the desk opens filtered on the phone and
- * back again (docs/desk-processing.md, S1).
+ * back again (docs/desk.md).
  *
  * Nothing here touches React or the store — a Thread arrives already reduced
  * to the handful of facts the facets ask about.

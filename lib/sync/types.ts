@@ -2,6 +2,7 @@ import type {
   CaptureLocation,
   MediaKind,
   ThreadKind,
+  ThreadRoute,
 } from "@/lib/local-capture/types";
 
 export type SyncCaptureStatus =
@@ -95,6 +96,8 @@ export type ServerThread = {
   projectName?: string | null;
   /** The walker's Research Verdict from Filing; null/absent = unset. */
   researchVerdict?: "kept" | "dismissed" | null;
+  /** Where the walker routed this Thread (ADR 0017); null = not settled. */
+  route?: ThreadRoute | null;
   captures: Array<{
     id: string;
     text: string;
@@ -206,6 +209,8 @@ export type ThreadRepository = {
       reviewedAt: string | null;
       /** Omitted keeps the current verdict; null clears it. */
       researchVerdict?: "kept" | "dismissed" | null;
+      /** Omitted keeps the current route; null clears it. */
+      route?: ThreadRoute | null;
     },
   ): Promise<ServerThread | null>;
   /**
