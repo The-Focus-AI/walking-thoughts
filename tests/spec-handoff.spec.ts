@@ -9,6 +9,7 @@ import type { SpecReportSource } from "@/lib/spec/handoff";
 import {
   createGitHubIssueDrafter,
   createMemoryIssueDrafter,
+  getIssueDrafter,
   listMemoryDraftedIssues,
   resetMemoryIssueDrafter,
 } from "@/lib/spec/issue-drafter";
@@ -437,17 +438,91 @@ test("hydration adopts the handoff record the way it adopts the Route", () => {
   expect(thread?.specHandoff).toEqual(specHandoff);
 });
 
+test("without a credential the routing skips visibly, then goes live once wired", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const project = await threads.createProject("user_a", "Umwelten", {
+    repository: "the-focus-ai/umwelten",
+  });
+  const id = await seedThread(threads, "t-nocred", "Spec before the token");
+  await threads.fileThread("user_a", id, {
+    projectId: project.id,
+    reviewedAt: "2026-08-08T09:00:00.000Z",
+    route: "spec",
+  });
+
+  // No credential provisioned: never a fabricated draft — the fake
+  // `drafted` would arm the permanent guard and block the real issue.
+  expect(getIssueDrafter({} as NodeJS.ProcessEnv)).toBeNull();
+  const skipped = await settleSpecHandoff({
+    userId: "user_a",
+    thread: await threadById(threads, id),
+    threads,
+    reports: NO_REPORTS,
+    drafter: null,
+  });
+  expect(skipped.status).toBe("skipped");
+  expect(skipped.reason).toBe("no_credential");
+  expect(listMemoryDraftedIssues(NS)).toHaveLength(0);
+
+  // The token arrives; the next routing drafts for real, exactly once.
+  const live = await settleSpecHandoff({
+    userId: "user_a",
+    thread: await threadById(threads, id),
+    threads,
+    reports: NO_REPORTS,
+    drafter: createMemoryIssueDrafter(NS),
+  });
+  expect(live.status).toBe("drafted");
+  expect(listMemoryDraftedIssues(NS)).toHaveLength(1);
+});
+
+test("a draft that lands but fails to record still answers drafted", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const drafter = createMemoryIssueDrafter(NS);
+  const project = await threads.createProject("user_a", "Umwelten", {
+    repository: "the-focus-ai/umwelten",
+  });
+  const id = await seedThread(threads, "t-halfway", "Draft lands, record dies");
+  await threads.fileThread("user_a", id, {
+    projectId: project.id,
+    reviewedAt: "2026-08-08T09:00:00.000Z",
+    route: "spec",
+  });
+
+  const flaky = {
+    listProjects: threads.listProjects.bind(threads),
+    recordSpecHandoff: async () => {
+      throw new Error("record_write_lost");
+    },
+  };
+  const handoff = await settleSpecHandoff({
+    userId: "user_a",
+    thread: await threadById(threads, id),
+    threads: flaky,
+    reports: NO_REPORTS,
+    drafter,
+  });
+  // The response never disowns an issue that exists (ADR 0018).
+  expect(handoff.status).toBe("drafted");
+  expect(listMemoryDraftedIssues(NS)).toHaveLength(1);
+});
+
 test("the GitHub drafter finds a prior issue by its key before ever creating", async () => {
   const calls: Array<{ url: string; method: string }> = [];
   const priorIssue = {
     html_url: "https://github.com/the-focus-ai/umwelten/issues/3",
     number: 3,
+    body: "Report…\n\nHandoff key: spec:t-1",
   };
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push({ url, method: init?.method ?? "GET" });
-    if (url.includes("/search/issues")) {
-      return Response.json({ items: [priorIssue] });
+    if (url.includes("/repos/the-focus-ai/umwelten/issues?state=all")) {
+      return Response.json([
+        // A pull request quoting the key must never be adopted as the draft.
+        { ...priorIssue, number: 99, pull_request: { url: "pr" } },
+        priorIssue,
+      ]);
     }
     throw new Error("unexpected fetch");
   }) as typeof fetch;
@@ -469,8 +544,10 @@ test("the GitHub drafter finds a prior issue by its key before ever creating", a
 test("the GitHub drafter creates when the key is unseen, and surfaces failures", async () => {
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes("/search/issues")) {
-      return Response.json({ items: [] });
+    if (url.includes("issues?state=all")) {
+      return Response.json([
+        { html_url: "u", number: 1, body: "another thread's key" },
+      ]);
     }
     if (url.endsWith("/repos/the-focus-ai/umwelten/issues")) {
       expect(init?.method).toBe("POST");

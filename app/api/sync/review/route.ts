@@ -74,25 +74,42 @@ export async function POST(request: Request) {
     }
 
     // The handoff runs after the filing write, never instead of it: the
-    // Route is already committed, and a draft that cannot land records
-    // itself as failed on the Thread rather than failing the filing
+    // Route is already committed, so nothing the handoff does — not even
+    // an unexpected throw — may turn this response into an error
     // (ADR 0018). Un-routing a drafted spec leaves the issue and notes the
     // orphan; routing back to spec reuses it and never drafts twice.
     let specHandoff = thread.specHandoff ?? null;
-    if (route === "spec") {
-      specHandoff = await settleSpecHandoff({
-        userId: access.userId,
-        thread,
-        threads: repository,
-        reports: getEnrichmentRepository(),
-        drafter: getIssueDrafter(),
-      });
-    } else if (route !== undefined) {
-      specHandoff = await orphanSpecHandoff({
-        userId: access.userId,
-        thread,
-        threads: repository,
-      });
+    try {
+      if (route === "spec") {
+        specHandoff = await settleSpecHandoff({
+          userId: access.userId,
+          thread,
+          threads: repository,
+          reports: getEnrichmentRepository(),
+          drafter: getIssueDrafter(),
+        });
+      } else if (route !== undefined) {
+        specHandoff = await orphanSpecHandoff({
+          userId: access.userId,
+          thread,
+          threads: repository,
+        });
+      }
+    } catch (error) {
+      // A throw that escaped the settle logic (the record write itself,
+      // the project lookup). An orphan that failed leaves the prior
+      // record standing; a settle that failed answers as a failed draft.
+      if (route === "spec") {
+        specHandoff = {
+          status: "failed",
+          repository: null,
+          issueUrl: null,
+          issueNumber: null,
+          reason: error instanceof Error ? error.message : "handoff_failed",
+          at: new Date().toISOString(),
+          orphanedAt: null,
+        };
+      }
     }
 
     return Response.json({

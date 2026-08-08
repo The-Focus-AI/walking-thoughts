@@ -17,10 +17,8 @@ export type SpecReportSource = {
   ): Promise<Array<{ text: string; kind?: string | null; createdAt: string }>>;
 };
 
-export const SPEC_HANDOFF_KEY_PREFIX = "spec:";
-
 export function specHandoffKey(threadId: string): string {
-  return `${SPEC_HANDOFF_KEY_PREFIX}${threadId}`;
+  return `spec:${threadId}`;
 }
 
 /**
@@ -58,8 +56,15 @@ export async function specIssueBody(
  * - already `drafted` → that issue, always; re-routing back clears the
  *   orphan note but never drafts twice.
  * - Project missing or without a repository → `skipped`, recorded, no
- *   external write; a later routing may retry past it.
- * - drafter succeeds → `drafted`, the permanent guard.
+ *   external write; a later routing may retry past it. A *proposed*
+ *   Project skips too — only the Projects the walker confirmed count,
+ *   because a proposal is not a decision.
+ * - no drafter (no credential provisioned) → `skipped` as well, with its
+ *   own reason: recording a fabricated draft would arm the permanent
+ *   guard and silently block the real issue forever.
+ * - drafter succeeds → `drafted`, the permanent guard — recorded, and
+ *   returned even when the record write itself fails, so the response
+ *   never disowns an issue that exists.
  * - drafter throws → `failed` with the reason, visible on the Thread; the
  *   filing itself has already committed and stays committed.
  */
@@ -68,7 +73,7 @@ export async function settleSpecHandoff(input: {
   thread: ServerThread;
   threads: Pick<ThreadRepository, "listProjects" | "recordSpecHandoff">;
   reports: SpecReportSource;
-  drafter: IssueDrafter;
+  drafter: IssueDrafter | null;
   now?: string;
 }): Promise<SpecHandoff> {
   const { userId, thread } = input;
@@ -82,6 +87,23 @@ export async function settleSpecHandoff(input: {
     return restored;
   }
 
+  const skip = async (
+    reason: string,
+    repository: string | null,
+  ): Promise<SpecHandoff> => {
+    const skipped: SpecHandoff = {
+      status: "skipped",
+      repository,
+      issueUrl: null,
+      issueNumber: null,
+      reason,
+      at,
+      orphanedAt: null,
+    };
+    await input.threads.recordSpecHandoff(userId, thread.id, skipped);
+    return skipped;
+  };
+
   const project = thread.projectId
     ? (await input.threads.listProjects(userId)).find(
         (candidate) => candidate.id === thread.projectId,
@@ -89,39 +111,18 @@ export async function settleSpecHandoff(input: {
     : undefined;
   const repository = project?.repository ?? null;
 
-  if (!repository) {
-    const skipped: SpecHandoff = {
-      status: "skipped",
-      repository: null,
-      issueUrl: null,
-      issueNumber: null,
-      reason: "no_repository",
-      at,
-      orphanedAt: null,
-    };
-    await input.threads.recordSpecHandoff(userId, thread.id, skipped);
-    return skipped;
-  }
+  if (!repository) return skip("no_repository", null);
+  if (!input.drafter) return skip("no_credential", repository);
 
-  const body = await specIssueBody(userId, thread, input.reports);
+  let drafted;
   try {
-    const drafted = await input.drafter.draftIssue({
+    const body = await specIssueBody(userId, thread, input.reports);
+    drafted = await input.drafter.draftIssue({
       repository,
       title: thread.title,
       body,
       idempotencyKey: specHandoffKey(thread.id),
     });
-    const record: SpecHandoff = {
-      status: "drafted",
-      repository: drafted.repository,
-      issueUrl: drafted.url,
-      issueNumber: drafted.number,
-      reason: null,
-      at,
-      orphanedAt: null,
-    };
-    await input.threads.recordSpecHandoff(userId, thread.id, record);
-    return record;
   } catch (error) {
     const failed: SpecHandoff = {
       status: "failed",
@@ -135,6 +136,24 @@ export async function settleSpecHandoff(input: {
     await input.threads.recordSpecHandoff(userId, thread.id, failed);
     return failed;
   }
+
+  const record: SpecHandoff = {
+    status: "drafted",
+    repository: drafted.repository,
+    issueUrl: drafted.url,
+    issueNumber: drafted.number,
+    reason: null,
+    at,
+    orphanedAt: null,
+  };
+  try {
+    await input.threads.recordSpecHandoff(userId, thread.id, record);
+  } catch {
+    // The issue exists; the record write missed. Return the draft anyway —
+    // the drafter's own key check repairs the record on the next routing
+    // rather than ever drafting a second issue.
+  }
+  return record;
 }
 
 /**

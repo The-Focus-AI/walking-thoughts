@@ -117,8 +117,11 @@ export function ThreadFiling({
       ) : null}
       {thread.route === "spec" && handoff?.status === "skipped" ? (
         <p className="thread-filing-handoff" data-testid="spec-handoff-note">
-          Spec recorded — this Project has no repository, so the handoff is
-          not live.
+          {handoff.reason === "no_credential"
+            ? "Spec recorded — the repo handoff is not wired up yet, so no issue was drafted."
+            : thread.projectId
+              ? "Spec recorded — this Project has no repository, so the handoff is not live."
+              : "Spec recorded — no Project with a repository is attached, so the handoff is not live."}
         </p>
       ) : null}
       {thread.route === "spec" && handoff?.status === "failed" ? (

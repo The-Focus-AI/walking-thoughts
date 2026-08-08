@@ -84,10 +84,11 @@ export function createMemoryIssueDrafter(namespace = "default"): IssueDrafter {
 }
 
 /**
- * The GitHub drafter, REST only. Before creating it searches the repo for
- * an open or closed issue already carrying the idempotency key in its body
- * — that is what makes a retry after a half-recorded success a no-op
- * instead of a second issue.
+ * The GitHub drafter, REST only. Before creating it lists the repo's
+ * issues and looks for the idempotency key in a body — the issues listing
+ * rather than the Search API, whose asynchronous indexing would miss an
+ * issue drafted seconds ago, which is exactly the half-recorded crash
+ * window this check exists to close.
  */
 export function createGitHubIssueDrafter(options: {
   token: string;
@@ -104,18 +105,24 @@ export function createGitHubIssueDrafter(options: {
 
   return {
     async draftIssue(draft) {
-      const query = encodeURIComponent(
-        `repo:${draft.repository} in:body "${draft.idempotencyKey}"`,
-      );
-      const searchResponse = await doFetch(
-        `${apiBase}/search/issues?q=${query}`,
+      const listResponse = await doFetch(
+        `${apiBase}/repos/${draft.repository}/issues?state=all&sort=created&direction=desc&per_page=100`,
         { headers },
       );
-      if (searchResponse.ok) {
-        const found = (await searchResponse.json()) as {
-          items?: Array<{ html_url: string; number: number }>;
-        };
-        const prior = found.items?.[0];
+      if (listResponse.ok) {
+        const issues = (await listResponse.json()) as Array<{
+          html_url: string;
+          number: number;
+          body?: string | null;
+          pull_request?: unknown;
+        }>;
+        // The listing returns PRs too; only a real issue whose body carries
+        // the exact key counts as the prior draft.
+        const prior = issues.find(
+          (issue) =>
+            !issue.pull_request &&
+            (issue.body ?? "").includes(draft.idempotencyKey),
+        );
         if (prior) {
           return {
             repository: draft.repository,
@@ -125,7 +132,7 @@ export function createGitHubIssueDrafter(options: {
           };
         }
       }
-      // A failed search is not a license to draft blind — the caller's
+      // A failed listing is not a license to draft blind — the caller's
       // record is the primary guard, and this path only runs when that
       // record says nothing was drafted.
 
@@ -155,18 +162,21 @@ export function createGitHubIssueDrafter(options: {
 }
 
 /**
- * The drafter production code asks for. TODO: no server-side GitHub
- * credential is provisioned yet — add SPEC_HANDOFF_GITHUB_TOKEN to fnox and
- * the Vercel environments to make the handoff live; until then the memory
- * drafter records everything faithfully and no real issue appears, which
- * the Thread's handoff record says plainly (ADR 0018).
+ * The drafter production code asks for — or null when the handoff cannot
+ * be live. TODO: no server-side GitHub credential is provisioned yet — add
+ * SPEC_HANDOFF_GITHUB_TOKEN to fnox and the Vercel environments to make
+ * the handoff real. Null must never fall back to the memory drafter: a
+ * fabricated `drafted` record is the permanent idempotency guard, and it
+ * would silently block the real issue forever (ADR 0018) — the settle
+ * logic records `skipped`/`no_credential` instead, which a later routing
+ * retries past once the token exists.
  */
 export function getIssueDrafter(
   environment: NodeJS.ProcessEnv = process.env,
-): IssueDrafter {
+): IssueDrafter | null {
   const token = environment.SPEC_HANDOFF_GITHUB_TOKEN;
   if (token) {
     return createGitHubIssueDrafter({ token });
   }
-  return createMemoryIssueDrafter("default");
+  return null;
 }

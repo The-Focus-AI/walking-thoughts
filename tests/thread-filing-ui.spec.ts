@@ -215,7 +215,7 @@ test("routing to Spec shows the drafted issue, or that the handoff is not live",
   await page.getByTestId("file-route-spec").click();
   await page.locator(".thread-file-open").first().click();
   await expect(page.getByTestId("spec-handoff-note")).toContainText(
-    "no repository, so the handoff is not live",
+    "the handoff is not live",
   );
 });
 

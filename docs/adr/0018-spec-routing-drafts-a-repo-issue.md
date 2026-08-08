@@ -37,10 +37,20 @@ handoff record notes it was orphaned (`orphanedAt`), keeping the link so
 the receipt can still name what exists. Routing back to Spec clears the
 orphan note and reuses the same issue; it never drafts a second one.
 
+**Batching.** There is none: each settle gesture drafts its own issue
+right then, matching the desk's no-commit-gate posture (ADR 0017) — the
+receipts screen is a reading of what already happened, never a queue
+waiting to flush. The rejected alternative, collecting a Day's spec
+routings into one batched write, would reintroduce exactly the gate the
+prototype cut.
+
 Accepted costs, recorded so nobody rediscovers them: an orphaned issue in
 a repo is the walker's to close by hand; a Thread whose title or report
 improves after drafting does not update the issue (the draft is a
 handoff, not a mirror); and until a server-side GitHub credential is
-provisioned, the drafter behind the seam is the in-memory one — routing
-records everything faithfully but no real issue appears, which the
-`skipped`/`failed` visibility above makes plain rather than silent.
+provisioned, spec routing settles as `skipped` with its own reason
+(`no_credential`) — recorded, said plainly on the Thread, and retried by
+a later routing once the token exists. A fabricated success was rejected
+outright: `drafted` is the permanent guard, so pretending would silently
+block the real issue forever. The in-memory drafter exists for tests
+only, never as a production fallback.

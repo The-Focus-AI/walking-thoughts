@@ -188,13 +188,19 @@ export function asSpecHandoff(value: unknown): SpecHandoff | null {
 
 /**
  * A Project's repository is a plain `owner/repo` — enough to address the
- * issue drafter without carrying a whole URL through the seams.
+ * issue drafter without carrying a whole URL through the seams. Dot-only
+ * segments are refused: `owner/..` splices into an API path as traversal.
  */
 export function asProjectRepository(value: unknown): string | null {
-  return typeof value === "string" &&
-    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value.trim())
-    ? value.trim()
-    : null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const segments = trimmed.split("/");
+  const wellFormed =
+    segments.length === 2 &&
+    segments.every(
+      (segment) => /^[A-Za-z0-9_.-]+$/.test(segment) && !/^\.+$/.test(segment),
+    );
+  return wellFormed ? trimmed : null;
 }
 
 export type LocalThread = {
