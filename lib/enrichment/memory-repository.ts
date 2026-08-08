@@ -1,3 +1,4 @@
+import { captureWords } from "@/lib/local-capture/types";
 import { createMemoryThreadRepository } from "@/lib/sync/memory-repository";
 import type { ThreadRepository } from "@/lib/sync/types";
 import { cosineSimilarity } from "@/lib/desk/similarity";
@@ -65,7 +66,7 @@ function buildSnapshot(
     entry: {
       id: capture.id,
       kind: "capture" as const,
-      text: capture.text,
+      text: captureWords(capture),
       sequence: capture.sequence,
       includedBy: db.includedBy.get(`${userId}:${capture.id}`) ?? null,
       createdAt: capture.createdAt,
