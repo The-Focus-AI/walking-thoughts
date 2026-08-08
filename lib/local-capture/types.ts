@@ -169,6 +169,12 @@ export type LocalThread = {
   researchVerdict?: ResearchVerdict | null;
   /** Where the walker routed this Thread; absent/null = not yet settled. */
   route?: ThreadRoute | null;
+  /**
+   * When the walker checked this off on the To-do list. An action on the
+   * destination surface, not a filing — it never reopens or re-files the
+   * Thread. Absent/null = still open.
+   */
+  todoDoneAt?: string | null;
 };
 
 export type CaptureSyncStatus =
@@ -314,6 +320,11 @@ export type CaptureStore = {
     threadId: string,
     reviewedAt: string | null,
   ): Promise<void>;
+  /** Record the To-do check-off on the local Thread row (null unchecks). */
+  setThreadTodoDone(
+    threadId: string,
+    todoDoneAt: string | null,
+  ): Promise<void>;
   /** Record what the walker settled while filing a Thread at the desk. */
   applyThreadFiling(filing: {
     threadId: string;
@@ -372,6 +383,7 @@ export type CaptureStore = {
       projectName?: string | null;
       researchVerdict?: ResearchVerdict | null;
       route?: ThreadRoute | null;
+      todoDoneAt?: string | null;
       captures: Array<{
         id: string;
         text: string;

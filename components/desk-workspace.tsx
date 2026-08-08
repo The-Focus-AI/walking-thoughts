@@ -1568,6 +1568,13 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
           </div>
           <div className="desk-header-side">
             <SyncStatusPill />
+            <Link
+              className="interview-entry"
+              href="/todo"
+              data-testid="todo-entry"
+            >
+              To-do
+            </Link>
             <Link className="interview-entry" href="/interview">
               Interview
             </Link>

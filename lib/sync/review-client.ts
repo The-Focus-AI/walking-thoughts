@@ -31,6 +31,14 @@ export type ReviewTransport = {
     threadId: string,
     filing: ThreadFiling,
   ): Promise<FiledThread | null>;
+  /**
+   * Check a routed to-do off (or back on) on the To-do destination surface.
+   * Not a filing: the server write never touches reviewedAt or route.
+   */
+  setTodoDone?(
+    threadId: string,
+    done: boolean,
+  ): Promise<{ threadId: string; todoDoneAt: string | null } | null>;
   listProjects?(): Promise<Project[] | null>;
   createProject?(name: string): Promise<Project | null>;
 };
@@ -78,6 +86,23 @@ function defaultTransport(): ReviewTransport {
         });
         if (!response.ok) return null;
         return (await response.json()) as FiledThread;
+      } catch {
+        return null;
+      }
+    },
+
+    async setTodoDone(threadId, done) {
+      try {
+        const response = await trackedFetch("/api/sync/todo", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ threadId, done }),
+        });
+        if (!response.ok) return null;
+        return (await response.json()) as {
+          threadId: string;
+          todoDoneAt: string | null;
+        };
       } catch {
         return null;
       }

@@ -1,5 +1,9 @@
 import { runDayDigest } from "@/lib/digest/run";
-import type { DayChatTurn, DayCorpusEntry } from "@/lib/digest/types";
+import type {
+  DayChatTurn,
+  DayCorpusEntry,
+  DayRoutedTodo,
+} from "@/lib/digest/types";
 import { requireSyncAccess } from "@/lib/sync/access";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +15,31 @@ type DigestBody = {
   corpus?: DayCorpusEntry[];
   walkerProfile?: string | null;
   history?: DayChatTurn[];
+  routedTodos?: DayRoutedTodo[];
 };
+
+/**
+ * Keep only well-formed routed to-dos, and keep the field's absence
+ * distinct from an empty list: absent = the client predates the To-do
+ * destination (derive as before); [] = the walker routed none that day.
+ */
+function sanitizeRoutedTodos(routedTodos: unknown): DayRoutedTodo[] | undefined {
+  if (!Array.isArray(routedTodos)) return undefined;
+  return routedTodos
+    .filter(
+      (todo): todo is DayRoutedTodo =>
+        typeof todo === "object" &&
+        todo !== null &&
+        typeof (todo as DayRoutedTodo).threadId === "string" &&
+        typeof (todo as DayRoutedTodo).text === "string" &&
+        (todo as DayRoutedTodo).text.trim().length > 0,
+    )
+    .map((todo) => ({
+      threadId: todo.threadId,
+      text: todo.text,
+      done: todo.done === true,
+    }));
+}
 
 /** Most recent turns of the ongoing chat sent back for context. */
 const HISTORY_TURN_LIMIT = 24;
@@ -75,6 +103,7 @@ export async function POST(request: Request) {
         walkerProfile:
           typeof body.walkerProfile === "string" ? body.walkerProfile : null,
         history: sanitizeHistory(body.history),
+        routedTodos: sanitizeRoutedTodos(body.routedTodos),
       },
       { userId: access.userId },
     );

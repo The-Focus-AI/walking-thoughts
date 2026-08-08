@@ -268,6 +268,16 @@ export function fileThreadTransition(
   );
 }
 
+export function setThreadTodoDoneTransition(
+  threads: LocalThread[],
+  threadId: string,
+  todoDoneAt: string | null,
+): LocalThread[] {
+  return threads.map((thread) =>
+    thread.id === threadId ? { ...thread, todoDoneAt } : thread,
+  );
+}
+
 export function setThreadReviewedTransition(
   threads: LocalThread[],
   threadId: string,

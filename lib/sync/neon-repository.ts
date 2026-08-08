@@ -79,6 +79,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ADD COLUMN IF NOT EXISTS route TEXT
       `;
       await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS todo_done_at TIMESTAMPTZ
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS sync_projects (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
@@ -391,7 +395,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       const threads = (await sql`
         SELECT t.id, t.title, t.revision, t.updated_at, t.reviewed_at, t.kind,
                t.topics, t.ask, t.project_id, t.research_verdict, t.route,
-               p.name AS project_name
+               t.todo_done_at, p.name AS project_name
         FROM sync_threads t
         LEFT JOIN sync_projects p ON p.id = t.project_id AND p.user_id = t.user_id
         WHERE t.user_id = ${userId}
@@ -414,6 +418,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         project_id: string | null;
         research_verdict: string | null;
         route: string | null;
+        todo_done_at: string | null;
         project_name: string | null;
       }>;
 
@@ -452,6 +457,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           projectName: thread.project_name ?? null,
           researchVerdict: asResearchVerdict(thread.research_verdict),
           route: asThreadRoute(thread.route),
+          todoDoneAt: thread.todo_done_at ?? null,
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -635,6 +641,18 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       `) as Array<{ id: string }>;
       if (!updated[0]) throw new Error("thread_not_found");
       return { threadId, reviewedAt };
+    },
+
+    async setThreadTodoDone(userId, threadId, todoDoneAt) {
+      await ensure();
+      const updated = (await sql`
+        UPDATE sync_threads
+        SET todo_done_at = ${todoDoneAt}
+        WHERE user_id = ${userId} AND id = ${threadId}
+        RETURNING id, todo_done_at
+      `) as Array<{ id: string; todo_done_at: string | null }>;
+      if (!updated[0]) return null;
+      return { threadId, todoDoneAt: updated[0].todo_done_at ?? null };
     },
 
     async splitThread(userId, threadId, now = new Date().toISOString()) {

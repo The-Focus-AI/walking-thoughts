@@ -33,6 +33,7 @@ type StoredThread = {
   projectId?: string | null;
   researchVerdict?: "kept" | "dismissed" | null;
   route?: ThreadRoute | null;
+  todoDoneAt?: string | null;
 };
 
 type StoredProject = {
@@ -399,6 +400,7 @@ export function createMemoryThreadRepository(
               : null,
             researchVerdict: thread.researchVerdict ?? null,
             route: thread.route ?? null,
+            todoDoneAt: thread.todoDoneAt ?? null,
             captures,
           } satisfies ServerThread;
         })
@@ -669,6 +671,15 @@ export function createMemoryThreadRepository(
       if (!existing) throw new Error("thread_not_found");
       db.threads.set(key, { ...existing, reviewedAt });
       return { threadId, reviewedAt };
+    },
+
+    async setThreadTodoDone(userId, threadId, todoDoneAt) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) return null;
+      db.threads.set(key, { ...existing, todoDoneAt });
+      return { threadId, todoDoneAt };
     },
   };
 }

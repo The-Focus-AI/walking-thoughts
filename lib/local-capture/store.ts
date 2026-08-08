@@ -19,6 +19,7 @@ import {
   restoreFromTrashTransition,
   setCaptureSyncState,
   setThreadReviewedTransition,
+  setThreadTodoDoneTransition,
   setTrashSyncStatus,
   threadCaptures,
   trashCaptureTransition,
@@ -227,6 +228,9 @@ export function createMemoryCaptureStore(
 
     async setThreadReviewed(threadId, reviewedAt) {
       threads = setThreadReviewedTransition(threads, threadId, reviewedAt);
+    },
+    async setThreadTodoDone(threadId, todoDoneAt) {
+      threads = setThreadTodoDoneTransition(threads, threadId, todoDoneAt);
     },
     async markSyncing(ids) {
       captures = setCaptureSyncState(captures, ids, {
@@ -616,6 +620,16 @@ export function createIdbCaptureStore(): CaptureStore {
         await writeAllThreads(
           db,
           setThreadReviewedTransition(threads, threadId, reviewedAt),
+        );
+      });
+    },
+
+    async setThreadTodoDone(threadId, todoDoneAt) {
+      await withDb(async (db) => {
+        const threads = await readAllThreads(db);
+        await writeAllThreads(
+          db,
+          setThreadTodoDoneTransition(threads, threadId, todoDoneAt),
         );
       });
     },

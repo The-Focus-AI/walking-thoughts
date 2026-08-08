@@ -20,6 +20,17 @@ export type DayChatTurn = {
   text: string;
 };
 
+/**
+ * One Thread the walker routed to To-do that day, in their own words. The
+ * digest's checklist lists these instead of re-deriving tasks from the
+ * corpus — the walker already said what goes on the list (docs/desk.md, D2).
+ */
+export type DayRoutedTodo = {
+  threadId: string;
+  text: string;
+  done: boolean;
+};
+
 export type DayDigestRequest = {
   dayKey: string;
   dayHeading: string;
@@ -28,6 +39,8 @@ export type DayDigestRequest = {
   walkerProfile?: string | null;
   /** Conversation so far, oldest first — the digest continues it. */
   history?: DayChatTurn[];
+  /** The day's routed to-dos; when present they are the checklist. */
+  routedTodos?: DayRoutedTodo[];
 };
 
 export type DayDigestResult = {

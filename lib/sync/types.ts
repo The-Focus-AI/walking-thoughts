@@ -98,6 +98,11 @@ export type ServerThread = {
   researchVerdict?: "kept" | "dismissed" | null;
   /** Where the walker routed this Thread (ADR 0017); null = not settled. */
   route?: ThreadRoute | null;
+  /**
+   * When the walker checked this off on the To-do list. Destination-surface
+   * state, not Filing — it rides beside the route without touching it.
+   */
+  todoDoneAt?: string | null;
   captures: Array<{
     id: string;
     text: string;
@@ -189,6 +194,16 @@ export type ThreadRepository = {
     threadId: string,
     now?: string,
   ): Promise<ThreadSplitResult>;
+  /**
+   * Check a routed to-do off (or back on, with null) from the To-do list.
+   * The walker's action on the destination surface: it never touches
+   * reviewedAt or route, so the Thread stays settled exactly as filed.
+   */
+  setThreadTodoDone(
+    userId: string,
+    threadId: string,
+    todoDoneAt: string | null,
+  ): Promise<{ threadId: string; todoDoneAt: string | null } | null>;
   /** Mark a Thread processed at the desk (null clears back to new). */
   setThreadReviewed(
     userId: string,
