@@ -14,6 +14,7 @@ import {
   type LocalCapture,
   type LocalThread,
   type ThreadRoute,
+  captureWords,
 } from "@/lib/local-capture/types";
 import type { Project } from "@/lib/sync/types";
 
@@ -383,7 +384,7 @@ function Deck({
   const proposal = proposalFor(thread);
   const report = view.enrichments[view.enrichments.length - 1] ?? null;
   const words = view.captures
-    .map((capture) => capture.text)
+    .map((capture) => captureWords(capture))
     .filter(Boolean);
   const media = view.captures.flatMap((capture) =>
     capture.attachments.filter(

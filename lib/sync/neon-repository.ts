@@ -131,6 +131,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
+        ALTER TABLE sync_captures
+        ADD COLUMN IF NOT EXISTS transcript TEXT
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS sync_trash (
           user_id TEXT NOT NULL,
           kind TEXT NOT NULL,
@@ -445,7 +449,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       const result = [];
       for (const thread of threads) {
         const captures = (await sql`
-          SELECT id, text, created_at, location, sequence, attachments
+          SELECT id, text, created_at, location, sequence, attachments,
+                 transcript
           FROM sync_captures
           WHERE user_id = ${userId} AND thread_id = ${thread.id}
             AND NOT EXISTS (
@@ -462,6 +467,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           location: SyncCapturePayload["location"];
           sequence: number;
           attachments: SyncCapturePayload["attachments"];
+          transcript: string | null;
         }>;
         if (captures.length === 0) continue;
         result.push({
@@ -486,6 +492,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
             location: capture.location,
             sequence: capture.sequence,
             attachments: capture.attachments ?? [],
+            transcript: capture.transcript ?? null,
           })),
         });
       }
@@ -661,6 +668,19 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         RETURNING id
       `) as Array<{ id: string }>;
       if (!updated[0]) throw new Error("thread_not_found");
+    },
+
+    async recordCaptureTranscripts(userId, transcripts) {
+      await ensure();
+      for (const transcript of transcripts) {
+        const text = transcript.text.trim();
+        if (!text) continue;
+        await sql`
+          UPDATE sync_captures
+          SET transcript = ${text}
+          WHERE user_id = ${userId} AND id = ${transcript.captureId}
+        `;
+      }
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

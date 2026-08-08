@@ -64,6 +64,7 @@ import {
   type LocalCapture,
   type LocalThread,
   type ResearchVerdict,
+  captureWords,
 } from "@/lib/local-capture/types";
 import { readAvailableLocation } from "@/lib/local-capture/location";
 import { getReviewTransport } from "@/lib/sync/review-client";
@@ -654,7 +655,7 @@ function ThreadRow({
         >
           <div className="thread-row-detail-words">
             {view.captures.map((capture) => (
-              <p key={capture.id}>{capture.text}</p>
+              <p key={capture.id}>{captureWords(capture)}</p>
             ))}
           </div>
           {view.enrichments.length > 0 ? (
@@ -951,7 +952,7 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         view,
         texts: [
           view.thread.title,
-          ...view.captures.map((capture) => capture.text),
+          ...view.captures.map((capture) => captureWords(capture)),
           ...(view.thread.topics ?? []),
           ...view.enrichments.map((enrichment) => enrichment.text),
         ].filter(Boolean),

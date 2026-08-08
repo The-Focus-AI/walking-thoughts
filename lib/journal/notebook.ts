@@ -1,4 +1,5 @@
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
+import { captureWords } from "@/lib/local-capture/types";
 
 /**
  * The notebook (docs/desk.md, D2): `route = journal` Threads read back as
@@ -59,7 +60,7 @@ export function notebookEntry(
     title: thread.title,
     routedAt: thread.reviewedAt ?? null,
     words: (context.captures ?? [])
-      .map((capture) => capture.text.trim())
+      .map((capture) => captureWords(capture))
       .filter((text) => text.length > 0),
     report,
     // Once any Enrichment reads the words as the seed of a post, a later

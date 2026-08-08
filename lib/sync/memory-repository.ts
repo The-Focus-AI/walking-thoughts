@@ -394,6 +394,7 @@ export function createMemoryThreadRepository(
               location: capture.location,
               sequence: capture.sequence,
               attachments: capture.attachments ?? [],
+              transcript: capture.transcript ?? null,
             }));
           return {
             id: thread.id,
@@ -682,6 +683,18 @@ export function createMemoryThreadRepository(
       const existing = db.threads.get(key);
       if (!existing) throw new Error("thread_not_found");
       db.threads.set(key, { ...existing, specHandoff: handoff });
+    },
+
+    async recordCaptureTranscripts(userId, transcripts) {
+      const db = state();
+      for (const transcript of transcripts) {
+        const text = transcript.text.trim();
+        if (!text) continue;
+        const key = `${userId}:${transcript.captureId}`;
+        const existing = db.captures.get(key);
+        if (!existing) continue;
+        db.captures.set(key, { ...existing, transcript: text });
+      }
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

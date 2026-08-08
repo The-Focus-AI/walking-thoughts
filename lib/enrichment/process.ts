@@ -492,6 +492,27 @@ async function runJob(
     );
 
     const transcripts = await transcribeAudioParts(media, transcriber);
+    // The transcript is what the walker actually said, so it belongs on the
+    // Capture, not only inside this report: the digest, search, the To-do
+    // list and the Day flow card all read the Capture's words, and a spoken
+    // walk was blank to every one of them before this write existed.
+    if (threadRepository && transcripts.length > 0) {
+      try {
+        await threadRepository.recordCaptureTranscripts(
+          userId,
+          transcripts
+            .filter((transcript) => transcript.captureId)
+            .map((transcript) => ({
+              captureId: transcript.captureId,
+              text: transcript.text,
+            })),
+        );
+      } catch (cause) {
+        // Best-effort: the report still carries the transcript, so a failure
+        // here costs the other surfaces their words, not the walker's work.
+        console.error("recording capture transcripts failed:", cause);
+      }
+    }
     // A transcribed recording travels as words, not bytes: no gateway model
     // reads audio (capabilities.ts), so sending the file too would only fail
     // the job. Everything else — the photograph, the video — still has to be

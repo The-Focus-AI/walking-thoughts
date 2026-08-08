@@ -29,7 +29,10 @@ import {
   formatDayHeading,
 } from "@/lib/local-capture/calendar-day";
 import { getCaptureStore } from "@/lib/local-capture/store";
-import { KIND_LABELS } from "@/lib/local-capture/types";
+import {
+  KIND_LABELS,
+  captureWords,
+} from "@/lib/local-capture/types";
 
 const SUGGESTIONS = [
   "Create a task checklist of the day",
@@ -83,7 +86,7 @@ export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
       threadTitle: capture.threadId
         ? (titleById.get(capture.threadId) ?? "Untitled Thread")
         : "Untitled Thread",
-      text: capture.text,
+      text: captureWords(capture),
       createdAt: capture.createdAt,
     });
   }

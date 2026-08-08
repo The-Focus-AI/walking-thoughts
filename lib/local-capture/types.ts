@@ -278,7 +278,29 @@ export type LocalCapture = {
   attachments: LocalAttachment[];
   syncReason?: string | null;
   syncRetryable?: boolean;
+  /**
+   * What a spoken Capture actually said (ADR 0015). Written by the
+   * Enrichment that transcribed it, never by the walker — their own typed
+   * words stay in `text`, so the two are never confused. Absent/null until
+   * a recording has been transcribed.
+   */
+  transcript?: string | null;
 };
+
+/**
+ * What a Capture says, spoken or typed. Every surface that shows "the
+ * walker's own words" reads this rather than `text`, so a recording is not
+ * silently blank (the digest, search, the to-do list, and the Day flow card
+ * all did exactly that before this existed).
+ */
+export function captureWords(capture: {
+  text: string;
+  transcript?: string | null;
+}): string {
+  const typed = capture.text.trim();
+  if (typed.length > 0) return typed;
+  return capture.transcript?.trim() ?? "";
+}
 
 export type PersistenceResult = "persisted" | "not_persisted" | "unsupported";
 
