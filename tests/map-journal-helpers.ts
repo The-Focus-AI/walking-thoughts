@@ -36,8 +36,10 @@ export function journal(page: Page) {
           state: hook.state,
           source: hook.source,
           markerCount: hook.markerCount,
+          timelineSpotCount: hook.timelineSpotCount,
           gps: hook.gps,
           selectedCaptureId: hook.selectedCaptureId,
+          openTimelineSpotId: hook.openTimelineSpotId,
         }
       : null;
   });
