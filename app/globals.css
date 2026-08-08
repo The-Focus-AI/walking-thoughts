@@ -5190,3 +5190,285 @@ img.media-lightbox-media {
   color: var(--muted);
   font-style: italic;
 }
+
+/* --- Field Manual ---------------------------------------------------------
+   A document, not an instrument: one column at reading measure, the four
+   voices doing their usual jobs, and the Route legend coloured by the same
+   roles the desk uses. */
+
+.manual-sheet {
+  display: grid;
+  gap: 2rem;
+  width: min(100%, 48rem);
+  margin: 0 auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1.25rem
+    calc(var(--tabbar-h) + 2rem);
+}
+
+.manual-section {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+  border-top: 2px solid var(--line-strong);
+  padding-top: 1.25rem;
+}
+
+.manual-stage {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--action);
+}
+
+.manual-section h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.manual-section p {
+  margin: 0;
+  max-width: 40rem;
+  line-height: 1.55;
+}
+
+.manual-aside {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+/* The walker's words, wherever they are quoted. */
+.manual-words {
+  margin: 0.25rem 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--identity);
+  font-family: var(--font-capture);
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.45;
+  max-width: 38rem;
+}
+
+.manual-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 42rem;
+}
+
+.manual-list li {
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.manual-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* The three steps read as a sequence, because they are one. */
+.manual-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manual-step {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--action);
+  padding: 0.85rem 0.9rem 1rem;
+}
+
+.manual-step-n {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--action);
+}
+
+.manual-step h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.manual-step p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.manual-rule {
+  background: var(--surface-raised);
+  border-left: 3px solid var(--identity);
+  padding: 0.9rem 1.05rem;
+}
+
+.manual-rule-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--identity);
+}
+
+.manual-scroller {
+  overflow-x: auto;
+}
+
+.manual-table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  text-align: left;
+}
+
+.manual-table thead th {
+  padding: 0 0.65rem 0.45rem;
+  border-bottom: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.manual-table td,
+.manual-table tbody th {
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.manual-table tbody tr:last-child td,
+.manual-table tbody tr:last-child th {
+  border-bottom: 0;
+}
+
+/* Each Route wears its own role colour, matching the desk. */
+.manual-route {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.manual-route.dr-spec { color: var(--action); }
+.manual-route.dr-todo { color: var(--attention); }
+.manual-route.dr-journal { color: var(--machine); }
+.manual-route.dr-timeline { color: var(--identity); }
+.manual-route.dr-drop { color: var(--muted); }
+
+.manual-status {
+  display: inline-block;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.manual-status.live {
+  color: var(--identity);
+  border: 1px solid var(--identity);
+}
+
+.manual-status.pending {
+  color: var(--attention);
+  border: 1px solid var(--attention);
+}
+
+.manual-key {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.manual-keys {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.45rem 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--background-deep);
+  border: 1px solid var(--line);
+}
+
+.manual-keys div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.manual-colophon {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Links inside the manual take the machine's blue — the app's own voice for
+   "this is the system talking" — not the browser default. */
+.manual-sheet a {
+  color: var(--machine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.manual-sheet a:hover {
+  color: var(--ink);
+}

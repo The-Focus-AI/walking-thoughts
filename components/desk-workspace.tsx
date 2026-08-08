@@ -1576,6 +1576,9 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
             >
               To-do
             </Link>
+            <Link className="interview-entry" href="/manual">
+              Manual
+            </Link>
             <Link className="interview-entry" href="/interview">
               Interview
             </Link>
