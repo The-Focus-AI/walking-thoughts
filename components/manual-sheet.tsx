@@ -48,8 +48,8 @@ const ROUTE_NOTES: Record<ThreadRoute, RouteNote> = {
     status: "Needs a token",
   },
   todo: {
-    does: "Puts it on the task list in your own words, and into the day's checklist. No elaboration, no ceremony.",
-    status: "Landing next",
+    does: "Puts it on the task list in your own words, and into the day's checklist. Ticking one off is the list's own business — it never re-files the Thread.",
+    status: "live",
   },
   journal: {
     does: "Files it into the notebook with the full report readable in place, and keeps the research reachable. Anything draft-worthy is flagged as a post candidate.",
@@ -305,7 +305,11 @@ export function ManualSheet() {
             thought, bodied from the report, ready for an agent.
           </li>
           <li>
-            <strong>The task list</strong> — arriving with the next change.
+            <strong>
+              <Link href="/todo">The task list</Link>
+            </strong>{" "}
+            — every routed to-do in your own words, checkable. Ticking one off
+            never re-opens or re-files the Thread it came from.
           </li>
         </ul>
       </section>
@@ -343,11 +347,6 @@ export function ManualSheet() {
             <strong>A Project needs a repository</strong> before its ideas can
             become issues. A Project without one records the spec and tells you
             the handoff is not live.
-          </li>
-          <li>
-            <strong>The task list arrives with the next change</strong> — until
-            then <kbd className="manual-key">t</kbd> records the route but has
-            nowhere yet to show it.
           </li>
         </ul>
       </section>
