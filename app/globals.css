@@ -4792,3 +4792,324 @@ img.media-lightbox-media {
   color: var(--muted);
   padding: 0.4rem 0;
 }
+
+/* --- The default door: the Day flow (docs/desk.md, D1) ------------------ */
+
+.day-flow {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  padding: 0.9rem 1rem 1rem;
+}
+
+.day-flow-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.day-flow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.day-flow-step b {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.3rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-weight: 600;
+}
+
+.day-flow-step.active {
+  color: var(--ink);
+}
+
+.day-flow-step.active b {
+  background: var(--action);
+  color: var(--action-text);
+  border-color: var(--action);
+}
+
+.day-flow-step.done b {
+  background: var(--identity);
+  color: var(--background);
+  border-color: var(--identity);
+}
+
+.day-flow-count {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.day-flow-count strong {
+  color: var(--ink);
+}
+
+.day-flow-sub {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.day-flow-lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.6rem;
+}
+
+.day-flow-lane {
+  border: 1px solid var(--line);
+  padding: 0.6rem 0.7rem;
+  background: var(--background);
+}
+
+.day-flow-lane h3,
+.day-flow-receipt h3 {
+  margin: 0 0 0.35rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.day-flow-lane-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.day-flow-lane ul,
+.day-flow-receipt ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.day-flow-lane li {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.day-flow-lane-word {
+  color: var(--attention);
+  font-style: italic;
+}
+
+.day-flow-start,
+.day-flow-accept {
+  justify-self: start;
+  appearance: none;
+  border: 1px solid var(--action);
+  background: var(--action);
+  color: var(--action-text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+
+.day-flow-position {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.day-flow-keys kbd,
+.day-flow-actions kbd,
+.day-flow-start kbd,
+.day-flow-report-toggle kbd {
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  padding: 0 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.day-flow-card {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--line);
+  background: var(--background);
+  padding: 0.85rem 0.95rem;
+}
+
+.day-flow-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.day-flow-card-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+
+.day-flow-words {
+  margin: 0;
+  padding: 0.1rem 0 0.1rem 0.75rem;
+  border-left: 2px solid var(--identity);
+  font-family: var(--font-capture);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.day-flow-words p {
+  margin: 0 0 0.35rem;
+}
+
+.day-flow-words p:last-child {
+  margin-bottom: 0;
+}
+
+.day-flow-words-empty {
+  color: var(--muted);
+  border-left-color: var(--line);
+}
+
+.day-flow-needs-word {
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(240, 180, 160, 0.4);
+  background: rgba(240, 180, 160, 0.08);
+  font-size: 0.9rem;
+}
+
+.day-flow-report-toggle {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--machine);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.day-flow-report-body {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-left: 2px solid var(--machine);
+  background: rgba(143, 184, 216, 0.06);
+}
+
+.day-flow-no-report {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.day-flow-proposal {
+  display: grid;
+  gap: 0.55rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
+}
+
+.day-flow-proposal p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.day-flow-proposal select {
+  font: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  padding: 0.15rem 0.3rem;
+}
+
+.day-flow-handoff {
+  color: var(--muted);
+}
+
+.day-flow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.day-flow-actions button {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+
+.day-flow-actions .day-flow-accept {
+  border-color: var(--action);
+  background: var(--action);
+  color: var(--action-text);
+}
+
+.day-flow-actions .day-flow-skip {
+  color: var(--muted);
+}
+
+.day-flow-receipts {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.day-flow-receipt {
+  border: 1px solid var(--line);
+  background: var(--background);
+  padding: 0.6rem 0.75rem;
+}
+
+.day-flow-receipt-note {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.day-flow-receipt li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+}
+
+.day-flow-undo {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--machine);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.day-flow-done {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+}
