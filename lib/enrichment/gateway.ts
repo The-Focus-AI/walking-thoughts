@@ -61,6 +61,7 @@ export function createFakeGatewayClient(
     ask?: string | null;
     project?: string | null;
     propose?: string | null;
+    draftWorthy?: boolean;
     mentions?: EnrichmentMention[];
     suggestedQuestions?: string[];
     sources?: EnrichmentSource[];
@@ -80,6 +81,7 @@ export function createFakeGatewayClient(
           ask: result.ask ?? null,
           project: result.project ?? null,
           propose: result.propose ?? null,
+          draftWorthy: result.draftWorthy ?? false,
           mentions: result.mentions ?? [],
           suggestedQuestions: result.suggestedQuestions ?? [],
           sources: result.sources ?? [],
@@ -123,6 +125,7 @@ export function createFakeGatewayClient(
         ask: null,
         project: null,
         propose: null,
+        draftWorthy: false,
         mentions: [],
         suggestedQuestions: [],
         sources,
@@ -302,6 +305,7 @@ function createAiSdkGatewayClient(): GatewayClient {
         ask: parsed.ask,
         project: parsed.project,
         propose: parsed.propose,
+        draftWorthy: parsed.draftWorthy,
         mentions: parsed.mentions,
         suggestedQuestions: parsed.suggestedQuestions,
         sources,

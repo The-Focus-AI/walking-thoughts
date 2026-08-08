@@ -143,6 +143,7 @@ export function buildEnrichmentPrompt(input: {
     `\`MENTIONS: \` up to six recurring nouns this Thread is actually about, comma separated, each written \`kind:Name\` where kind is one of ${MENTION_KINDS.join(", ")} — for example \`species:Barred owl, place:Cornwall Market\`. Name them as the walker would say them. Leave the header out when the Thread turns on nothing nameable`,
     "`QUESTIONS: ` up to three follow-up questions the walker might want to ask next about this Thread, separated by ` | `. Offer them; do not answer them. Leave the header out when nothing obvious follows",
     "`ASK: ` one specific question when a name, reference, or intent in the Capture is genuinely unknown to you — otherwise leave this header out entirely",
+    "`DRAFT: yes` only when the walker's own words already read like the seed of a post — an aphorism or observation worth publishing nearly as said. Leave the header out otherwise; a question researched or a task noted is not a draft",
     knownProjects.length > 0
       ? `\`PROJECT: \` the Project this Thread belongs to, copied exactly from this list — ${knownProjects.join(", ")} — or left out when none of them fits. Never invent a name here; prefer joining one of these over proposing a new one`
       : null,
@@ -180,7 +181,7 @@ export function buildEnrichmentPrompt(input: {
 }
 
 const HEADER_LINE =
-  /^\s*(TITLE|KIND|TOPICS|MENTIONS|QUESTIONS|ASK|PROJECT|PROPOSE)\s*:\s*(.*)$/i;
+  /^\s*(TITLE|KIND|TOPICS|MENTIONS|QUESTIONS|ASK|DRAFT|PROJECT|PROPOSE)\s*:\s*(.*)$/i;
 
 /** A Project name is one line of prose at most; keep the store tidy. */
 export const MAX_PROJECT_NAME_LENGTH = 60;
@@ -266,6 +267,8 @@ export function parseGatewayText(
   topics: string[];
   /** One question the walker must answer before this Thread can go further. */
   ask: string | null;
+  /** The DRAFT header: the walker's words already read like a post. */
+  draftWorthy: boolean;
   /** A Project name the model recognized; matched to the walker's list later. */
   project: string | null;
   /** A name for an effort absent from that list; becomes a Proposed Project. */
@@ -306,6 +309,9 @@ export function parseGatewayText(
     mentions: readMentions(headers.get("MENTIONS") ?? ""),
     suggestedQuestions: readSuggestedQuestions(headers.get("QUESTIONS") ?? ""),
     ask: headers.get("ASK")?.trim().slice(0, 240) || null,
+    // Anything other than an affirmative reads as not-a-draft: the flag only
+    // ever adds an entry to the post queue, never gates the report.
+    draftWorthy: /^(yes|true)$/i.test(headers.get("DRAFT")?.trim() ?? ""),
     project:
       headers.get("PROJECT")?.trim().slice(0, MAX_PROJECT_NAME_LENGTH) || null,
     propose:

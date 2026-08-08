@@ -651,6 +651,7 @@ async function runJob(
       kind: generation.kind,
       topics: generation.topics,
       ask: generation.ask,
+      draftWorthy: generation.draftWorthy,
       mentions: generation.mentions,
       suggestedQuestions: generation.suggestedQuestions,
       sources: generation.sources,

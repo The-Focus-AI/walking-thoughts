@@ -120,6 +120,11 @@ export type ThreadEnrichment = {
   topics?: string[];
   /** One question the walker must answer before this Thread can go further. */
   ask?: string | null;
+  /**
+   * The model judged the walker's words the seed of a post — what the
+   * notebook flags as a draft candidate for the tweet/article queue.
+   */
+  draftWorthy?: boolean;
   sources: EnrichmentSource[];
   /** The recurring nouns this Enrichment met — places, species, people, ideas. */
   mentions?: EnrichmentMention[];
@@ -169,6 +174,8 @@ export type GatewayGeneration = {
   project: string | null;
   /** A name for an effort absent from that list; becomes a Proposed Project. */
   propose: string | null;
+  /** The model's DRAFT header: the walker's words already read like a post. */
+  draftWorthy: boolean;
   /** The recurring nouns of the walk this Enrichment met. */
   mentions: EnrichmentMention[];
   /** Follow-ups the walker might ask next. */
@@ -274,6 +281,7 @@ export type EnrichmentRepository = {
       kind?: ThreadKind | null;
       topics?: string[];
       ask?: string | null;
+      draftWorthy?: boolean;
       mentions?: EnrichmentMention[];
       suggestedQuestions?: string[];
       sources: EnrichmentSource[];
