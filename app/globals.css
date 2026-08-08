@@ -2722,6 +2722,121 @@ footer {
   font-size: 0.85rem;
 }
 
+/* The notebook: journal-routed Threads read back as entries. */
+.notebook-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notebook-filter {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.notebook-filter-on {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.notebook-entries {
+  display: grid;
+  gap: 0.75rem;
+  /* Keep the tab bar clear of the last entry. */
+  padding-bottom: 4.5rem;
+}
+
+.notebook-entry {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.notebook-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.notebook-entry-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  font-size: 1.1rem;
+}
+
+.notebook-entry-head h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.notebook-entry-head h2 a:hover {
+  text-decoration: underline;
+}
+
+.notebook-draft-flag {
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.notebook-routed {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+}
+
+.notebook-words {
+  margin: 0;
+  padding: 0.15rem 0 0.15rem 0.85rem;
+  border-left: 2px solid var(--line-strong);
+}
+
+.notebook-words p {
+  margin: 0 0 0.35rem;
+}
+
+.notebook-words p:last-child {
+  margin-bottom: 0;
+}
+
+.notebook-no-report {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.notebook-entry-links {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 .journal-followup {
   display: grid;
   gap: 0.5rem;

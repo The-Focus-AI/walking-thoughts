@@ -203,6 +203,7 @@ export function createMemoryEnrichmentRepository(
           kind: enrichment.kind ?? null,
           topics: enrichment.topics ?? [],
           ask: enrichment.ask ?? null,
+          draftWorthy: enrichment.draftWorthy ?? false,
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],

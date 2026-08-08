@@ -523,6 +523,9 @@ export function MapJournal() {
           <span>Map Journal</span>
         </Link>
         <div className="journal-status" role="status">
+          <Link className="topbar-link" href="/journal/notebook">
+            Notebook
+          </Link>
           <Link className="topbar-link" href="/offline-maps">
             Offline maps
           </Link>
