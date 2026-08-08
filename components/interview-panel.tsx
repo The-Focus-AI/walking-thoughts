@@ -418,6 +418,9 @@ export function InterviewPanel() {
       <footer className="interview-footer">
         <ScaleBar />
         <p className="interview-footer-line">
+          <Link href="/manual">Field Manual</Link> — how a thought gets home
+        </p>
+        <p className="interview-footer-line">
           Learned from your own words · revertible line by line
         </p>
         <p className="interview-footer-line">
