@@ -32,6 +32,8 @@ export type SyncCapturePayload = {
   /** Stable idempotency key; defaults to capture id. */
   idempotencyKey: string;
   attachments?: SyncAttachmentMeta[];
+  /** What a spoken Capture said, once an Enrichment transcribed it. */
+  transcript?: string | null;
 };
 
 export type SyncCaptureResult = {
@@ -121,6 +123,8 @@ export type ServerThread = {
     location: CaptureLocation | null;
     sequence: number;
     attachments: SyncAttachmentMeta[];
+    /** What a spoken Capture said, once an Enrichment transcribed it. */
+    transcript?: string | null;
   }>;
 };
 
@@ -215,6 +219,17 @@ export type ThreadRepository = {
     threadId: string,
     todoDoneAt: string | null,
   ): Promise<{ threadId: string; todoDoneAt: string | null } | null>;
+  /**
+   * Record what spoken Captures said, once an Enrichment transcribed them
+   * (ADR 0015). The transcript lands on the Capture itself so every surface
+   * that shows the walker's own words — the digest, search, the To-do list,
+   * the Day flow card — reads a recording the same way it reads typing.
+   * Idempotent: re-transcribing overwrites with the same text.
+   */
+  recordCaptureTranscripts(
+    userId: string,
+    transcripts: Array<{ captureId: string; text: string }>,
+  ): Promise<void>;
   /** Mark a Thread processed at the desk (null clears back to new). */
   setThreadReviewed(
     userId: string,

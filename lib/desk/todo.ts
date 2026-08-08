@@ -2,6 +2,7 @@ import { dayKeyForThread } from "@/lib/local-capture/calendar-day";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import type { LocalCapture, LocalThread } from "@/lib/local-capture/types";
 import { getReviewTransport } from "@/lib/sync/review-client";
+import { captureWords } from "@/lib/local-capture/types";
 
 /**
  * One item on the To-do list: a `route = "todo"` Thread, shown in the
@@ -43,7 +44,7 @@ export function collectTodos(
       );
       return {
         threadId: thread.id,
-        text: owned[0]?.text || thread.title,
+        text: (owned[0] ? captureWords(owned[0]) : "") || thread.title,
         dayKey: dayKeyForThread(thread, owned),
         todoDoneAt: thread.todoDoneAt ?? null,
       };
