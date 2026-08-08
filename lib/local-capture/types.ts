@@ -67,16 +67,83 @@ export function asThreadKind(value: unknown): ThreadKind | null {
 }
 
 /**
- * The Research Verdict the walker settled while Filing: kept (worth
- * returning to) or dismissed (read and let go). Absent/null = unset — the
- * Thread may be Reviewed either way; the verdict only says whether its
- * research stays in reach. Dismissing retracts the Thread's Artifact page;
- * keeping again restores it at the same address (ADR 0016).
+ * The Research Verdict: whether a Thread's research stays in reach. Implied
+ * by the Route rather than asked (docs/desk.md): Journal keeps it, Drop lets
+ * it go and retracts the Artifact page — keeping again restores it at the
+ * same address (ADR 0016). Absent/null = unset.
  */
 export type ResearchVerdict = "kept" | "dismissed";
 
 export function asResearchVerdict(value: unknown): ResearchVerdict | null {
   return value === "kept" || value === "dismissed" ? value : null;
+}
+
+/**
+ * Where a Thread goes when the walker settles it (ADR 0017). Kind is what a
+ * Thread *is*; Route is what the walker *does* with it — settling one is a
+ * single gesture that marks the Thread Reviewed and makes its handoff
+ * happen.
+ */
+export const THREAD_ROUTES = [
+  "spec",
+  "todo",
+  "journal",
+  "timeline",
+  "drop",
+] as const;
+
+export type ThreadRoute = (typeof THREAD_ROUTES)[number];
+
+/** Route names the walker reads. */
+export const ROUTE_LABELS: Record<ThreadRoute, string> = {
+  spec: "Spec",
+  todo: "To-do",
+  journal: "Journal",
+  timeline: "Timeline",
+  drop: "Drop",
+};
+
+export function asThreadRoute(value: unknown): ThreadRoute | null {
+  return typeof value === "string" &&
+    (THREAD_ROUTES as readonly string[]).includes(value)
+    ? (value as ThreadRoute)
+    : null;
+}
+
+/**
+ * The Enrichment's proposed Route, defaulted from Kind until a `ROUTE:`
+ * header exists (docs/desk.md, D1). An unclassified Thread proposes the
+ * notebook — the one destination where reading is the whole action.
+ */
+export function routeForKind(kind: ThreadKind | null | undefined): ThreadRoute {
+  switch (kind) {
+    case "idea":
+      return "spec";
+    case "task":
+      return "todo";
+    case "place":
+      return "timeline";
+    case "noise":
+      return "drop";
+    case "question":
+    case "observation":
+    case "media":
+    default:
+      return "journal";
+  }
+}
+
+/**
+ * The Research Verdict a Route implies when the filing does not say one
+ * outright: Journal keeps the research, Drop lets it go, every other Route
+ * leaves the verdict alone (undefined = keep current).
+ */
+export function verdictImpliedByRoute(
+  route: ThreadRoute,
+): ResearchVerdict | undefined {
+  if (route === "journal") return "kept";
+  if (route === "drop") return "dismissed";
+  return undefined;
 }
 
 export type LocalThread = {
@@ -100,6 +167,8 @@ export type LocalThread = {
   projectName?: string | null;
   /** The walker's Research Verdict from Filing; absent/null = unset. */
   researchVerdict?: ResearchVerdict | null;
+  /** Where the walker routed this Thread; absent/null = not yet settled. */
+  route?: ThreadRoute | null;
 };
 
 export type CaptureSyncStatus =
@@ -254,6 +323,8 @@ export type CaptureStore = {
     projectName?: string | null;
     /** Omitted keeps the current verdict; null clears it. */
     researchVerdict?: ResearchVerdict | null;
+    /** Omitted keeps the current route; null clears it. */
+    route?: ThreadRoute | null;
   }): Promise<void>;
   markSyncing(ids: string[]): Promise<void>;
   restoreSavedLocally(ids: string[]): Promise<void>;
@@ -300,6 +371,7 @@ export type CaptureStore = {
       projectId?: string | null;
       projectName?: string | null;
       researchVerdict?: ResearchVerdict | null;
+      route?: ThreadRoute | null;
       captures: Array<{
         id: string;
         text: string;

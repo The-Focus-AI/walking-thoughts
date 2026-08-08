@@ -4526,6 +4526,7 @@ img.media-lightbox-media {
 
 .thread-filing-kinds,
 .thread-filing-projects,
+.thread-filing-routes,
 .thread-filing-verdict,
 .thread-filing-actions {
   display: flex;
@@ -4535,6 +4536,7 @@ img.media-lightbox-media {
 
 .thread-filing-kind,
 .thread-filing-project,
+.thread-filing-route,
 .thread-filing-read,
 .thread-filing-keep,
 .thread-filing-dismiss,
@@ -4555,10 +4557,18 @@ img.media-lightbox-media {
 
 /* The Enrichment's guess, pre-picked: confirming it is one tap. */
 .thread-filing-kind.guessed,
-.thread-filing-project.guessed {
+.thread-filing-project.guessed,
+.thread-filing-route.guessed {
   border-color: rgba(143, 184, 216, 0.55);
   background: rgba(143, 184, 216, 0.12);
   color: var(--machine);
+}
+
+/* The Route the walker settled — the one exit gesture (ADR 0017). */
+.thread-filing-route.settled {
+  border-color: rgba(169, 209, 143, 0.55);
+  background: rgba(169, 209, 143, 0.16);
+  color: var(--identity);
 }
 
 .thread-filing-new {

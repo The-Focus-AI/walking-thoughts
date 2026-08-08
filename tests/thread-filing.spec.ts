@@ -11,6 +11,11 @@ import {
   resetMemoryBlobStore,
 } from "@/lib/media/memory-blob-store";
 import {
+  routeForKind,
+  verdictImpliedByRoute,
+} from "@/lib/local-capture/types";
+import { mergeRemoteThreads } from "@/lib/sync/hydrate";
+import {
   createMemoryThreadRepository,
   resetMemoryThreadRepository,
 } from "@/lib/sync/memory-repository";
@@ -213,4 +218,83 @@ test("a Thread with no verdict reads as unset, not an error", async () => {
   const id = await seedThread(threads, "t-verdict-unset", "Hawk over the clearcut");
   expect(await threads.getThreadResearchVerdict("user_a", id)).toBeNull();
   expect(await threads.getThreadResearchVerdict("user_a", "t-missing")).toBeNull();
+});
+
+test("settling a Route files the Thread and round-trips", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const id = await seedThread(threads, "t-route", "Pull scheduling out of Welton");
+
+  const routed = await threads.fileThread("user_a", id, {
+    reviewedAt: "2026-08-08T09:00:00.000Z",
+    route: "spec",
+  });
+  expect(routed?.route).toBe("spec");
+  expect(routed?.reviewedAt).toBe("2026-08-08T09:00:00.000Z");
+
+  const listed = await threads.listThreads("user_a");
+  expect(listed.find((t) => t.id === id)?.route).toBe("spec");
+
+  // Refiling the kind says nothing about the route.
+  const refiled = await threads.fileThread("user_a", id, {
+    kind: "idea",
+    reviewedAt: "2026-08-08T09:05:00.000Z",
+  });
+  expect(refiled?.route).toBe("spec");
+
+  // An explicit null clears it back to unsettled.
+  const cleared = await threads.fileThread("user_a", id, {
+    reviewedAt: "2026-08-08T09:10:00.000Z",
+    route: null,
+  });
+  expect(cleared?.route).toBeNull();
+});
+
+test("the Route implies the verdict: Journal keeps, Drop lets go", () => {
+  // The mapping the review API applies when the filing names no verdict
+  // outright (ADR 0017): the retraction gate reads what Drop implies.
+  expect(verdictImpliedByRoute("journal")).toBe("kept");
+  expect(verdictImpliedByRoute("drop")).toBe("dismissed");
+  expect(verdictImpliedByRoute("spec")).toBeUndefined();
+  expect(verdictImpliedByRoute("todo")).toBeUndefined();
+  expect(verdictImpliedByRoute("timeline")).toBeUndefined();
+});
+
+test("every Kind proposes a Route; the unclassified propose the notebook", () => {
+  expect(routeForKind("idea")).toBe("spec");
+  expect(routeForKind("task")).toBe("todo");
+  expect(routeForKind("question")).toBe("journal");
+  expect(routeForKind("observation")).toBe("journal");
+  expect(routeForKind("media")).toBe("journal");
+  expect(routeForKind("place")).toBe("timeline");
+  expect(routeForKind("noise")).toBe("drop");
+  expect(routeForKind(null)).toBe("journal");
+});
+
+test("hydration adopts the Route the way it adopts the review decision", () => {
+  const local = {
+    id: "t-hydrate-route",
+    title: "Morning cow",
+    revision: 1,
+    updatedAt: "2026-08-08T06:40:00.000Z",
+    reviewedAt: null,
+    route: null,
+  };
+  const merged = mergeRemoteThreads({
+    localCaptures: [],
+    localThreads: [local],
+    remoteThreads: [
+      {
+        id: "t-hydrate-route",
+        title: "Morning cow",
+        revision: 1,
+        updatedAt: "2026-08-08T06:40:00.000Z",
+        reviewedAt: "2026-08-08T09:00:00.000Z",
+        route: "timeline",
+        captures: [],
+      },
+    ],
+  });
+  const thread = merged.threads.find((t) => t.id === "t-hydrate-route");
+  expect(thread?.route).toBe("timeline");
+  expect(thread?.reviewedAt).toBe("2026-08-08T09:00:00.000Z");
 });

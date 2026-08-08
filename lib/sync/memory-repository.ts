@@ -1,5 +1,6 @@
 import { titleFromText } from "@/lib/local-capture/thread-destination";
 import { asThreadKind } from "@/lib/local-capture/types";
+import type { ThreadRoute } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   ProjectProposal,
@@ -31,6 +32,7 @@ type StoredThread = {
   ask?: string | null;
   projectId?: string | null;
   researchVerdict?: "kept" | "dismissed" | null;
+  route?: ThreadRoute | null;
 };
 
 type StoredProject = {
@@ -396,6 +398,7 @@ export function createMemoryThreadRepository(
               ? (db.projects.get(`${userId}:${thread.projectId}`)?.name ?? null)
               : null,
             researchVerdict: thread.researchVerdict ?? null,
+            route: thread.route ?? null,
             captures,
           } satisfies ServerThread;
         })
@@ -627,6 +630,8 @@ export function createMemoryThreadRepository(
           filing.researchVerdict === undefined
             ? (existing.researchVerdict ?? null)
             : filing.researchVerdict,
+        route:
+          filing.route === undefined ? (existing.route ?? null) : filing.route,
       });
       const threads = await this.listThreads(userId);
       return threads.find((thread) => thread.id === threadId) ?? null;

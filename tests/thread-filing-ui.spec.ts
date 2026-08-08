@@ -131,3 +131,75 @@ test("keeping the research files the Thread and reads back settled", async ({
     "All filed",
   );
 });
+
+/**
+ * The Route is Filing's primary verb (ADR 0017): settling one gesture both
+ * reviews the Thread and records where it went; Journal implies the
+ * research is kept.
+ */
+test("routing a Thread settles it in one gesture and reads back", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (globalThis as typeof globalThis & { __WT_REVIEW_TRANSPORT__?: unknown }).__WT_REVIEW_TRANSPORT__ =
+      {
+        async setReviewed(threadId: string) {
+          return { threadId, reviewedAt: new Date().toISOString() };
+        },
+        async listProjects() {
+          return [];
+        },
+        async fileThread(
+          threadId: string,
+          filing: {
+            kind?: string | null;
+            researchVerdict?: "kept" | "dismissed" | null;
+            route?: string | null;
+          },
+        ) {
+          // The server implies the verdict from the Route when the filing
+          // names none outright — mirrored here so the seam under test is
+          // the client's adoption of that answer.
+          const implied =
+            filing.route === "journal"
+              ? "kept"
+              : filing.route === "drop"
+                ? "dismissed"
+                : null;
+          return {
+            threadId,
+            reviewedAt: new Date().toISOString(),
+            kind: filing.kind ?? null,
+            projectId: null,
+            projectName: null,
+            researchVerdict: filing.researchVerdict ?? implied,
+            route: filing.route ?? null,
+          };
+        },
+      };
+  });
+
+  await openCaptureShell(page);
+  await commitCapture(page, "Why is it dark at night with so many stars");
+
+  await page.goto("/days");
+  await page.locator(".desk-day-open").first().click();
+  await page.locator(".thread-file-open").first().click();
+  await expect(page.getByTestId("thread-filing")).toBeVisible();
+
+  // One gesture: route it to the notebook.
+  await page.getByTestId("file-route-journal").click();
+
+  // Routed = Reviewed, and the route + implied verdict read back settled.
+  await expect(page.getByTestId("thread-reviewed-chip")).toBeVisible();
+  await page.locator(".thread-file-open").first().click();
+  await expect(page.getByTestId("file-route-journal")).toHaveText("Journal ✓");
+  await expect(page.getByTestId("file-keep-research")).toHaveText(
+    "Research kept ✓",
+  );
+
+  await page.goto("/days");
+  await expect(page.locator(".desk-day-open").first()).toContainText(
+    "All filed",
+  );
+});

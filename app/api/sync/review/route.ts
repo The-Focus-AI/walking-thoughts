@@ -1,13 +1,20 @@
-import { asResearchVerdict, asThreadKind } from "@/lib/local-capture/types";
+import {
+  asResearchVerdict,
+  asThreadKind,
+  asThreadRoute,
+  verdictImpliedByRoute,
+} from "@/lib/local-capture/types";
 import { requireSyncAccess } from "@/lib/sync/access";
 import { getThreadRepository } from "@/lib/sync/repository";
 
 export const dynamic = "force-dynamic";
 
 /**
- * File a Thread at the desk. Confirming its kind, putting it in a Project, or
- * simply having read it all settle the Thread — it leaves the New queue and
- * the sitting-down-afterwards is done when nothing is left there.
+ * File a Thread at the desk. Settling its Route, confirming its kind,
+ * putting it in a Project, or simply having read it all settle the Thread —
+ * it leaves the New queue, and a Route brings its handoff with it
+ * (ADR 0017): Journal implies the research is kept, Drop implies dismissed,
+ * which is what retracts the Artifact page.
  */
 export async function POST(request: Request) {
   const access = await requireSyncAccess(request);
@@ -19,6 +26,7 @@ export async function POST(request: Request) {
     kind?: string | null;
     projectId?: string | null;
     researchVerdict?: string | null;
+    route?: string | null;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -36,10 +44,18 @@ export async function POST(request: Request) {
   const kind = body.kind === undefined ? undefined : asThreadKind(body.kind);
   // Same shape as kind: an unknown verdict clears rather than stores — only
   // the two words the glossary names (kept, dismissed) are worth keeping.
-  const researchVerdict =
+  let researchVerdict =
     body.researchVerdict === undefined
       ? undefined
       : asResearchVerdict(body.researchVerdict);
+  // Same narrowing again: only a Route the glossary names is a place to go.
+  const route =
+    body.route === undefined ? undefined : asThreadRoute(body.route);
+  // The Route implies the verdict when the filing does not say one outright.
+  if (route && researchVerdict === undefined) {
+    const implied = verdictImpliedByRoute(route);
+    if (implied !== undefined) researchVerdict = implied;
+  }
 
   try {
     const repository = getThreadRepository();
@@ -48,6 +64,7 @@ export async function POST(request: Request) {
       projectId: body.projectId,
       reviewedAt,
       researchVerdict,
+      route,
     });
     if (!thread) {
       return Response.json({ error: "thread_not_found" }, { status: 404 });
@@ -59,6 +76,7 @@ export async function POST(request: Request) {
       projectId: thread.projectId ?? null,
       projectName: thread.projectName ?? null,
       researchVerdict: thread.researchVerdict ?? null,
+      route: thread.route ?? null,
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "review_failed";

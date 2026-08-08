@@ -259,6 +259,10 @@ export function fileThreadTransition(
             filing.researchVerdict === undefined
               ? (thread.researchVerdict ?? null)
               : filing.researchVerdict,
+          route:
+            filing.route === undefined
+              ? (thread.route ?? null)
+              : filing.route,
         }
       : thread,
   );

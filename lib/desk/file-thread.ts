@@ -2,18 +2,23 @@ import { getCaptureStore } from "@/lib/local-capture/store";
 import type {
   ResearchVerdict,
   ThreadKind,
+  ThreadRoute,
 } from "@/lib/local-capture/types";
+import { asResearchVerdict, asThreadRoute } from "@/lib/local-capture/types";
 import { getReviewTransport } from "@/lib/sync/review-client";
 
 /**
- * What Filing can settle: the kind the Enrichment guessed, the Project, and
- * the Research Verdict. Any of them marks the Thread Reviewed.
+ * What Filing can settle: the Route (the primary verb — where the Thread
+ * goes), the kind the Enrichment guessed, the Project, and the Research
+ * Verdict. Any of them marks the Thread Reviewed; a Route also implies the
+ * verdict server-side (Journal keeps, Drop dismisses — ADR 0017).
  */
 export type ThreadFilingInput = {
   kind?: ThreadKind | null;
   projectId?: string | null;
   projectName?: string | null;
   researchVerdict?: ResearchVerdict | null;
+  route?: ThreadRoute | null;
 };
 
 /**
@@ -33,8 +38,13 @@ export async function fileThread(
     kind: filing.kind,
     projectId: filing.projectId,
     researchVerdict: filing.researchVerdict,
+    route: filing.route,
   });
   if (!result) return false;
+  // A Route settles the verdict server-side, so the local copy adopts the
+  // server's verdict whenever either was part of this filing.
+  const verdictSettled =
+    filing.researchVerdict !== undefined || filing.route !== undefined;
   await getCaptureStore().applyThreadFiling({
     threadId,
     reviewedAt: result.reviewedAt,
@@ -42,10 +52,15 @@ export async function fileThread(
     projectId:
       filing.projectId === undefined ? undefined : (result.projectId ?? null),
     projectName: result.projectName ?? filing.projectName ?? null,
-    researchVerdict:
-      filing.researchVerdict === undefined
+    researchVerdict: verdictSettled
+      ? (asResearchVerdict(result.researchVerdict) ??
+        filing.researchVerdict ??
+        null)
+      : undefined,
+    route:
+      filing.route === undefined
         ? undefined
-        : (result.researchVerdict ?? filing.researchVerdict ?? null),
+        : (asThreadRoute(result.route) ?? filing.route ?? null),
   });
   return true;
 }
