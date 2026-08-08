@@ -10,9 +10,14 @@ import {
   type DayChatMessage,
 } from "@/lib/digest/chat-store";
 import { readCachedArtifacts } from "@/lib/artifacts/client";
+import { collectTodos } from "@/lib/desk/todo";
 import { collectDayCorpus } from "@/lib/digest/corpus";
 import { summarizeDay, type DaySheet } from "@/lib/digest/day-sheet";
-import type { DayCorpusEntry, DayDigestResult } from "@/lib/digest/types";
+import type {
+  DayCorpusEntry,
+  DayDigestResult,
+  DayRoutedTodo,
+} from "@/lib/digest/types";
 import { readCachedThreadEnrichments } from "@/lib/enrichment/thread-view";
 import {
   fetchWithTimeout,
@@ -103,6 +108,28 @@ export async function loadDayCorpus(dayKey: string): Promise<DayCorpusEntry[]> {
   }
 
   return collectDayCorpus(entries, dayKey);
+}
+
+/**
+ * The day's routed to-dos, read locally the way the corpus is. Sent with
+ * every ask so a checklist question lists what the walker actually routed
+ * instead of the model re-deriving tasks (docs/desk.md, D2).
+ */
+export async function loadDayRoutedTodos(
+  dayKey: string,
+): Promise<DayRoutedTodo[]> {
+  const store = getCaptureStore();
+  const [captures, threads] = await Promise.all([
+    store.list(),
+    store.listRecentThreads(),
+  ]);
+  return collectTodos(threads, captures)
+    .filter((item) => item.dayKey === dayKey)
+    .map((item) => ({
+      threadId: item.threadId,
+      text: item.text,
+      done: Boolean(item.todoDoneAt),
+    }));
 }
 
 type DailyDigestPanelProps = {
@@ -258,7 +285,10 @@ export function DailyDigestPanel({
     setMessages([...before, walkerTurn]);
     setDraft("");
     try {
-      const corpus = await loadDayCorpus(dayKey);
+      const [corpus, routedTodos] = await Promise.all([
+        loadDayCorpus(dayKey),
+        loadDayRoutedTodos(dayKey),
+      ]);
       if (corpus.length === 0) {
         throw new Error(
           isToday
@@ -276,6 +306,7 @@ export function DailyDigestPanel({
             dayHeading,
             question: trimmed,
             corpus,
+            routedTodos,
             history: before
               .slice(-HISTORY_TURN_LIMIT)
               .map(({ role, text }) => ({ role, text })),
