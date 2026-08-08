@@ -46,18 +46,26 @@ if (!connection) {
 const sql = neon(connection);
 
 async function main() {
-  // The column the pipeline now writes; a run against an older database
-  // should say so rather than fail mid-way.
-  const columns = await sql`
-    SELECT column_name FROM information_schema.columns
-    WHERE table_name = 'sync_captures' AND column_name = 'transcript'
+  // The app creates this column lazily, inside the repository's ensure() on
+  // its first use — so a fresh deploy alone does not create it, and this
+  // script would otherwise be blocked until some request happened to touch
+  // the thread repository. Same statement the app runs, and idempotent, so
+  // running it here costs nothing and removes the ordering dependency.
+  const hadColumn = (
+    await sql`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'sync_captures' AND column_name = 'transcript'
+    `
+  ).length > 0;
+  await sql`
+    ALTER TABLE sync_captures
+    ADD COLUMN IF NOT EXISTS transcript TEXT
   `;
-  if (columns.length === 0) {
-    console.error(
-      "sync_captures.transcript does not exist yet — deploy the app once so " +
-        "the schema migration runs, then re-run this script.",
-    );
-    process.exit(1);
+  if (!hadColumn) {
+    // Said out loud because it is the one write a --dry-run still makes:
+    // adding an empty nullable column, exactly what the app's next request
+    // would have done anyway. No Capture is touched by it.
+    console.log("Added the sync_captures.transcript column (empty).");
   }
 
   const rows = await sql`
