@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { captureWords } from "@/lib/local-capture/types";
 import type { ThreadRepository } from "@/lib/sync/types";
 import { MAX_ENRICHMENT_ATTEMPTS } from "./failures";
 import type {
@@ -212,7 +213,13 @@ export function createNeonEnrichmentRepository(
             entry: {
               id: capture.id,
               kind: "capture" as const,
-              text: capture.text,
+              // What was said, not only what was typed. A Capture that is
+              // audio alone is blank here otherwise — and only the job's
+              // *target* Captures get their bytes re-sent, so every earlier
+              // recording on the Thread would reach the model as an empty
+              // line. The report would be written as if the walk had been
+              // silent up to that point.
+              text: captureWords(capture),
               sequence: capture.sequence,
               includedBy: includedBy.get(capture.id) ?? null,
               createdAt: capture.createdAt,

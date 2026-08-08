@@ -4,6 +4,10 @@ import { captureWords } from "@/lib/local-capture/types";
 import { collectTodos } from "@/lib/desk/todo";
 import { mergeRemoteThreads } from "@/lib/sync/hydrate";
 import {
+  createMemoryEnrichmentRepository,
+  resetMemoryEnrichmentRepository,
+} from "@/lib/enrichment/memory-repository";
+import {
   createMemoryThreadRepository,
   resetMemoryThreadRepository,
 } from "@/lib/sync/memory-repository";
@@ -20,6 +24,7 @@ const NS = "capture-transcript-tests";
 
 test.beforeEach(() => {
   resetMemoryThreadRepository(NS);
+  resetMemoryEnrichmentRepository(NS);
 });
 
 const SPOKEN = "For Welton — pull scheduling into its own worker.";
@@ -164,6 +169,26 @@ test("the day digest corpus carries what was said, not a blank line", () => {
   });
 
   expect(prompt).toContain(SPOKEN);
+});
+
+test("a Thread's frozen history carries what earlier recordings said", async () => {
+  // The job re-sends audio bytes only for the Captures it targets. Every
+  // *earlier* recording on the Thread reaches the model through this history
+  // and nowhere else — blank there means the report is written as though the
+  // walk had been silent until the last thought.
+  const threads = createMemoryThreadRepository(NS);
+  const id = await seedSpokenCapture(threads);
+  await threads.recordCaptureTranscripts("user_a", [
+    { captureId: id, text: SPOKEN },
+  ]);
+
+  const enrichment = createMemoryEnrichmentRepository(NS, threads);
+  const pending = await enrichment.listPendingThreads("user_a");
+  const entry = pending
+    .flatMap((thread) => thread.entries)
+    .find((candidate) => candidate.id === id);
+
+  expect(entry?.text).toBe(SPOKEN);
 });
 
 test("the To-do list shows a spoken task in the walker's own words", () => {
