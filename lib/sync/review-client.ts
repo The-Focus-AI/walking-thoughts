@@ -1,3 +1,4 @@
+import type { SpecHandoff } from "@/lib/local-capture/types";
 import { trackedFetch } from "@/lib/sync/session-state";
 import type { Project } from "./types";
 
@@ -20,6 +21,8 @@ export type FiledThread = {
   projectName?: string | null;
   researchVerdict?: "kept" | "dismissed" | null;
   route?: string | null;
+  /** What routing to Spec did outside the system (ADR 0018). */
+  specHandoff?: SpecHandoff | null;
 };
 
 export type ReviewTransport = {
@@ -40,7 +43,10 @@ export type ReviewTransport = {
     done: boolean,
   ): Promise<{ threadId: string; todoDoneAt: string | null } | null>;
   listProjects?(): Promise<Project[] | null>;
-  createProject?(name: string): Promise<Project | null>;
+  createProject?(
+    name: string,
+    repository?: string | null,
+  ): Promise<Project | null>;
 };
 
 type ReviewGlobals = typeof globalThis & {
@@ -121,12 +127,14 @@ function defaultTransport(): ReviewTransport {
       }
     },
 
-    async createProject(name) {
+    async createProject(name, repository) {
       try {
         const response = await trackedFetch("/api/sync/projects", {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify({ name }),
+          body: JSON.stringify(
+            repository === undefined ? { name } : { name, repository },
+          ),
         });
         if (!response.ok) return null;
         const body = (await response.json()) as { project?: Project };

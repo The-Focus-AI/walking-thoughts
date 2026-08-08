@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { titleFromText } from "@/lib/local-capture/thread-destination";
 import {
   asResearchVerdict,
+  asSpecHandoff,
   asThreadKind,
   asThreadRoute,
 } from "@/lib/local-capture/types";
@@ -28,6 +29,7 @@ type ProjectRow = {
   name: string;
   state: ProjectState;
   created_at: string;
+  repository?: string | null;
 };
 
 function mapProject(row: ProjectRow): Project {
@@ -36,6 +38,7 @@ function mapProject(row: ProjectRow): Project {
     name: row.name,
     state: row.state,
     createdAt: row.created_at,
+    repository: row.repository ?? null,
   };
 }
 
@@ -83,6 +86,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ADD COLUMN IF NOT EXISTS todo_done_at TIMESTAMPTZ
       `;
       await sql`
+        ALTER TABLE sync_threads
+        ADD COLUMN IF NOT EXISTS spec_handoff JSONB
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS sync_projects (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
@@ -100,6 +107,10 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await sql`
         ALTER TABLE sync_projects
         ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'confirmed'
+      `;
+      await sql`
+        ALTER TABLE sync_projects
+        ADD COLUMN IF NOT EXISTS repository TEXT
       `;
       await sql`
         CREATE TABLE IF NOT EXISTS sync_captures (
@@ -303,15 +314,23 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     userId: string,
     name: string,
     initial: ProjectState,
+    repository?: string | null,
   ): Promise<Project> {
     await ensure();
     const trimmed = name.trim();
     if (!trimmed) throw new Error("project_name_required");
+    // A repository named on an existing Project sets it; omitted keeps
+    // whatever the row already has.
     const rows = (await sql`
-      INSERT INTO sync_projects (id, user_id, name, state, created_at)
-      VALUES (${crypto.randomUUID()}, ${userId}, ${trimmed}, ${initial}, ${new Date().toISOString()})
-      ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id, name, state, created_at
+      INSERT INTO sync_projects (id, user_id, name, state, created_at, repository)
+      VALUES (${crypto.randomUUID()}, ${userId}, ${trimmed}, ${initial}, ${new Date().toISOString()}, ${repository ?? null})
+      ON CONFLICT (user_id, name) DO UPDATE SET
+        name = EXCLUDED.name,
+        repository = CASE
+          WHEN ${repository === undefined} THEN sync_projects.repository
+          ELSE EXCLUDED.repository
+        END
+      RETURNING id, name, state, created_at, repository
     `) as Array<ProjectRow>;
     return mapProject(rows[0]);
   }
@@ -395,7 +414,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       const threads = (await sql`
         SELECT t.id, t.title, t.revision, t.updated_at, t.reviewed_at, t.kind,
                t.topics, t.ask, t.project_id, t.research_verdict, t.route,
-               t.todo_done_at, p.name AS project_name
+               t.todo_done_at, t.spec_handoff, p.name AS project_name
         FROM sync_threads t
         LEFT JOIN sync_projects p ON p.id = t.project_id AND p.user_id = t.user_id
         WHERE t.user_id = ${userId}
@@ -419,6 +438,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         research_verdict: string | null;
         route: string | null;
         todo_done_at: string | null;
+        spec_handoff: unknown;
         project_name: string | null;
       }>;
 
@@ -458,6 +478,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           researchVerdict: asResearchVerdict(thread.research_verdict),
           route: asThreadRoute(thread.route),
           todoDoneAt: thread.todo_done_at ?? null,
+          specHandoff: asSpecHandoff(thread.spec_handoff),
           captures: captures.map((capture) => ({
             id: capture.id,
             text: capture.text,
@@ -483,15 +504,15 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
     async listProjects(userId) {
       await ensure();
       const rows = (await sql`
-        SELECT id, name, state, created_at FROM sync_projects
+        SELECT id, name, state, created_at, repository FROM sync_projects
         WHERE user_id = ${userId} AND state = 'confirmed'
         ORDER BY name ASC
       `) as Array<ProjectRow>;
       return rows.map(mapProject);
     },
 
-    async createProject(userId, name) {
-      return upsertProject(userId, name, "confirmed");
+    async createProject(userId, name, options) {
+      return upsertProject(userId, name, "confirmed", options?.repository);
     },
 
     async proposeProject(userId, name) {
@@ -629,6 +650,17 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         WHERE user_id = ${userId} AND id = ${threadId}
       `) as Array<{ research_verdict: string | null }>;
       return asResearchVerdict(rows[0]?.research_verdict);
+    },
+
+    async recordSpecHandoff(userId, threadId, handoff) {
+      await ensure();
+      const updated = (await sql`
+        UPDATE sync_threads
+        SET spec_handoff = ${handoff ? JSON.stringify(handoff) : null}
+        WHERE user_id = ${userId} AND id = ${threadId}
+        RETURNING id
+      `) as Array<{ id: string }>;
+      if (!updated[0]) throw new Error("thread_not_found");
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

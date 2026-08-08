@@ -1,6 +1,6 @@
 import { titleFromText } from "@/lib/local-capture/thread-destination";
 import { asThreadKind } from "@/lib/local-capture/types";
-import type { ThreadRoute } from "@/lib/local-capture/types";
+import type { SpecHandoff, ThreadRoute } from "@/lib/local-capture/types";
 import { expiresAtFrom, isExpired } from "./trash";
 import type {
   ProjectProposal,
@@ -34,6 +34,7 @@ type StoredThread = {
   researchVerdict?: "kept" | "dismissed" | null;
   route?: ThreadRoute | null;
   todoDoneAt?: string | null;
+  specHandoff?: SpecHandoff | null;
 };
 
 type StoredProject = {
@@ -42,6 +43,7 @@ type StoredProject = {
   name: string;
   state: ProjectState;
   createdAt: string;
+  repository?: string | null;
 };
 
 type MemoryState = {
@@ -241,6 +243,7 @@ export function createMemoryThreadRepository(
     userId: string,
     name: string,
     initial: ProjectState,
+    repository?: string | null,
   ) => {
     const db = state();
     const trimmed = name.trim();
@@ -249,11 +252,16 @@ export function createMemoryThreadRepository(
       (project) => project.userId === userId && project.name === trimmed,
     );
     if (existing) {
+      // A repository named on an existing Project sets it; omitted keeps.
+      if (repository !== undefined) {
+        existing.repository = repository;
+      }
       return {
         id: existing.id,
         name: existing.name,
         state: existing.state,
         createdAt: existing.createdAt,
+        repository: existing.repository ?? null,
       };
     }
     const project: StoredProject = {
@@ -262,6 +270,7 @@ export function createMemoryThreadRepository(
       name: trimmed,
       state: initial,
       createdAt: new Date().toISOString(),
+      repository: repository ?? null,
     };
     db.projects.set(`${userId}:${project.id}`, project);
     return {
@@ -269,6 +278,7 @@ export function createMemoryThreadRepository(
       name: project.name,
       state: project.state,
       createdAt: project.createdAt,
+      repository: project.repository ?? null,
     };
   };
 
@@ -401,6 +411,7 @@ export function createMemoryThreadRepository(
             researchVerdict: thread.researchVerdict ?? null,
             route: thread.route ?? null,
             todoDoneAt: thread.todoDoneAt ?? null,
+            specHandoff: thread.specHandoff ?? null,
             captures,
           } satisfies ServerThread;
         })
@@ -530,17 +541,18 @@ export function createMemoryThreadRepository(
           (project) =>
             project.userId === userId && project.state === "confirmed",
         )
-        .map(({ id, name, state: projectState, createdAt }) => ({
+        .map(({ id, name, state: projectState, createdAt, repository }) => ({
           id,
           name,
           state: projectState,
           createdAt,
+          repository: repository ?? null,
         }))
         .sort((a, b) => (a.name < b.name ? -1 : 1));
     },
 
-    async createProject(userId, name) {
-      return upsertProject(userId, name, "confirmed");
+    async createProject(userId, name, options) {
+      return upsertProject(userId, name, "confirmed", options?.repository);
     },
 
     async proposeProject(userId, name) {
@@ -662,6 +674,14 @@ export function createMemoryThreadRepository(
     async getThreadResearchVerdict(userId, threadId) {
       const existing = state().threads.get(`${userId}:${threadId}`);
       return existing?.researchVerdict ?? null;
+    },
+
+    async recordSpecHandoff(userId, threadId, handoff) {
+      const db = state();
+      const key = `${userId}:${threadId}`;
+      const existing = db.threads.get(key);
+      if (!existing) throw new Error("thread_not_found");
+      db.threads.set(key, { ...existing, specHandoff: handoff });
     },
 
     async setThreadReviewed(userId, threadId, reviewedAt) {

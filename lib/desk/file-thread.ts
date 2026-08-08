@@ -61,6 +61,35 @@ export async function fileThread(
       filing.route === undefined
         ? undefined
         : (asThreadRoute(result.route) ?? filing.route ?? null),
+    // The server settles what spec routing did outside the system — adopt
+    // its record whenever a route was part of this filing and the server
+    // actually answered with the field (ADR 0018); an older server's
+    // silence must not clear a record we already hold.
+    specHandoff:
+      filing.route === undefined || result.specHandoff === undefined
+        ? undefined
+        : (result.specHandoff ?? null),
+  });
+  return true;
+}
+
+/**
+ * Undo a settled Route while the walker is still at the desk: the Thread
+ * returns to the New pile with no route and no implied verdict, so the deck
+ * offers it again. The same seam as filing, run backwards.
+ */
+export async function unfileThread(threadId: string): Promise<boolean> {
+  const result = await getReviewTransport().fileThread?.(threadId, {
+    reviewed: false,
+    route: null,
+    researchVerdict: null,
+  });
+  if (!result) return false;
+  await getCaptureStore().applyThreadFiling({
+    threadId,
+    reviewedAt: result.reviewedAt ?? null,
+    researchVerdict: null,
+    route: null,
   });
   return true;
 }

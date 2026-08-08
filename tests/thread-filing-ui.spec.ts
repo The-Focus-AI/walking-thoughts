@@ -133,6 +133,93 @@ test("keeping the research files the Thread and reads back settled", async ({
 });
 
 /**
+ * Spec routing's receipt (ADR 0018): the drafted issue reads back with its
+ * repo named and a link; a Project without a repository says plainly that
+ * the handoff is not live.
+ */
+test("routing to Spec shows the drafted issue, or that the handoff is not live", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let repositoryWired = true;
+    (globalThis as typeof globalThis & { __WT_REVIEW_TRANSPORT__?: unknown }).__WT_REVIEW_TRANSPORT__ =
+      {
+        async setReviewed(threadId: string) {
+          return { threadId, reviewedAt: new Date().toISOString() };
+        },
+        async listProjects() {
+          return [];
+        },
+        async fileThread(threadId: string, filing: { route?: string | null }) {
+          // First spec routing drafts; after the walker re-routes to
+          // Journal the record keeps naming the orphaned issue. The
+          // second Thread's Project has no repository — skipped.
+          const specHandoff =
+            filing.route === undefined
+              ? null
+              : repositoryWired
+                ? {
+                    status: "drafted",
+                    repository: "the-focus-ai/umwelten",
+                    issueUrl:
+                      "https://github.com/the-focus-ai/umwelten/issues/7",
+                    issueNumber: 7,
+                    reason: null,
+                    at: new Date().toISOString(),
+                    orphanedAt: null,
+                  }
+                : {
+                    status: "skipped",
+                    repository: null,
+                    issueUrl: null,
+                    issueNumber: null,
+                    reason: "no_repository",
+                    at: new Date().toISOString(),
+                    orphanedAt: null,
+                  };
+          if (filing.route === "spec") repositoryWired = false;
+          return {
+            threadId,
+            reviewedAt: new Date().toISOString(),
+            kind: null,
+            projectId: null,
+            projectName: null,
+            researchVerdict: null,
+            route: filing.route ?? null,
+            specHandoff,
+          };
+        },
+      };
+  });
+
+  await openCaptureShell(page);
+  await commitCapture(page, "Ship the umwelten reader as its own tool");
+
+  await page.goto("/days");
+  await page.locator(".desk-day-open").first().click();
+  await page.locator(".thread-file-open").first().click();
+  await expect(page.getByTestId("thread-filing")).toBeVisible();
+
+  // Route to Spec: the receipt names the repo and links the drafted issue.
+  await page.getByTestId("file-route-spec").click();
+  await page.locator(".thread-file-open").first().click();
+  const note = page.getByTestId("spec-handoff-note");
+  await expect(note).toContainText("Issue drafted in the-focus-ai/umwelten");
+  await expect(note.locator("a")).toHaveAttribute(
+    "href",
+    "https://github.com/the-focus-ai/umwelten/issues/7",
+  );
+
+  // Route to Spec again (the stub now has no repository): recorded, and the
+  // Thread says the handoff is not live.
+  await page.getByTestId("file-route-spec").click();
+  await page.locator(".thread-file-open").first().click();
+  await expect(page.getByTestId("spec-handoff-note")).toContainText(
+    "the handoff is not live",
+  );
+});
+
+/**
  * The Route is Filing's primary verb (ADR 0017): settling one gesture both
  * reviews the Thread and records where it went; Journal implies the
  * research is kept.

@@ -19,11 +19,24 @@ import {
 } from "@/lib/offline-region/download-copy";
 import {
   addCaptureMarkerLayers,
+  addTimelineSpotLayers,
   CLUSTER_LAYER,
   MARKER_LAYER,
+  TIMELINE_SPOT_LAYER,
   updateCaptureMarkers,
+  updateTimelineSpots,
 } from "@/lib/map-journal/map-layers";
 import { captureMarkers } from "@/lib/map-journal/markers";
+import {
+  removedFrameCaptureIds,
+  removeFrame,
+} from "@/lib/map-journal/timeline-removals";
+import {
+  timelineSpotMarkers,
+  timelineSpots,
+  type TimelineSpot,
+} from "@/lib/map-journal/timeline-spots";
+import { TimelineStrip } from "@/components/timeline-strip";
 import {
   resolveJournalRegion,
   resolveRegionBaseUrl,
@@ -62,8 +75,11 @@ export type MapJournalHook = {
   /** Which pack renders: installed ("local"), streamed ("remote"), or null. */
   source: "local" | "remote" | null;
   markerCount: number;
+  /** Same-spot Timeline strips currently on the map (docs/desk.md, D2). */
+  timelineSpotCount: number;
   gps: GpsState;
   selectedCaptureId: string | null;
+  openTimelineSpotId: string | null;
   refreshMarkers: () => Promise<void>;
 };
 
@@ -86,8 +102,11 @@ export function MapJournal() {
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
   const [context, setContext] = useState<ThreadContext | null>(null);
+  const [spot, setSpot] = useState<TimelineSpot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [markerCount, setMarkerCount] = useState(0);
+  const [spotCount, setSpotCount] = useState(0);
+  const spotsRef = useRef<TimelineSpot[]>([]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -134,15 +153,48 @@ export function MapJournal() {
     source: null as "local" | "remote" | null,
     gps,
     markerCount,
+    spotCount,
     selected: null as string | null,
+    openSpot: null as string | null,
   });
+
+  // Same-spot strips cluster from whatever the store holds right now — no
+  // manual setup, routing a photo Thread to the Timeline is the only input.
+  const loadTimelineSpots = useCallback(async () => {
+    const store = getCaptureStore();
+    const [captures, threads] = await Promise.all([
+      store.list(),
+      store.listRecentThreads(),
+    ]);
+    const spots = timelineSpots(threads, captures, removedFrameCaptureIds());
+    spotsRef.current = spots;
+    setSpotCount(spots.length);
+    return spots;
+  }, []);
 
   const refreshMarkers = useCallback(async () => {
     const captures = await getCaptureStore().list();
     const markers = captureMarkers(captures);
     setMarkerCount(markers.features.length);
-    if (mapRef.current) updateCaptureMarkers(mapRef.current, markers);
-  }, []);
+    const spots = await loadTimelineSpots();
+    if (mapRef.current) {
+      updateCaptureMarkers(mapRef.current, markers);
+      updateTimelineSpots(mapRef.current, timelineSpotMarkers(spots));
+    }
+    // Keep an open strip current — same spot if it still holds any of its
+    // frames (its founding Capture may have been removed), gone otherwise.
+    setSpot((current) => {
+      if (!current) return current;
+      const captureIds = new Set(
+        current.frames.map((frame) => frame.captureId),
+      );
+      return (
+        spots.find((candidate) =>
+          candidate.frames.some((frame) => captureIds.has(frame.captureId)),
+        ) ?? null
+      );
+    });
+  }, [loadTimelineSpots]);
 
   const openCapture = useCallback(async (captureId: string) => {
     const store = getCaptureStore();
@@ -150,6 +202,7 @@ export function MapJournal() {
     const capture = captures.find((item) => item.id === captureId);
     if (!capture) return;
 
+    setSpot(null);
     if (!capture.threadId) {
       setContext({ capture, thread: null, captures: [capture], enrichments: [] });
       return;
@@ -159,6 +212,21 @@ export function MapJournal() {
     setContext({ capture, ...view, enrichments });
   }, []);
 
+  const openSpot = useCallback((spotId: string) => {
+    const found = spotsRef.current.find((candidate) => candidate.id === spotId);
+    if (!found) return;
+    setContext(null);
+    setSpot(found);
+  }, []);
+
+  const removeSpotFrame = useCallback(
+    (captureId: string) => {
+      removeFrame(captureId);
+      void refreshMarkers();
+    },
+    [refreshMarkers],
+  );
+
   // Expose the journal to the Playwright seam.
   useEffect(() => {
     hookRef.current = {
@@ -166,9 +234,11 @@ export function MapJournal() {
       source: state.phase === "ready" ? state.source : null,
       gps,
       markerCount,
+      spotCount,
       selected: context?.capture.id ?? null,
+      openSpot: spot?.id ?? null,
     };
-  }, [state, gps, markerCount, context]);
+  }, [state, gps, markerCount, spotCount, context, spot]);
 
   useEffect(() => {
     window.__WT_MAP_JOURNAL__ = {
@@ -181,11 +251,17 @@ export function MapJournal() {
       get markerCount() {
         return hookRef.current.markerCount;
       },
+      get timelineSpotCount() {
+        return hookRef.current.spotCount;
+      },
       get gps() {
         return hookRef.current.gps;
       },
       get selectedCaptureId() {
         return hookRef.current.selected;
+      },
+      get openTimelineSpotId() {
+        return hookRef.current.openSpot;
       },
       refreshMarkers,
     };
@@ -297,13 +373,26 @@ export function MapJournal() {
       const captures = await getCaptureStore().list();
       const markers = captureMarkers(captures);
       setMarkerCount(markers.features.length);
+      const spots = await loadTimelineSpots();
 
       const attach = () => {
         addCaptureMarkerLayers(map, markers);
+        addTimelineSpotLayers(map, timelineSpotMarkers(spots));
         map.on("click", MARKER_LAYER, (event) => {
+          // The spot ring draws above the Capture markers; when a tap lands
+          // on both, the strip is what the walker aimed for.
+          const spotsHit = map.queryRenderedFeatures(event.point, {
+            layers: [TIMELINE_SPOT_LAYER],
+          });
+          if (spotsHit.length > 0) return;
           const feature = event.features?.[0];
           const captureId = feature?.properties?.captureId as string | undefined;
           if (captureId) void openCapture(captureId);
+        });
+        map.on("click", TIMELINE_SPOT_LAYER, (event) => {
+          const feature = event.features?.[0];
+          const spotId = feature?.properties?.spotId as string | undefined;
+          if (spotId) openSpot(spotId);
         });
         map.on("click", CLUSTER_LAYER, (event) => {
           const feature = event.features?.[0];
@@ -314,7 +403,7 @@ export function MapJournal() {
             zoom: Math.min(map.getZoom() + 2, 17),
           });
         });
-        for (const layer of [MARKER_LAYER, CLUSTER_LAYER]) {
+        for (const layer of [MARKER_LAYER, CLUSTER_LAYER, TIMELINE_SPOT_LAYER]) {
           map.on("mouseenter", layer, () => {
             map.getCanvas().style.cursor = "pointer";
           });
@@ -339,7 +428,7 @@ export function MapJournal() {
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- readySource flips remote→local without a remount
-  }, [readyManifest, baseUrl, region, openCapture, placeGpsPin]);
+  }, [readyManifest, baseUrl, region, openCapture, openSpot, loadTimelineSpots, placeGpsPin]);
 
   // Live GPS from the moment the surface opens — including while a pack
   // downloads — so the permission prompt and first fix land before the map
@@ -424,7 +513,7 @@ export function MapJournal() {
         : "GPS starting…";
 
   return (
-    <div className="journal" data-selected={context ? "true" : "false"}>
+    <div className="journal" data-selected={context || spot ? "true" : "false"}>
       <SyncRuntime />
       <header className="journal-topbar">
         <Link className="brand" href="/" aria-label="Walking Thoughts home">
@@ -434,6 +523,9 @@ export function MapJournal() {
           <span>Map Journal</span>
         </Link>
         <div className="journal-status" role="status">
+          <Link className="topbar-link" href="/journal/notebook">
+            Notebook
+          </Link>
           <Link className="topbar-link" href="/offline-maps">
             Offline maps
           </Link>
@@ -548,9 +640,15 @@ export function MapJournal() {
           <aside
             className="journal-panel"
             aria-label="Thread context"
-            hidden={!context}
+            hidden={!context && !spot}
           >
-            {context?.thread ? (
+            {spot ? (
+              <TimelineStrip
+                spot={spot}
+                onRemoveFrame={removeSpotFrame}
+                onClose={() => setSpot(null)}
+              />
+            ) : context?.thread ? (
               <ThreadChat
                 threadId={context.thread.id}
                 embedded
