@@ -1,9 +1,12 @@
 import type {
   CaptureLocation,
   MediaKind,
+  SpecHandoff,
   ThreadKind,
   ThreadRoute,
 } from "@/lib/local-capture/types";
+
+export type { SpecHandoff } from "@/lib/local-capture/types";
 
 export type SyncCaptureStatus =
   | "saved_locally"
@@ -63,6 +66,12 @@ export type Project = {
   name: string;
   state: ProjectState;
   createdAt: string;
+  /**
+   * The `owner/repo` a spec Thread routed here drafts its issue into
+   * (docs/desk.md, D3). Optional: a Project without one records spec
+   * routings but makes no external write.
+   */
+  repository?: string | null;
 };
 
 /** A Proposed Project with the Threads that have accrued to it. */
@@ -98,6 +107,8 @@ export type ServerThread = {
   researchVerdict?: "kept" | "dismissed" | null;
   /** Where the walker routed this Thread (ADR 0017); null = not settled. */
   route?: ThreadRoute | null;
+  /** What spec routing did outside the system (ADR 0018); null = nothing. */
+  specHandoff?: SpecHandoff | null;
   captures: Array<{
     id: string;
     text: string;
@@ -222,12 +233,29 @@ export type ThreadRepository = {
     threadId: string,
   ): Promise<"kept" | "dismissed" | null>;
   /**
+   * Overwrite the Thread's spec handoff record (ADR 0018). One record per
+   * Thread — `drafted` is the idempotency guard the settle logic reads.
+   */
+  recordSpecHandoff(
+    userId: string,
+    threadId: string,
+    handoff: SpecHandoff | null,
+  ): Promise<void>;
+  /**
    * The walker's Projects — `confirmed` only. Desk surfaces call this one;
    * a Proposed Project must never read as a decision the walker made.
    */
   listProjects(userId: string): Promise<Project[]>;
-  /** Idempotent by name — filing the same new Project twice makes one. */
-  createProject(userId: string, name: string): Promise<Project>;
+  /**
+   * Idempotent by name — filing the same new Project twice makes one. A
+   * repository passed on an existing name sets it (the seam by which a
+   * Project gains its repo); omitted leaves whatever it already has.
+   */
+  createProject(
+    userId: string,
+    name: string,
+    options?: { repository?: string | null },
+  ): Promise<Project>;
   /** Proposed Projects with the Threads that have accrued to them. */
   listProposedProjects(userId: string): Promise<ProjectProposal[]>;
   /** Names the walker has already rejected, so the model stops proposing them. */

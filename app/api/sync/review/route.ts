@@ -1,9 +1,12 @@
+import { getEnrichmentRepository } from "@/lib/enrichment/repository";
 import {
   asResearchVerdict,
   asThreadKind,
   asThreadRoute,
   verdictImpliedByRoute,
 } from "@/lib/local-capture/types";
+import { orphanSpecHandoff, settleSpecHandoff } from "@/lib/spec/handoff";
+import { getIssueDrafter } from "@/lib/spec/issue-drafter";
 import { requireSyncAccess } from "@/lib/sync/access";
 import { getThreadRepository } from "@/lib/sync/repository";
 
@@ -69,6 +72,29 @@ export async function POST(request: Request) {
     if (!thread) {
       return Response.json({ error: "thread_not_found" }, { status: 404 });
     }
+
+    // The handoff runs after the filing write, never instead of it: the
+    // Route is already committed, and a draft that cannot land records
+    // itself as failed on the Thread rather than failing the filing
+    // (ADR 0018). Un-routing a drafted spec leaves the issue and notes the
+    // orphan; routing back to spec reuses it and never drafts twice.
+    let specHandoff = thread.specHandoff ?? null;
+    if (route === "spec") {
+      specHandoff = await settleSpecHandoff({
+        userId: access.userId,
+        thread,
+        threads: repository,
+        reports: getEnrichmentRepository(),
+        drafter: getIssueDrafter(),
+      });
+    } else if (route !== undefined) {
+      specHandoff = await orphanSpecHandoff({
+        userId: access.userId,
+        thread,
+        threads: repository,
+      });
+    }
+
     return Response.json({
       threadId: thread.id,
       reviewedAt: thread.reviewedAt ?? null,
@@ -77,6 +103,7 @@ export async function POST(request: Request) {
       projectName: thread.projectName ?? null,
       researchVerdict: thread.researchVerdict ?? null,
       route: thread.route ?? null,
+      specHandoff,
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "review_failed";
