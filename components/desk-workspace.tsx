@@ -12,6 +12,7 @@ import {
 } from "@/components/media-lightbox";
 import { useLinkFallback } from "@/components/use-link-fallback";
 import { DailyDigestPanel } from "@/components/daily-digest-panel";
+import { DayFlow } from "@/components/day-flow";
 import { DeskRail, LensControl } from "@/components/desk-rail";
 import {
   LENSES,
@@ -1862,6 +1863,16 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
             dayKey={selectedDayKey}
             onClose={() => router.push(keepQuery("/days"))}
           >
+            {/* The default door: a Day with unrouted Threads opens on the
+                arrival summary, and the deck settles them one at a time
+                (docs/desk.md). A day with nothing to route says nothing. */}
+            <DayFlow
+              views={dayThreads}
+              loaded={loaded}
+              projects={projects}
+              onFiled={() => void load()}
+              onOpenMedia={setOpenMedia}
+            />
             {/* At the desk the sidebar already lists this day's Threads;
                 repeating them under the digest would say it twice. */}
             {dayThreads.length > 0 && !atTheDesk ? (

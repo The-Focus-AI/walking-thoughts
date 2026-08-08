@@ -64,3 +64,24 @@ export async function fileThread(
   });
   return true;
 }
+
+/**
+ * Undo a settled Route while the walker is still at the desk: the Thread
+ * returns to the New pile with no route and no implied verdict, so the deck
+ * offers it again. The same seam as filing, run backwards.
+ */
+export async function unfileThread(threadId: string): Promise<boolean> {
+  const result = await getReviewTransport().fileThread?.(threadId, {
+    reviewed: false,
+    route: null,
+    researchVerdict: null,
+  });
+  if (!result) return false;
+  await getCaptureStore().applyThreadFiling({
+    threadId,
+    reviewedAt: result.reviewedAt ?? null,
+    researchVerdict: null,
+    route: null,
+  });
+  return true;
+}
