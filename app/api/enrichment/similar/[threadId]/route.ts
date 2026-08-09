@@ -9,10 +9,10 @@ type RouteContext = {
 };
 
 /**
- * What came before this Thread, named. Shared mentions are exact and ranked
- * first; embedding neighbours follow. Both are resolved to titles and walk
- * dates here rather than on the device, because the device holds only its
- * own Threads and this is a question about the whole corpus.
+ * What came before this Thread, named — its embedding neighbours, resolved
+ * to titles and walk dates here rather than on the device, because the
+ * device holds only its own Threads and this is a question about the whole
+ * corpus.
  *
  * A Thread with nothing behind it answers with an empty list: a first
  * sighting is a fact about the corpus, not a failure to report.
@@ -27,7 +27,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const repository = getEnrichmentRepository();
-  if (!repository.listThreadMentionIndex) {
+  if (!repository.listThreadIndex) {
     return Response.json({ similar: [] });
   }
 
@@ -37,7 +37,7 @@ export async function GET(request: Request, context: RouteContext) {
   let index;
   let embeddingMatches: Array<{ threadId: string; score: number }> = [];
   try {
-    index = await repository.listThreadMentionIndex(access.userId);
+    index = await repository.listThreadIndex(access.userId);
     embeddingMatches = repository.findSimilarThreads
       ? await repository.findSimilarThreads(access.userId, threadId, {
           limit: 5,
@@ -56,20 +56,12 @@ export async function GET(request: Request, context: RouteContext) {
       title: mine.title,
       dayKey: mine.at.slice(0, 10),
       at: mine.at,
-      mentions: mine.mentions.map((mention) => ({
-        slug: mention.slug,
-        name: mention.name,
-      })),
     },
     candidates: index.map((entry) => ({
       threadId: entry.threadId,
       title: entry.title,
       dayKey: entry.at.slice(0, 10),
       at: entry.at,
-      mentions: entry.mentions.map((mention) => ({
-        slug: mention.slug,
-        name: mention.name,
-      })),
     })),
     embeddingMatches,
   });

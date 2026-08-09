@@ -84,7 +84,6 @@ test("just reading a Thread files it without changing what it is", async () => {
   const id = await seedThread(threads, "t-2", "Why is the night sky dark");
   await threads.updateThreadClassification!("user_a", id, {
     kind: "question",
-    topics: ["astronomy"],
     ask: null,
   });
 
@@ -107,7 +106,6 @@ test("a later Enrichment never overrules what the walker filed", async () => {
 
   await threads.updateThreadClassification!("user_a", id, {
     kind: "question",
-    topics: [],
     ask: "Who is Goldin?",
   });
 

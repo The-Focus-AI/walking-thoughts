@@ -1,36 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { railRow, seedPile } from "./helpers/desk-pile";
+import { seedPile } from "./helpers/desk-pile";
 
 /**
  * The walk has been here before, and the row says so before it is opened.
- * Shared mentions are exact and already on the device, so the chip needs no
- * request — which is also why it survives being offline.
+ *
+ * The exact half of this — a shared mention, on the device already and so
+ * readable offline — went with Mentions in ADR 0019. What remains is the
+ * embedding link, which is resolved on the server and therefore absent from
+ * a seeded local pile. So what a fixture can still hold the line on is the
+ * empty case: a Thread with nothing behind it must say so rather than break.
  */
-
-test("a row that shares a mention with an earlier Thread says how many", async ({
-  page,
-}) => {
-  const ids = await seedPile(page);
-  await page.goto("/days?state=open");
-  await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
-  // Rows paint from the store before their Enrichments land, and a prior is
-  // read off a mention — so wait for something only the Enrichments can
-  // produce before asking whether the chip is there.
-  await expect(railRow(page, "mention", "the-reservoir")).toBeVisible();
-
-  // The photo Thread came after the wall Thread and names the same place,
-  // so the later one carries the chip and the earlier one does not.
-  await expect(page.getByTestId(`thread-prior-${ids.grate}`)).toContainText(
-    "1 prior",
-  );
-  await expect(page.getByTestId(`thread-prior-${ids.question}`)).toHaveCount(0);
-
-  // Opened, it names the Thread and what the two have in common.
-  await page.getByTestId(`expand-thread-${ids.grate}`).click();
-  const priors = page.getByTestId("thread-priors");
-  await expect(priors).toContainText("reservoir wall");
-  await expect(priors).toContainText("The reservoir");
-});
 
 test("a Thread with nothing behind it says so rather than showing an error", async ({
   page,
@@ -38,9 +17,7 @@ test("a Thread with nothing behind it says so rather than showing an error", asy
   const ids = await seedPile(page);
   await page.goto("/days?state=open");
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
-  await expect(railRow(page, "mention", "the-reservoir")).toBeVisible();
 
-  // The Goldin Thread mentions nothing, so nothing came before it.
   await page.getByTestId(`expand-thread-${ids.goldin}`).click();
   await expect(page.getByTestId("thread-priors-none")).toContainText(
     "First time this has come up",

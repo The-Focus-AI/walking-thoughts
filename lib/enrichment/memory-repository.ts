@@ -202,15 +202,11 @@ export function createMemoryEnrichmentRepository(
           createdAt: new Date().toISOString(),
           title: enrichment.title,
           kind: enrichment.kind ?? null,
-          topics: enrichment.topics ?? [],
           ask: enrichment.ask ?? null,
-          draftWorthy: enrichment.draftWorthy ?? false,
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
           transcripts: enrichment.transcripts ?? [],
-          mentions: enrichment.mentions ?? [],
-          suggestedQuestions: enrichment.suggestedQuestions ?? [],
         };
         db.enrichments.set(`${userId}:${enrichmentId}`, stored);
         if (enrichment.title && threadRepository.updateThreadTitle) {
@@ -226,7 +222,6 @@ export function createMemoryEnrichmentRepository(
             job.threadId,
             {
               kind: enrichment.kind ?? null,
-              topics: enrichment.topics ?? [],
               ask: enrichment.ask ?? null,
             },
           );
@@ -323,22 +318,12 @@ export function createMemoryEnrichmentRepository(
       return found.slice(0, options?.limit ?? 25);
     },
 
-    async listThreadMentionIndex(userId) {
-      const db = state();
+    async listThreadIndex(userId) {
       const threads = await threadRepository.listThreads(userId);
-      const newest = new Map<string, ThreadEnrichment>();
-      for (const [key, enrichment] of db.enrichments) {
-        if (!key.startsWith(`${userId}:`)) continue;
-        const current = newest.get(enrichment.threadId);
-        if (!current || current.createdAt < enrichment.createdAt) {
-          newest.set(enrichment.threadId, enrichment);
-        }
-      }
       return threads.map((thread) => ({
         threadId: thread.id,
         title: thread.title,
         at: thread.updatedAt,
-        mentions: newest.get(thread.id)?.mentions ?? [],
       }));
     },
 

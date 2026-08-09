@@ -18,6 +18,11 @@ import { join } from "node:path";
 const ROOTS = ["lib", "scripts", "app"];
 const SQL_KEYWORDS = new Set(["set", "select", "values", "only"]);
 const SQL_SOURCE = /\.(ts|mjs)$/;
+/**
+ * Postgres' own catalogs. A schema-qualified read of one is asking the
+ * database about itself — nothing creates them, and nothing should.
+ */
+const CATALOG_SCHEMAS = new Set(["information_schema", "pg_catalog"]);
 
 function sourceFiles(dir: string): string[] {
   const found: string[] = [];
@@ -48,11 +53,13 @@ test("no query names a table nothing creates", () => {
         created.add(match[1].toLowerCase());
       }
       for (const match of statement.matchAll(
-        /\b(?:FROM|JOIN|INSERT INTO|UPDATE|ALTER TABLE|DELETE FROM)\s+([a-z_][a-z0-9_]*)/gi,
+        /\b(?:FROM|JOIN|INSERT INTO|UPDATE|ALTER TABLE|DELETE FROM)\s+([a-z_][a-z0-9_]*)(\.[a-z_][a-z0-9_]*)?/gi,
       )) {
         const table = match[1].toLowerCase();
         // `DO UPDATE SET` puts a keyword where a table name would sit.
         if (SQL_KEYWORDS.has(table)) continue;
+        // `information_schema.columns` is the database describing itself.
+        if (match[2] && CATALOG_SCHEMAS.has(table)) continue;
         if (!referenced.has(table)) referenced.set(table, file);
       }
     }

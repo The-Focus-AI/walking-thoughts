@@ -4,7 +4,6 @@ import type { ThreadRepository } from "@/lib/sync/types";
 import { MAX_ENRICHMENT_ATTEMPTS } from "./failures";
 import type {
   EnrichmentJob,
-  EnrichmentMention,
   EnrichmentRepository,
   EnrichmentThreadSnapshot,
   ThreadEnrichment,
@@ -78,6 +77,9 @@ export function createNeonEnrichmentRepository(
         ALTER TABLE enrichments
         ADD COLUMN IF NOT EXISTS kind TEXT
       `;
+      // topics / mentions / suggested_questions / draft_worthy are no longer
+      // written (ADR 0019). The columns stay: they hold the history, and a
+      // reversal should find them where it left them.
       await sql`
         ALTER TABLE enrichments
         ADD COLUMN IF NOT EXISTS topics JSONB NOT NULL DEFAULT '[]'::jsonb
@@ -256,9 +258,8 @@ export function createNeonEnrichmentRepository(
       await ensure();
       const rows = (await sql`
         SELECT id, thread_id, text, model, basis_revision, basis_entry_ids,
-               target_capture_ids, title, kind, topics, ask, sources, research,
-               memory_patches, transcripts, mentions, suggested_questions,
-               draft_worthy, created_at
+               target_capture_ids, title, kind, ask, sources, research,
+               memory_patches, transcripts, created_at
         FROM enrichments
         WHERE user_id = ${userId} AND thread_id = ${threadId}
         ORDER BY created_at ASC
@@ -272,15 +273,11 @@ export function createNeonEnrichmentRepository(
         target_capture_ids: string[];
         title: string | null;
         kind: ThreadEnrichment["kind"];
-        topics: string[] | null;
         ask: string | null;
         sources: ThreadEnrichment["sources"];
         research: ThreadEnrichment["research"];
         memory_patches: ThreadEnrichment["memoryPatches"];
         transcripts: ThreadEnrichment["transcripts"];
-        mentions: ThreadEnrichment["mentions"];
-        suggested_questions: ThreadEnrichment["suggestedQuestions"];
-        draft_worthy: boolean | null;
         created_at: string;
       }>;
       return rows.map((row) => ({
@@ -294,15 +291,11 @@ export function createNeonEnrichmentRepository(
         createdAt: row.created_at,
         title: row.title,
         kind: row.kind ?? null,
-        topics: row.topics ?? [],
         ask: row.ask ?? null,
         sources: row.sources ?? [],
         research: row.research ?? [],
         memoryPatches: row.memory_patches ?? [],
         transcripts: row.transcripts ?? [],
-        mentions: row.mentions ?? [],
-        suggestedQuestions: row.suggested_questions ?? [],
-        draftWorthy: row.draft_worthy ?? false,
       }));
     },
 
@@ -492,9 +485,8 @@ export function createNeonEnrichmentRepository(
       const enrichmentId = `enrichment:${job.id}`;
       const existing = (await sql`
         SELECT id, thread_id, text, model, basis_revision, basis_entry_ids,
-               target_capture_ids, title, kind, topics, ask, sources, research,
-               memory_patches, transcripts, mentions, suggested_questions,
-               draft_worthy, created_at
+               target_capture_ids, title, kind, ask, sources, research,
+               memory_patches, transcripts, created_at
         FROM enrichments
         WHERE user_id = ${userId} AND id = ${enrichmentId}
         LIMIT 1
@@ -508,15 +500,11 @@ export function createNeonEnrichmentRepository(
         target_capture_ids: string[];
         title: string | null;
         kind: ThreadEnrichment["kind"];
-        topics: string[] | null;
         ask: string | null;
         sources: ThreadEnrichment["sources"];
         research: ThreadEnrichment["research"];
         memory_patches: ThreadEnrichment["memoryPatches"];
         transcripts: ThreadEnrichment["transcripts"];
-        mentions: ThreadEnrichment["mentions"];
-        suggested_questions: ThreadEnrichment["suggestedQuestions"];
-        draft_worthy: boolean | null;
         created_at: string;
       }>;
 
@@ -534,15 +522,11 @@ export function createNeonEnrichmentRepository(
           createdAt: existing[0].created_at,
           title: existing[0].title,
           kind: existing[0].kind ?? null,
-          topics: existing[0].topics ?? [],
           ask: existing[0].ask ?? null,
           sources: existing[0].sources ?? [],
           research: existing[0].research ?? [],
           memoryPatches: existing[0].memory_patches ?? [],
           transcripts: existing[0].transcripts ?? [],
-          mentions: existing[0].mentions ?? [],
-          suggestedQuestions: existing[0].suggested_questions ?? [],
-          draftWorthy: existing[0].draft_worthy ?? false,
         };
       } else {
         created = true;
@@ -550,9 +534,8 @@ export function createNeonEnrichmentRepository(
         await sql`
           INSERT INTO enrichments (
             id, user_id, thread_id, text, model, basis_revision,
-            basis_entry_ids, target_capture_ids, title, kind, topics, ask,
-            sources, research, memory_patches, transcripts, mentions,
-            suggested_questions, draft_worthy, created_at
+            basis_entry_ids, target_capture_ids, title, kind, ask,
+            sources, research, memory_patches, transcripts, created_at
           ) VALUES (
             ${enrichmentId},
             ${userId},
@@ -564,15 +547,11 @@ export function createNeonEnrichmentRepository(
             ${JSON.stringify(job.targetCaptureIds)},
             ${enrichment.title},
             ${enrichment.kind ?? null},
-            ${JSON.stringify(enrichment.topics ?? [])},
             ${enrichment.ask ?? null},
             ${JSON.stringify(enrichment.sources ?? [])},
             ${JSON.stringify(enrichment.research ?? [])},
             ${JSON.stringify(enrichment.memoryPatches ?? [])},
             ${JSON.stringify(enrichment.transcripts ?? [])},
-            ${JSON.stringify(enrichment.mentions ?? [])},
-            ${JSON.stringify(enrichment.suggestedQuestions ?? [])},
-            ${enrichment.draftWorthy ?? false},
             ${createdAt}
           )
           ON CONFLICT (id) DO NOTHING
@@ -588,15 +567,11 @@ export function createNeonEnrichmentRepository(
           createdAt,
           title: enrichment.title,
           kind: enrichment.kind ?? null,
-          topics: enrichment.topics ?? [],
           ask: enrichment.ask ?? null,
           sources: enrichment.sources ?? [],
           research: enrichment.research ?? [],
           memoryPatches: enrichment.memoryPatches ?? [],
           transcripts: enrichment.transcripts ?? [],
-          mentions: enrichment.mentions ?? [],
-          suggestedQuestions: enrichment.suggestedQuestions ?? [],
-          draftWorthy: enrichment.draftWorthy ?? false,
         };
         if (enrichment.title && threadRepository.updateThreadTitle) {
           await threadRepository.updateThreadTitle(
@@ -614,7 +589,6 @@ export function createNeonEnrichmentRepository(
             job.threadId,
             {
               kind: enrichment.kind ?? null,
-              topics: enrichment.topics ?? [],
               ask: enrichment.ask ?? null,
             },
           );
@@ -760,23 +734,22 @@ export function createNeonEnrichmentRepository(
       }));
     },
 
-    async listThreadMentionIndex(userId) {
+    async listThreadIndex(userId) {
       await ensure();
-      // One row per Thread: its newest Enrichment is the current reading of
-      // what the Thread is about.
+      // One row per Thread that has been reported on at all — the set the
+      // embedding index can possibly match against.
       // sync_threads is the production surface — `threads` never existed —
       // and it dates a Thread by updated_at, which is the only timestamp it
       // keeps.
       const rows = (await sql`
         SELECT DISTINCT ON (e.thread_id)
-               e.thread_id, e.mentions, t.title, t.updated_at
+               e.thread_id, t.title, t.updated_at
         FROM enrichments e
         JOIN sync_threads t ON t.id = e.thread_id AND t.user_id = e.user_id
         WHERE e.user_id = ${userId}
         ORDER BY e.thread_id, e.created_at DESC
       `) as Array<{
         thread_id: string;
-        mentions: EnrichmentMention[] | null;
         title: string;
         updated_at: string;
       }>;
@@ -784,7 +757,6 @@ export function createNeonEnrichmentRepository(
         threadId: row.thread_id,
         title: row.title,
         at: new Date(row.updated_at).toISOString(),
-        mentions: row.mentions ?? [],
       }));
     },
 

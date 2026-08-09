@@ -77,7 +77,6 @@ function enrichmentFixture(
     createdAt: "2026-07-24T10:00:00.000Z",
     title: "Where the patio stone came from",
     kind: "question",
-    topics: ["bluestone"],
     ask: null,
     sources: [],
     ...overrides,
@@ -546,7 +545,6 @@ test("publishing twice returns the page already stored", async () => {
     createdAt: "2026-07-24T10:00:00.000Z",
     title: "Where the patio stone came from",
     kind: "question",
-    topics: ["bluestone"],
     ask: null,
     sources: [],
   };
@@ -601,8 +599,7 @@ test("Enrichment publishes the report as a page in the same pass", async () => {
       text: longReport("Q", 900),
       title: "Where the patio stone came from",
       kind: "question" as const,
-      topics: ["bluestone"],
-    })),
+      })),
     artifactGateway: createFakeGatewayClient(async (input) => {
       publishPrompt = input.prompt;
       return {

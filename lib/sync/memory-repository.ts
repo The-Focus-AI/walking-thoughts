@@ -28,7 +28,6 @@ type StoredThread = {
   updatedAt: string;
   reviewedAt?: string | null;
   kind?: string | null;
-  topics?: string[];
   ask?: string | null;
   projectId?: string | null;
   researchVerdict?: "kept" | "dismissed" | null;
@@ -403,7 +402,6 @@ export function createMemoryThreadRepository(
             updatedAt: thread.updatedAt,
             reviewedAt: thread.reviewedAt ?? null,
             kind: asThreadKind(thread.kind),
-            topics: thread.topics ?? [],
             ask: thread.ask ?? null,
             projectId: thread.projectId ?? null,
             projectName: thread.projectId
@@ -664,10 +662,6 @@ export function createMemoryThreadRepository(
         kind: existing.reviewedAt
           ? (existing.kind ?? null)
           : (classification.kind ?? existing.kind ?? null),
-        topics:
-          classification.topics.length > 0
-            ? classification.topics
-            : (existing.topics ?? []),
         ask: classification.ask,
       });
     },

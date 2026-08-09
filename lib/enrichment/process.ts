@@ -608,10 +608,6 @@ async function runJob(
       captureTexts: frozenHistory
         .filter((entry) => entry.kind === "capture")
         .map((entry) => entry.text),
-      mentions:
-        (
-          await repository.listThreadEnrichments(userId, running.threadId)
-        ).at(-1)?.mentions ?? [],
     });
 
     const prompt = buildEnrichmentPrompt({
@@ -670,11 +666,7 @@ async function runJob(
       model: generation.model,
       title: generation.title,
       kind: generation.kind,
-      topics: generation.topics,
       ask: generation.ask,
-      draftWorthy: generation.draftWorthy,
-      mentions: generation.mentions,
-      suggestedQuestions: generation.suggestedQuestions,
       sources: generation.sources,
       research: generation.research,
       memoryPatches: appliedPatches,

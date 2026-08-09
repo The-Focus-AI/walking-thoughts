@@ -25,8 +25,6 @@ export type NotebookEntry = {
   words: string[];
   /** The newest Enrichment, readable in place; null when none has landed. */
   report: ThreadEnrichment | null;
-  /** Flagged as a post candidate — the tweet/article queue pulls from these. */
-  draftWorthy: boolean;
   /** The published Artifact page for this Thread, when it has one. */
   artifactId: string | null;
 };
@@ -63,14 +61,7 @@ export function notebookEntry(
       .map((capture) => captureWords(capture))
       .filter((text) => text.length > 0),
     report,
-    // Once any Enrichment reads the words as the seed of a post, a later
-    // follow-up answer does not unsay it.
-    draftWorthy: enrichments.some((enrichment) => enrichment.draftWorthy),
     artifactId: context.artifactId ?? null,
   };
 }
 
-/** The post queue: entries whose words already read like a draft. */
-export function draftCandidates(entries: NotebookEntry[]): NotebookEntry[] {
-  return entries.filter((entry) => entry.draftWorthy);
-}

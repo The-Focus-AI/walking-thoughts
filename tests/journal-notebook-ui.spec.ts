@@ -111,7 +111,6 @@ test("a journal-routed Thread reads back as a notebook entry, until un-routed", 
     "The streams of tokens will wash away the differences",
   );
   await expect(entry).toContainText("homogenization pressure");
-  await expect(entry.getByTestId("notebook-draft-flag")).toBeVisible();
   await expect(entry.getByTestId("notebook-thread-link")).toHaveAttribute(
     "href",
     `/threads/${threadId}`,
@@ -119,13 +118,6 @@ test("a journal-routed Thread reads back as a notebook entry, until un-routed", 
   await expect(entry.getByTestId("notebook-artifact-link")).toHaveAttribute(
     "href",
     `/artifacts/${encodeURIComponent("artifact:e-notebook")}`,
-  );
-
-  // The post queue: draft candidates listed together.
-  await page.getByTestId("notebook-drafts-toggle").click();
-  await expect(page.getByTestId(`notebook-entry-${threadId}`)).toBeVisible();
-  await expect(page.getByTestId("notebook-count")).toContainText(
-    "1 draft candidate",
   );
 
   // Un-routing (the desk's undo) removes the entry…

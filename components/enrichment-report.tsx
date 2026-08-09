@@ -149,8 +149,6 @@ export function EnrichmentReport({
     threadId: string;
     title: string;
     dayKey: string;
-    via: "mention" | "embedding";
-    sharedMentions: string[];
   }>;
 }) {
   return (
@@ -194,42 +192,12 @@ export function EnrichmentReport({
               <li key={prior.threadId}>
                 <Link href={`/threads/${prior.threadId}`}>{prior.title}</Link>
                 <span className="enrichment-prior-why">
-                  {prior.via === "mention"
-                    ? `${prior.dayKey} · ${prior.sharedMentions.join(", ")}`
-                    : "reads alike"}
+                  {prior.dayKey ? `${prior.dayKey} · reads alike` : "reads alike"}
                 </span>
               </li>
             ))}
           </ul>
         </details>
-      ) : null}
-      {(enrichment.mentions ?? []).length > 0 ? (
-        <ul
-          className="enrichment-mentions"
-          aria-label="Mentions"
-          data-testid="enrichment-mentions"
-        >
-          {(enrichment.mentions ?? []).map((mention) => (
-            <li key={mention.slug} className="enrichment-mention">
-              {mention.kind ? (
-                <span className="enrichment-mention-kind">{mention.kind}</span>
-              ) : null}
-              {mention.name}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {/* Offered, never answered: the walker asks by replying in the Thread. */}
-      {(enrichment.suggestedQuestions ?? []).length > 0 ? (
-        <ul
-          className="enrichment-questions"
-          aria-label="Questions you might ask next"
-          data-testid="enrichment-questions"
-        >
-          {(enrichment.suggestedQuestions ?? []).map((question) => (
-            <li key={question}>{question}</li>
-          ))}
-        </ul>
       ) : null}
       <ResearchTrace steps={enrichment.research ?? []} />
       <MemoryPatchFooter patches={enrichment.memoryPatches ?? []} />

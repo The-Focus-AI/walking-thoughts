@@ -52,7 +52,7 @@ const ROUTE_NOTES: Record<ThreadRoute, RouteNote> = {
     status: "live",
   },
   journal: {
-    does: "Files it into the notebook with the full report readable in place, and keeps the research reachable. Anything draft-worthy is flagged as a post candidate.",
+    does: "Files it into the notebook with the full report readable in place, and keeps the research reachable.",
     status: "live",
   },
   timeline: {

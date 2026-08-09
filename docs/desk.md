@@ -33,7 +33,7 @@ rail round); verdicts in each folder's VERDICT.md.
 | **Reports are readable in the flow** — on the routing card and in the notebook, not just a one-line summary. | Derived from the walker's reaction ("it doesn't tell me the reports") |
 | The Route set: **Spec / To-do / Journal** deliberate, **Timeline** automatic for GPS-clustered photos, **Drop** for noise. "New project" is not a Route — Proposed Projects + the Interview cover it. | Derived recommendation |
 | **Spec** routing drafts a ticket-shaped issue in the Project's repo for a coding agent. | Derived recommendation |
-| **Journal** absorbs questions and observations; draft-worthy entries are flagged as post candidates. | Derived recommendation |
+| **Journal** absorbs questions and observations. (The draft-worthy post-candidate flag was cut by ADR 0019: it never once fired in 171 reports.) | Derived recommendation |
 | **Timeline** spots are stable clusters of photo Captures within ~25 m across days; the walker only ever removes a frame. | Derived recommendation |
 
 ## The gesture: Route
@@ -87,8 +87,9 @@ as a conversation) remains the place to go deeper before routing.
 ## Slices
 
 Strictly ordered; each ships alone. Earlier desk work already shipped:
-the queue/rail surface, structured mentions, similarity retrieval into
-the prompt, and the Dialogue view.
+the queue/rail surface, similarity retrieval into the prompt, and the
+Dialogue view. (Structured mentions shipped in that same run and were
+retired by ADR 0019 — 14 of 171 reports emitted one.)
 
 ### D1 — Route on the filing seam, and the Day flow
 
@@ -123,8 +124,7 @@ Acceptance (public browser seam, per repo verification style):
   `DAY_DIGEST_SYSTEM_INSTRUCTION` draws its checklist from routed to-dos
   instead of re-deriving them.
 - **Journal:** the notebook — `route = journal` Threads with their
-  reports; the existing `/journal` route grows sections; draft-worthy
-  flags surface post candidates.
+  reports; the existing `/journal` route grows sections.
 - **Timeline:** same-spot clustering over photo Captures' GPS
   (`lib/local-capture/types.ts` already carries lat/lon); a spot is a
   stable ≤25 m cluster across days; the strip renders on the map journal

@@ -7,7 +7,6 @@ import {
 } from "./system-instruction";
 import type {
   ThreadKind,
-  EnrichmentMention,
   EnrichmentSource,
   GatewayClient,
   GatewayGenerateInput,
@@ -57,13 +56,9 @@ export function createFakeGatewayClient(
     model?: string;
     title?: string | null;
     kind?: ThreadKind | null;
-    topics?: string[];
     ask?: string | null;
     project?: string | null;
     propose?: string | null;
-    draftWorthy?: boolean;
-    mentions?: EnrichmentMention[];
-    suggestedQuestions?: string[];
     sources?: EnrichmentSource[];
     research?: ResearchStep[];
   }>,
@@ -77,13 +72,9 @@ export function createFakeGatewayClient(
           model: result.model ?? input.model,
           title: result.title ?? null,
           kind: result.kind ?? null,
-          topics: result.topics ?? [],
           ask: result.ask ?? null,
           project: result.project ?? null,
           propose: result.propose ?? null,
-          draftWorthy: result.draftWorthy ?? false,
-          mentions: result.mentions ?? [],
-          suggestedQuestions: result.suggestedQuestions ?? [],
           sources: result.sources ?? [],
           research: result.research ?? [],
         };
@@ -121,13 +112,9 @@ export function createFakeGatewayClient(
         model: input.model,
         title,
         kind: "question",
-        topics: [],
         ask: null,
         project: null,
         propose: null,
-        draftWorthy: false,
-        mentions: [],
-        suggestedQuestions: [],
         sources,
         research,
       } satisfies GatewayGeneration;
@@ -301,13 +288,9 @@ function createAiSdkGatewayClient(): GatewayClient {
         model: input.model,
         title: parsed.title,
         kind: parsed.kind,
-        topics: parsed.topics,
         ask: parsed.ask,
         project: parsed.project,
         propose: parsed.propose,
-        draftWorthy: parsed.draftWorthy,
-        mentions: parsed.mentions,
-        suggestedQuestions: parsed.suggestedQuestions,
         sources,
         research,
       };
