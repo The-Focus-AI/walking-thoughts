@@ -4,14 +4,15 @@ import type { ThreadEnrichment } from "./types";
 const CACHE_PREFIX = "wt-thread-enrichments:";
 
 function normalize(enrichments: ThreadEnrichment[]): ThreadEnrichment[] {
-  // Older cached payloads predate `sources`; `research`, `transcripts`,
-  // `mentions`, and `suggestedQuestions` stay optional.
+  // Older cached payloads predate `sources`; `research` and `transcripts`
+  // stay optional. Cached `topics` / `mentions` / `suggestedQuestions` /
+  // `draftWorthy` are ignored rather than migrated away (ADR 0019) — an
+  // extra key on a retained object costs nothing and reading none of them
+  // is what retires them.
   return enrichments.map((enrichment) => ({
     ...enrichment,
     sources: enrichment.sources ?? [],
     transcripts: enrichment.transcripts ?? [],
-    mentions: enrichment.mentions ?? [],
-    suggestedQuestions: enrichment.suggestedQuestions ?? [],
   }));
 }
 

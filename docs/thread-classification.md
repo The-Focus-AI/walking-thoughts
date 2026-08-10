@@ -1,5 +1,13 @@
 # Thread classification and smarter Thread processing
 
+> **Superseded in part by ADR 0019 (2026-08-09).** Everything here about
+> `TOPICS`, topic linking, and the draft-worthy flag was built and then
+> retired: measured over the walker's whole corpus, 405 of 438 topic slugs
+> named exactly one Thread, and the DRAFT flag never once fired in 171
+> reports. Finding 3 below called it correctly at 69 Threads and the fix it
+> proposed — reuse an existing slug, or group by embedding — was answered by
+> going with embeddings alone. `KIND` and `ASK` stayed and work.
+
 A read of every Thread in Production as of 2026-07-24 — 67 Threads, 74
 Captures, 66 Enrichments, 8 stuck jobs — and a proposal for what Thread
 processing should do differently.

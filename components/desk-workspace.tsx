@@ -127,12 +127,6 @@ function toFacetThread(
     ),
     projectId: view.thread.projectId ?? null,
     projectName: view.thread.projectName ?? null,
-    // The newest Enrichment's reading of what the Thread is about; older
-    // ones described a Thread that has since grown.
-    mentions:
-      view.enrichments[view.enrichments.length - 1]?.mentions?.map(
-        (mention) => ({ slug: mention.slug, name: mention.name }),
-      ) ?? [],
     mediaKinds,
     hasReport: artifacts.has(view.thread.id),
     hasEnrichment: view.enrichments.length > 0,
@@ -268,9 +262,7 @@ function PriorThreads({
             {prior.title}
           </Link>
           <span className="thread-row-prior-why">
-            {prior.via === "mention"
-              ? `${prior.dayKey} · ${prior.sharedMentions.join(", ")}`
-              : "reads alike"}
+            {prior.dayKey ? `${prior.dayKey} · reads alike` : "reads alike"}
           </span>
         </li>
       ))}
@@ -885,10 +877,6 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         title: view.thread.title,
         dayKey: view.dayKey,
         at: view.captures[0]?.createdAt ?? view.thread.updatedAt,
-        mentions:
-          view.enrichments[view.enrichments.length - 1]?.mentions?.map(
-            (mention) => ({ slug: mention.slug, name: mention.name }),
-          ) ?? [],
       })),
     [threads],
   );
@@ -953,7 +941,6 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
         texts: [
           view.thread.title,
           ...view.captures.map((capture) => captureWords(capture)),
-          ...(view.thread.topics ?? []),
           ...view.enrichments.map((enrichment) => enrichment.text),
         ].filter(Boolean),
       }))
@@ -1077,31 +1064,6 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
     () => facetCounts(facetThreads, facets, projects),
     [facetThreads, facets, projects],
   );
-
-  /**
-   * The rail's Mentions rows are whatever the pile actually talks about,
-   * most mentioned first, capped so one walk's nouns cannot bury the rail.
-   */
-  const mentionOptions = useMemo(() => {
-    const bySlug = new Map<string, { value: string; label: string }>();
-    for (const thread of facetThreads) {
-      for (const mention of thread.mentions) {
-        if (!bySlug.has(mention.slug)) {
-          bySlug.set(mention.slug, {
-            value: mention.slug,
-            label: mention.name,
-          });
-        }
-      }
-    }
-    return [...bySlug.values()]
-      .sort(
-        (a, b) =>
-          (counts.mention[b.value] ?? 0) - (counts.mention[a.value] ?? 0) ||
-          a.label.localeCompare(b.label),
-      )
-      .slice(0, 12);
-  }, [facetThreads, counts]);
 
   /** The Threads the facets let through, in the scope's own order. */
   const visibleViews = useMemo(() => {
@@ -1672,7 +1634,6 @@ export function DeskWorkspace({ children }: { children?: React.ReactNode }) {
                   lens={lens}
                   counts={counts}
                   projects={projects}
-                  mentions={mentionOptions}
                 />
                 <div className="desk-browse-main">
                   {dayScoped && activeDayKey ? (

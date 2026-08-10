@@ -11,9 +11,7 @@ import {
   resetMemoryEnrichmentRepository,
 } from "@/lib/enrichment/memory-repository";
 import { processPendingEnrichments } from "@/lib/enrichment/process";
-import { parseGatewayText } from "@/lib/enrichment/system-instruction";
 import {
-  draftCandidates,
   journalThreads,
   notebookEntry,
 } from "@/lib/journal/notebook";
@@ -121,73 +119,6 @@ test("the notebook holds journal-routed Threads only, newest settled first", asy
 
   const routed = journalThreads(await threads.listThreads("user_a"));
   expect(routed.map((thread) => thread.id)).toEqual(["t-c", "t-a"]);
-});
-
-/**
- * Acceptance: draft-worthy entries carry a visible flag and can be listed
- * together. The flag rides the Enrichment's DRAFT header end to end.
- */
-test("the DRAFT header marks a post candidate and round-trips to the queue", async () => {
-  expect(
-    parseGatewayText(
-      ["KIND: observation", "DRAFT: yes", "", "Reads like a post."].join("\n"),
-      false,
-    ).draftWorthy,
-  ).toBe(true);
-  expect(
-    parseGatewayText(["KIND: question", "", "Body."].join("\n"), false)
-      .draftWorthy,
-  ).toBe(false);
-
-  const threads = createMemoryThreadRepository(NS);
-  const enrichment = createMemoryEnrichmentRepository(NS, threads);
-  await seedThread(
-    threads,
-    "t-draft",
-    "The streams of tokens will wash away the differences.",
-  );
-  await seedThread(threads, "t-plain", "Who stacked these walls?");
-
-  await processPendingEnrichments("user_a", enrichment, {
-    gateway: createFakeGatewayClient(async (input) => ({
-      text: input.prompt.includes("streams of tokens")
-        ? "The idea has a name: homogenization pressure."
-        : "Probably a farmer clearing the field.",
-      kind: "observation" as const,
-      draftWorthy: input.prompt.includes("streams of tokens"),
-    })),
-    blobStore: createMemoryBlobStore(NS),
-    threadRepository: threads,
-    pushSender: null,
-  });
-
-  for (const id of ["t-draft", "t-plain"]) {
-    await threads.fileThread("user_a", id, {
-      reviewedAt: "2026-08-08T09:00:00.000Z",
-      route: "journal",
-    });
-  }
-
-  const routed = journalThreads(await threads.listThreads("user_a"));
-  const entries = await Promise.all(
-    routed.map(async (thread) =>
-      notebookEntry(thread, {
-        captures: thread.captures,
-        enrichments: await enrichment.listThreadEnrichments(
-          "user_a",
-          thread.id,
-        ),
-      }),
-    ),
-  );
-
-  const flagged = entries.find((entry) => entry.threadId === "t-draft");
-  const plain = entries.find((entry) => entry.threadId === "t-plain");
-  expect(flagged?.draftWorthy).toBe(true);
-  expect(plain?.draftWorthy).toBe(false);
-  expect(draftCandidates(entries).map((entry) => entry.threadId)).toEqual([
-    "t-draft",
-  ]);
 });
 
 /** Acceptance: the entry links to the Thread and to its Artifact page. */

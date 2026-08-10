@@ -1506,35 +1506,6 @@ h1 {
   color: var(--muted);
 }
 
-/* One tap to ask what the report itself thought was worth asking. */
-.thread-suggested {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.5rem;
-}
-
-.thread-suggested-chip {
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.78rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.thread-suggested-chip:hover:not(:disabled) {
-  border-color: var(--ink);
-}
-
-.thread-suggested-chip:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 /* The walk has been here before. */
 .thread-row-prior {
   padding: 0.2rem 0.5rem;
@@ -1584,45 +1555,6 @@ h1 {
   font-family: var(--font-mono);
   font-size: 0.66rem;
   letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
-/* What the Enrichment met, and what it offers to ask next. */
-.enrichment-mentions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0.7rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.enrichment-mention {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.3rem;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 0.78rem;
-  color: var(--ink);
-}
-
-.enrichment-mention-kind {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.enrichment-questions {
-  display: grid;
-  gap: 0.3rem;
-  margin: 0.7rem 0 0;
-  padding: 0 0 0 1rem;
-  font-size: 0.85rem;
-  line-height: 1.45;
   color: var(--muted);
 }
 
@@ -2723,35 +2655,6 @@ footer {
 }
 
 /* The notebook: journal-routed Threads read back as entries. */
-.notebook-filters {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.notebook-filter {
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  text-decoration: none;
-}
-
-.notebook-filter-on {
-  border-color: var(--line-strong);
-  color: var(--ink);
-  background: var(--surface);
-}
-
 .notebook-entries {
   display: grid;
   gap: 0.75rem;
@@ -2791,17 +2694,6 @@ footer {
 
 .notebook-entry-head h2 a:hover {
   text-decoration: underline;
-}
-
-.notebook-draft-flag {
-  padding: 0.1rem 0.55rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .notebook-routed {
@@ -4955,6 +4847,10 @@ img.media-lightbox-media {
   border: 1px solid var(--line);
   padding: 0.6rem 0.7rem;
   background: var(--background);
+  /* A grid item's min-content is its longest unbreakable word, and a Thread
+     titled after a 95-character filename is exactly that — without this the
+     track blows past 1fr and takes the whole page sideways with it. */
+  min-width: 0;
 }
 
 .day-flow-lane h3,
@@ -4984,9 +4880,12 @@ img.media-lightbox-media {
   gap: 0.3rem;
 }
 
-.day-flow-lane li {
+.day-flow-lane li,
+.day-flow-receipt li {
   font-size: 0.9rem;
   line-height: 1.35;
+  /* Break inside the word when there is nowhere else to break. */
+  overflow-wrap: anywhere;
 }
 
 .day-flow-lane-word {

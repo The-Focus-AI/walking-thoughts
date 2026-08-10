@@ -212,8 +212,6 @@ export type LocalThread = {
   reviewedAt?: string | null;
   /** The newest Enrichment's verdict; null until one classifies the Thread. */
   kind?: ThreadKind | null;
-  /** Topic slugs that group this Thread with others on the same subject. */
-  topics?: string[];
   /**
    * The open question from the newest Enrichment — the model met a name or
    * intent it could not place and asked rather than guessing.
@@ -460,7 +458,6 @@ export type CaptureStore = {
       updatedAt: string;
       reviewedAt?: string | null;
       kind?: ThreadKind | null;
-      topics?: string[];
       ask?: string | null;
       projectId?: string | null;
       projectName?: string | null;

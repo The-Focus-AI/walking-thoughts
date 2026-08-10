@@ -31,7 +31,6 @@ test("header lines carry the title, kind, and topics off the body", () => {
     [
       "TITLE: Token pool as a billing backend",
       "KIND: idea",
-      "TOPICS: token-billing, LiteLLM, focus.ai, token-billing, extra, more",
       "",
       "**The idea.** A shared token backend other projects plug into.",
     ].join("\n"),
@@ -40,13 +39,6 @@ test("header lines carry the title, kind, and topics off the body", () => {
 
   expect(parsed.title).toBe("Token pool as a billing backend");
   expect(parsed.kind).toBe("idea");
-  // Slugged, de-duplicated, and capped at four.
-  expect(parsed.topics).toEqual([
-    "token-billing",
-    "litellm",
-    "focus-ai",
-    "extra",
-  ]);
   expect(parsed.text).toBe(
     "**The idea.** A shared token backend other projects plug into.",
   );
@@ -91,7 +83,6 @@ test("a report with no headers keeps its whole body", () => {
 
   expect(parsed.title).toBeNull();
   expect(parsed.kind).toBeNull();
-  expect(parsed.topics).toEqual([]);
   expect(parsed.ask).toBeNull();
   expect(parsed.text).toBe("Mist sits in the valley this morning.");
 });
@@ -172,7 +163,6 @@ test("the Thread's kind and topics are stored with its Enrichment", async () => 
   const threadId = result.results[0]!.threadId;
   const stored = await enrichment.listThreadEnrichments("user_a", threadId);
   expect(stored[0]?.kind).toBe("idea");
-  expect(stored[0]?.topics).toEqual(["token-billing", "litellm"]);
 
   // And the Thread itself carries the verdict, so a queue can group by kind
   // without reading every report.
@@ -180,7 +170,6 @@ test("the Thread's kind and topics are stored with its Enrichment", async () => 
     (candidate) => candidate.id === threadId,
   );
   expect(thread?.kind).toBe("idea");
-  expect(thread?.topics).toEqual(["token-billing", "litellm"]);
 });
 
 test("an open question rides on the Thread and a later Enrichment clears it", async () => {
@@ -307,6 +296,5 @@ test("an Enrichment that cannot tell leaves the prior kind standing", async () =
     (candidate) => candidate.id === threadId,
   );
   expect(thread?.kind).toBe("task");
-  expect(thread?.topics).toEqual(["stone"]);
   expect(thread?.ask).toBe("What would you like to do with this?");
 });

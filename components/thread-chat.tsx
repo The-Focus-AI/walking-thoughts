@@ -702,10 +702,6 @@ export function ThreadChat({
    */
   const roles = dialogueRoles(timeline.map((entry) => entry.kind));
   const conversationRoles = roles.slice(baseCapture ? 1 : 0);
-  /** The newest report's offered follow-ups, as one-tap chips. */
-  const suggested =
-    enrichments[enrichments.length - 1]?.suggestedQuestions ?? [];
-
   // Back goes to the day this Thread belongs to, not the whole Days list —
   // the walker was reading one day and should land back inside it.
   const dayKey = thread ? dayKeyForThread(thread, captures) : null;
@@ -964,28 +960,6 @@ export function ThreadChat({
       ) : null}
 
       <footer className="thread-chat-composer">
-        {/* The report's own offered follow-ups. Asking one is not a special
-            kind of act: the chip commits an ordinary Capture into the
-            Thread, exactly as typing the question would. */}
-        {suggested.length > 0 ? (
-          <div
-            className="thread-suggested"
-            data-testid="thread-suggested"
-            aria-label="Questions you might ask next"
-          >
-            {suggested.map((question) => (
-              <button
-                key={question}
-                type="button"
-                className="thread-suggested-chip"
-                disabled={busy}
-                onClick={() => void send(question)}
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        ) : null}
         <label className="capture-field-label" htmlFor="thread-chat-followup">
           Reply in this Thread
         </label>

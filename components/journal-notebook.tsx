@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { DataHandlingDisclosure } from "@/components/data-handling-disclosure";
 import { EnrichmentReport } from "@/components/enrichment-report";
@@ -14,7 +13,6 @@ import {
 } from "@/lib/artifacts/client";
 import { loadThreadEnrichments } from "@/lib/enrichment/thread-view";
 import {
-  draftCandidates,
   journalThreads,
   notebookEntry,
   type NotebookEntry,
@@ -53,8 +51,6 @@ async function loadNotebookEntries(): Promise<NotebookEntry[]> {
 }
 
 export function JournalNotebook() {
-  const searchParams = useSearchParams();
-  const draftsOnly = searchParams.get("drafts") === "1";
   const [entries, setEntries] = useState<NotebookEntry[] | null>(null);
 
   useEffect(() => {
@@ -67,8 +63,7 @@ export function JournalNotebook() {
     };
   }, []);
 
-  const drafts = entries ? draftCandidates(entries) : [];
-  const visible = draftsOnly ? drafts : (entries ?? []);
+  const visible = entries ?? [];
 
   return (
     <div className="journal notebook">
@@ -87,43 +82,17 @@ export function JournalNotebook() {
           <span data-testid="notebook-count">
             {entries === null
               ? "Opening the notebook…"
-              : `${entries.length} ${entries.length === 1 ? "entry" : "entries"} · ${drafts.length} draft ${drafts.length === 1 ? "candidate" : "candidates"}`}
+              : `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`}
           </span>
         </div>
       </header>
 
-      <nav className="notebook-filters" aria-label="Notebook sections">
-        <Link
-          className={
-            draftsOnly ? "notebook-filter" : "notebook-filter notebook-filter-on"
-          }
-          href="/journal/notebook"
-        >
-          All entries
-        </Link>
-        {/* URL-carried like the desk's facets, so the queue is linkable. */}
-        <Link
-          className={
-            draftsOnly ? "notebook-filter notebook-filter-on" : "notebook-filter"
-          }
-          href="/journal/notebook?drafts=1"
-          data-testid="notebook-drafts-toggle"
-        >
-          Draft candidates
-        </Link>
-      </nav>
-
       {entries !== null && visible.length === 0 ? (
         <section className="journal-empty" role="status">
-          <h1>
-            {draftsOnly
-              ? "No draft candidates yet"
-              : "Nothing in the notebook yet"}
-          </h1>
+          <h1>Nothing in the notebook yet</h1>
           <p>
-            {draftsOnly
-              ? "Entries the Enrichment reads as the seed of a post are flagged and gather here."
-              : "Route a Thread to Journal at the desk and it files in here with its report."}
+            Route a Thread to Journal at the desk and it files in here with
+            its report.
           </p>
         </section>
       ) : null}
@@ -144,14 +113,6 @@ export function JournalNotebook() {
                   {entry.title}
                 </Link>
               </h2>
-              {entry.draftWorthy ? (
-                <span
-                  className="notebook-draft-flag"
-                  data-testid="notebook-draft-flag"
-                >
-                  Draft candidate
-                </span>
-              ) : null}
               {entry.routedAt ? (
                 <time className="notebook-routed" dateTime={entry.routedAt}>
                   {new Date(entry.routedAt).toLocaleDateString(undefined, {

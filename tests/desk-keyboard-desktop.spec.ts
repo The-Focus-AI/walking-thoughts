@@ -147,7 +147,7 @@ test("g cycles the Lens, and typing in a filing control is never a shortcut", as
     "true",
   );
   await page.keyboard.press("g");
-  await expect(page).toHaveURL(/lens=topics/);
+  await expect(page).toHaveURL(/lens=project/);
   await page.keyboard.press("g");
   await expect(page).toHaveURL(/lens=kind/);
 

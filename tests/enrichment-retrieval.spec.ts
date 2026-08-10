@@ -6,10 +6,7 @@ import {
   resetMemoryEnrichmentRepository,
 } from "@/lib/enrichment/memory-repository";
 import { processPendingEnrichments } from "@/lib/enrichment/process";
-import {
-  formatPriorThreads,
-  mentionsInText,
-} from "@/lib/enrichment/retrieval";
+import { formatPriorThreads } from "@/lib/enrichment/retrieval";
 import {
   createMemoryBlobStore,
   resetMemoryBlobStore,
@@ -79,9 +76,10 @@ async function enrichCapturingPrompt(
   return { prompts };
 }
 
-test("a Capture with a shared noun in its past gets that past in the prompt", async () => {
+test("a Capture whose past reads like it gets that past in the prompt", async () => {
   const threads = createMemoryThreadRepository(NS);
   const enrichment = createMemoryEnrichmentRepository(NS, threads);
+  const embeddings = createFakeEmbeddingClient();
 
   // July: the walls get dated.
   await seedCapture(
@@ -91,38 +89,38 @@ test("a Capture with a shared noun in its past gets that past in the prompt", as
     "How old is the stone wall along the reservoir?",
     "2026-07-04T08:00:00.000Z",
   );
-  await enrichCapturingPrompt("user_a", threads, enrichment, {
-    text: "Dry-laid, and the town survey puts these walls at 1840s.",
-    title: "Dating the reservoir walls",
-    kind: "question" as const,
-    mentions: [
-      { name: "The reservoir", slug: "the-reservoir", kind: "place" as const },
-    ],
-  });
+  await enrichCapturingPrompt(
+    "user_a",
+    threads,
+    enrichment,
+    {
+      text: "Dry-laid, and the town survey puts these walls at 1840s.",
+      title: "Dating the reservoir walls",
+      kind: "question" as const,
+    },
+    { embeddings },
+  );
 
   // August: the corner of the same wall.
   await seedCapture(
     threads,
     "user_a",
     "cap-august",
-    "The reservoir wall corner has slumped since spring",
+    "How old is the stone wall along the reservoir? The corner has slumped",
     "2026-08-04T08:00:00.000Z",
   );
   const { prompts } = await enrichCapturingPrompt(
     "user_a",
     threads,
     enrichment,
-    {
-      text: "Building on the July dating.",
-      kind: "observation" as const,
-    },
+    { text: "Building on the July dating.", kind: "observation" as const },
+    { embeddings },
   );
 
   const prompt = prompts.at(-1)!;
   expect(prompt).toContain("Earlier Threads from this walker's own history");
   expect(prompt).toContain("Dating the reservoir walls");
   expect(prompt).toContain("walked 2026-07-04");
-  expect(prompt).toContain("shares The reservoir");
 });
 
 test("a Capture with no history is prompted exactly as before retrieval existed", async () => {
@@ -162,7 +160,7 @@ test("a retrieval that throws writes the cold-start report rather than failing",
   // The index itself is broken, which is the worst retrieval can do.
   const broken = {
     ...enrichment,
-    async listThreadMentionIndex() {
+    async listThreadIndex() {
       throw new Error("index unavailable");
     },
   };
@@ -187,93 +185,28 @@ test("a retrieval that throws writes the cold-start report rather than failing",
   expect(stored[0]?.text).toBe("The report that must still be written.");
 });
 
-test("a Thread that only reads alike is retrieved too, and says which it is", async () => {
-  const threads = createMemoryThreadRepository(NS);
-  const enrichment = createMemoryEnrichmentRepository(NS, threads);
-  const embeddings = createFakeEmbeddingClient();
-
-  await seedCapture(
-    threads,
-    "user_d",
-    "cap-owl-july",
-    "Barred owl calling over the water at dusk",
-    "2026-07-04T08:00:00.000Z",
-  );
-  await enrichCapturingPrompt(
-    "user_d",
-    threads,
-    enrichment,
-    { text: "A report with no mentions at all.", kind: "observation" as const },
-    { embeddings },
-  );
-
-  await seedCapture(
-    threads,
-    "user_d",
-    "cap-owl-august",
-    "Barred owl calling over the water again",
-    "2026-08-04T08:00:00.000Z",
-  );
-  const { prompts } = await enrichCapturingPrompt(
-    "user_d",
-    threads,
-    enrichment,
-    { text: "The second sighting.", kind: "observation" as const },
-    { embeddings },
-  );
-
-  const prompt = prompts.at(-1)!;
-  // Nothing was ever named, so the only link possible is the resemblance —
-  // and the prompt says that is what it is.
-  expect(prompt).toContain("Earlier Threads from this walker's own history");
-  expect(prompt).toContain("reads alike");
-});
-
-test("the retrieved past is rendered with the reason each Thread is there", () => {
+test("the retrieved past is rendered as named Threads with their walk dates", () => {
   expect(formatPriorThreads([])).toBeNull();
   const rendered = formatPriorThreads([
     {
       threadId: "t-1",
       title: "Dating the reservoir walls",
       dayKey: "2026-07-04",
-      via: "mention",
-      sharedMentions: ["The reservoir", "Dry stone"],
+      score: 0.91,
     },
     {
       threadId: "t-2",
       title: "Frost in the hollow",
       dayKey: "2026-06-01",
-      via: "embedding",
-      sharedMentions: [],
       score: 0.82,
     },
   ])!;
 
-  expect(rendered).toContain("[thread t-1, walked 2026-07-04; shares The reservoir, Dry stone] Dating the reservoir walls");
-  expect(rendered).toContain("[thread t-2, walked 2026-06-01; reads alike] Frost in the hollow");
+  expect(rendered).toContain(
+    "[thread t-1, walked 2026-07-04; reads alike] Dating the reservoir walls",
+  );
+  expect(rendered).toContain(
+    "[thread t-2, walked 2026-06-01; reads alike] Frost in the hollow",
+  );
   expect(rendered).toContain("say plainly which one you are building on");
-});
-
-test("a noun the corpus knows, used whole in the walker's own words, is an exact link", () => {
-  const known = [
-    { name: "The reservoir", slug: "the-reservoir", kind: "place" as const },
-    { name: "Barred owl", slug: "barred-owl", kind: "species" as const },
-    // Too short to mean anything; it would match half the corpus.
-    { name: "Elm", slug: "elm", kind: "species" as const },
-  ];
-
-  expect(
-    mentionsInText(known, ["The reservoir wall corner has slumped"]).map(
-      (mention) => mention.slug,
-    ),
-  ).toEqual(["the-reservoir"]);
-
-  // Whole words only: "owlet" is not the owl, and a short name is skipped
-  // however often it appears.
-  expect(mentionsInText(known, ["An owlet in the elm"])).toEqual([]);
-  expect(
-    mentionsInText(known, ["barred owl over THE RESERVOIR"]).map(
-      (mention) => mention.slug,
-    ),
-  ).toEqual(["the-reservoir", "barred-owl"]);
 });

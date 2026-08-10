@@ -347,7 +347,6 @@ test.describe("trail Threads", () => {
             revision: thread.revision,
             updatedAt: thread.updatedAt,
             kind: kindFor(thread.title),
-            topics: ["morning-walk"],
             captures: view.captures.map((capture) => ({
               id: capture.id,
               text: capture.text,
@@ -407,7 +406,6 @@ test.describe("trail Threads", () => {
           revision: thread.revision,
           updatedAt: thread.updatedAt,
           kind: null,
-          topics: [],
           ask: "Who is Goldin — a client, a project, or a person?",
           captures: view.captures.map((capture) => ({
             id: capture.id,
@@ -480,7 +478,6 @@ test.describe("trail Threads", () => {
           revision: thread.revision,
           updatedAt: thread.updatedAt,
           kind: null,
-          topics: [],
           ask: "Who is Goldin — a client, a project, or a person?",
           captures: view.captures.map((capture) => ({
             id: capture.id,

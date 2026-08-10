@@ -22,7 +22,6 @@ function thread(overrides: Partial<FacetThread> & { id: string }): FacetThread {
     needsAttention: false,
     projectId: null,
     projectName: null,
-    mentions: [],
     mediaKinds: [],
     hasReport: false,
     hasEnrichment: false,
@@ -113,7 +112,7 @@ test("a Lens re-stacks the same set without changing its membership", () => {
   expect(days.map((stack) => stack.key)).toEqual(["2026-08-01", "2026-07-31"]);
   expect(membership("days")).toEqual(membership("kind"));
   expect(membership("days")).toEqual(membership("media"));
-  expect(membership("days")).toEqual(membership("topics"));
+  expect(membership("days")).toEqual(membership("project"));
   expect(membership("days")).toEqual(membership("reports"));
 
   // Kind stacks follow the desk order, unclassified last.
@@ -122,8 +121,8 @@ test("a Lens re-stacks the same set without changing its membership", () => {
     "question",
     "place",
   ]);
-  // Topics is Project plus an unfiled bucket until mentions exist.
-  expect(stackByLens(kept, "topics").map((stack) => stack.key)).toEqual([
+  // Project stacks the filed Threads and gathers the rest under Unfiled.
+  expect(stackByLens(kept, "project").map((stack) => stack.key)).toEqual([
     "p-umwelten",
     "unfiled",
   ]);

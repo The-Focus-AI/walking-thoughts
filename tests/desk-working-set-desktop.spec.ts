@@ -12,9 +12,9 @@ test("opening a Thread from a Lens keeps the queue, not its day", async ({
   page,
 }) => {
   const ids = await seedPile(page);
-  await page.goto("/days?reports=full&lens=topics");
+  await page.goto("/days?reports=full&lens=project");
 
-  await expect(page.getByTestId("lens-topics")).toHaveAttribute(
+  await expect(page.getByTestId("lens-project")).toHaveAttribute(
     "aria-current",
     "true",
   );
@@ -23,9 +23,9 @@ test("opening a Thread from a Lens keeps the queue, not its day", async ({
     .click();
   await expect(page.getByTestId("thread-chat")).toBeVisible();
 
-  // Still the working set: the Lens is still Topics, the facet is still on,
+  // Still the working set: the Lens is still Project, the facet is still on,
   // and the pane has not become that Thread's day.
-  await expect(page.getByTestId("lens-topics")).toHaveAttribute(
+  await expect(page.getByTestId("lens-project")).toHaveAttribute(
     "aria-current",
     "true",
   );

@@ -65,6 +65,8 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         ALTER TABLE sync_threads
         ADD COLUMN IF NOT EXISTS kind TEXT
       `;
+      // topics is no longer written or read (ADR 0019); the column stays so
+      // the history survives and a reversal finds it where it left it.
       await sql`
         ALTER TABLE sync_threads
         ADD COLUMN IF NOT EXISTS topics JSONB NOT NULL DEFAULT '[]'::jsonb
@@ -417,7 +419,7 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
       await ensure();
       const threads = (await sql`
         SELECT t.id, t.title, t.revision, t.updated_at, t.reviewed_at, t.kind,
-               t.topics, t.ask, t.project_id, t.research_verdict, t.route,
+               t.ask, t.project_id, t.research_verdict, t.route,
                t.todo_done_at, t.spec_handoff, p.name AS project_name
         FROM sync_threads t
         LEFT JOIN sync_projects p ON p.id = t.project_id AND p.user_id = t.user_id
@@ -436,7 +438,6 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         updated_at: string;
         reviewed_at: string | null;
         kind: string | null;
-        topics: string[] | null;
         ask: string | null;
         project_id: string | null;
         research_verdict: string | null;
@@ -477,7 +478,6 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
           updatedAt: thread.updated_at,
           reviewedAt: thread.reviewed_at ?? null,
           kind: asThreadKind(thread.kind),
-          topics: thread.topics ?? [],
           ask: thread.ask ?? null,
           projectId: thread.project_id ?? null,
           projectName: thread.project_name ?? null,
@@ -639,11 +639,6 @@ export function createNeonThreadRepository(databaseUrl: string): ThreadRepositor
         SET kind = CASE
               WHEN reviewed_at IS NOT NULL THEN kind
               ELSE COALESCE(${classification.kind}, kind)
-            END,
-            topics = CASE
-              WHEN ${classification.topics.length} > 0
-                THEN ${JSON.stringify(classification.topics)}::jsonb
-              ELSE topics
             END,
             ask = ${classification.ask}
         WHERE user_id = ${userId} AND id = ${threadId}

@@ -22,7 +22,6 @@ export const FACET_GROUPS = [
   "attention",
   "kind",
   "project",
-  "mention",
   "media",
   "reports",
 ] as const;
@@ -36,13 +35,13 @@ export type FacetSelection = Partial<Record<FacetGroup, string>>;
  * A Lens re-stacks whatever the facets let through; it never filters. Days
  * is the default, so the desk still opens on the day-by-day frame.
  */
-export const LENSES = ["days", "topics", "kind", "media", "reports"] as const;
+export const LENSES = ["days", "project", "kind", "media", "reports"] as const;
 
 export type Lens = (typeof LENSES)[number];
 
 export const LENS_LABELS: Record<Lens, string> = {
   days: "Days",
-  topics: "Topics",
+  project: "Project",
   kind: "Kind",
   media: "Media",
   reports: "Reports",
@@ -69,12 +68,6 @@ export type FacetThread = {
   needsAttention: boolean;
   projectId: string | null;
   projectName: string | null;
-  /**
-   * The recurring nouns the Enrichment met, leading one first. The Topics
-   * Lens falls back to the leading mention for a Thread with no Project, so
-   * an unfiled pile stacks by what it is about rather than by nothing.
-   */
-  mentions: Array<{ slug: string; name: string }>;
   mediaKinds: MediaKind[];
   /** The report earned a published Artifact page. */
   hasReport: boolean;
@@ -118,7 +111,6 @@ export const GROUP_LABELS: Record<FacetGroup, string> = {
   attention: "Attention",
   kind: "Kind",
   project: "Project",
-  mention: "Mentions",
   media: "Media",
   reports: "Reports",
 };
@@ -155,8 +147,7 @@ function optionValues(group: FacetGroup): string[] | null {
     case "reports":
       return REPORT_OPTIONS.map((option) => option.value);
     case "project":
-    case "mention":
-      // Any id or slug is legal; the rail renders only the ones that exist.
+      // Any id is legal; the rail renders only the ones that exist.
       return null;
   }
 }
@@ -249,8 +240,6 @@ function matchesGroup(
       return value === UNFILED
         ? !thread.projectId
         : thread.projectId === value;
-    case "mention":
-      return thread.mentions.some((mention) => mention.slug === value);
     case "media":
       if (value === "text") return thread.mediaKinds.length === 0;
       if (value === MEDIA_ANY) return thread.mediaKinds.length > 0;
@@ -301,26 +290,15 @@ export function facetCounts(
     attention: {},
     kind: {},
     project: {},
-    mention: {},
     media: {},
     reports: {},
   } as Record<FacetGroup, Record<string, number>>;
-
-  const mentionSlugs = [
-    ...new Set(
-      threads.flatMap((thread) =>
-        thread.mentions.map((mention) => mention.slug),
-      ),
-    ),
-  ];
 
   for (const group of FACET_GROUPS) {
     const values =
       group === "project"
         ? [...projects.map((project) => project.id), UNFILED]
-        : group === "mention"
-          ? mentionSlugs
-          : (optionValues(group) ?? []);
+        : (optionValues(group) ?? []);
     const pool = threads.filter((thread) =>
       matchesFacets(thread, selection, { except: group }),
     );
@@ -361,20 +339,13 @@ function bucketFor(
   switch (lens) {
     case "days":
       return { key: thread.dayKey, title: thread.dayKey };
-    case "topics": {
-      if (thread.projectId) {
-        return {
-          key: thread.projectId,
-          title: thread.projectName ?? "Project",
-        };
-      }
-      // No Project yet, but the Enrichment named what it was about: stack
-      // under that rather than dropping the Thread into "unfiled".
-      const leading = thread.mentions[0];
-      return leading
-        ? { key: `mention:${leading.slug}`, title: leading.name }
+    case "project":
+      // Was the Topics Lens, which stacked by Project and fell back to the
+      // leading mention. Mentions are gone (ADR 0019) and the fallback with
+      // them; what is left is what it always mostly was.
+      return thread.projectId
+        ? { key: thread.projectId, title: thread.projectName ?? "Project" }
         : { key: UNFILED, title: "Unfiled" };
-    }
     case "kind":
       return thread.kind
         ? { key: thread.kind, title: KIND_LABELS[thread.kind] }

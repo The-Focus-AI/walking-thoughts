@@ -181,6 +181,10 @@ test("trashing a Thread hides its history until restore; purge removes Neon rows
       kind: "thread",
       targetId: "thread-a",
       idempotencyKey: "restore-thread-a",
+      // Pinned: restore is refused after the 30-day deadline, so leaving
+      // this on the real clock made the test pass until July 31 2026 and
+      // fail every day after.
+      now: "2026-07-02T13:00:00.000Z",
     },
   ]);
   threads = await repository.listThreads("user_a");

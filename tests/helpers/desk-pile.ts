@@ -122,11 +122,6 @@ export async function seedPile(page: Page): Promise<DeskPile> {
         targetCaptureIds: [],
         createdAt: "2026-08-01T19:00:00.000Z",
         sources: [],
-        mentions: [
-          { name: "The reservoir", slug: "the-reservoir", kind: "place" },
-          { name: "Frost heave", slug: "frost-heave", kind: "idea" },
-        ],
-        suggestedQuestions: ["How deep does the frost line run here?"],
       },
     ],
     [ids.grate]: [
@@ -140,10 +135,6 @@ export async function seedPile(page: Page): Promise<DeskPile> {
         targetCaptureIds: [],
         createdAt: "2026-08-01T19:10:00.000Z",
         sources: [],
-        mentions: [
-          { name: "The reservoir", slug: "the-reservoir", kind: "place" },
-        ],
-        suggestedQuestions: [],
       },
     ],
   };
@@ -190,17 +181,12 @@ export async function seedPile(page: Page): Promise<DeskPile> {
           targetCaptureIds: [],
           createdAt: "2026-08-01T19:00:00.000Z",
           sources: [],
-          mentions: [
-            { name: "The reservoir", slug: "the-reservoir", kind: "place" },
-            { name: "Frost heave", slug: "frost-heave", kind: "idea" },
-          ],
-          suggestedQuestions: ["How deep does the frost line run here?"],
         },
       ]),
     );
 
-    // A second Thread mentioning the same place, so a Mentions row counts
-    // more than one and the Topics Lens has something to stack.
+    // A second Thread with a report, so the Reports rows count more than
+    // one and the Lenses have something to stack.
     localStorage.setItem(
       `wt-thread-enrichments:${seeded.grate}`,
       JSON.stringify([
@@ -214,10 +200,6 @@ export async function seedPile(page: Page): Promise<DeskPile> {
           targetCaptureIds: [],
           createdAt: "2026-08-01T19:10:00.000Z",
           sources: [],
-          mentions: [
-            { name: "The reservoir", slug: "the-reservoir", kind: "place" },
-          ],
-          suggestedQuestions: [],
         },
       ]),
     );
