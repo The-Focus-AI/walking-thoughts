@@ -45,8 +45,8 @@ current PR's Preview check; it does not create a deployment.
 
 ## Mycel AI operations
 
-Enrichments, Day digests, Artifact publishing, recorded-audio transcription,
-and embeddings use Mycel's OpenAI-compatible API. `MYCEL_API_KEY` is a
+Enrichments, Day digests, and Artifact publishing use Mycel's OpenAI-compatible
+API with `z-ai/glm-5.3-flash` for text, tools, and photos. `MYCEL_API_KEY` is a
 server-only Application credential, resolved from the `password` field of
 `MYCEL_WALKING_THOUGHTS_KEY` in the environment's own 1Password vault.
 Never reuse the Production Application key for Preview or Development.
@@ -60,10 +60,17 @@ the live catalog capabilities for that operation. A missing model, missing
 capability, or failed transcription fails visibly, without dropping media or
 silently selecting another model. Existing Enrichment model history is retained.
 
-Before cutover, verify chat + tools + photo input, recorded-file transcription,
-and embeddings against live, priced Mycel suppliers using isolated Preview
-credentials. Sync the five Mycel/model settings to the corresponding Vercel
-environment, verify Preview, then merge the approved PR. Old AI Gateway keys
+Audio transcription, video Enrichment, and similar-Thread suggestions are
+deliberately unavailable for this open-source-only rollout. Keep
+`AI_TRANSCRIPTION_MODEL` and `AI_GATEWAY_EMBEDDING_MODEL` empty in Vercel;
+`vercel:sync` skips empty values, so explicitly clear any old model values.
+Recordings and existing transcripts remain preserved. The operation adapters
+remain available for separately verified open-source suppliers later.
+
+Before cutover, verify chat + tools + photo input against live, priced Mycel
+suppliers using isolated Preview credentials. Sync the Mycel/model settings
+to the corresponding Vercel environment, verify Preview, then merge the
+approved PR. Old AI Gateway keys
 are no longer used by this code; remove them from Vercel after rollout.
 Changing embedding models requires a separately verified re-embedding run;
 do not compare vectors from different models.

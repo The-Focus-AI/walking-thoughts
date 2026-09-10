@@ -1,10 +1,18 @@
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import { expect, test } from "@playwright/test";
-import { getGatewayClient } from "@/lib/enrichment/gateway";
+import { getGatewayClient, getSelectedGatewayModel } from "@/lib/enrichment/gateway";
 import { getEmbeddingClient } from "@/lib/enrichment/embeddings";
 import { getTranscriptionClient } from "@/lib/enrichment/transcription";
 import { probeIntegrationDependencies } from "@/lib/integrations/probes";
 import { reportIntegrationHealth } from "@/lib/integrations/health";
+
+test("unselected specialist models stay blocked without proprietary defaults", async () => {
+  const environment = { MYCEL_API_KEY: "fixture", MYCEL_BASE_URL: "http://127.0.0.1:1/v1" };
+  await expect(getEmbeddingClient(environment, "walker").embed("A pine tree")).rejects.toThrow("AI_GATEWAY_EMBEDDING_MODEL_required");
+  await expect(getTranscriptionClient(environment, "walker").transcribe({
+    attachmentId: "recording", fileName: "walk.wav", mimeType: "audio/wav", bytes: new Uint8Array([1]),
+  })).rejects.toThrow("AI_TRANSCRIPTION_MODEL_required");
+});
 
 test("health fails closed when a configured Mycel model lacks its required operation", async () => {
   const server = createServer((_req, res) => {
@@ -22,6 +30,9 @@ test("health fails closed when a configured Mycel model lacks its required opera
     const probes = await probeIntegrationDependencies({ ...environment, NODE_ENV: "test" });
     const health = reportIntegrationHealth(environment, probes);
     expect(health.services.gateway).toEqual({ status: "error", detail: "mycel_models_unavailable" });
+    const glmOnly = { ...environment, AI_TRANSCRIPTION_MODEL: "", AI_GATEWAY_EMBEDDING_MODEL: "" };
+    const enabledProbes = await probeIntegrationDependencies({ ...glmOnly, NODE_ENV: "test" });
+    expect(reportIntegrationHealth(glmOnly, enabledProbes).services.gateway).toEqual({ status: "ready" });
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -151,12 +162,12 @@ test("Mycel generation preserves per-user attribution and executes a research to
     requests.push({ path: req.url!, headers: req.headers, body });
     res.setHeader("Content-Type", "application/json");
     if (req.url === "/v1/models") {
-      res.end(JSON.stringify({ data: [{ id: "test/research", capabilities: ["chat", "tool-calling"] }] }));
+      res.end(JSON.stringify({ data: [{ id: "z-ai/glm-5.3-flash", capabilities: ["chat", "tool-calling"] }] }));
       return;
     }
     const hasResult = body.messages.some((m: { role: string }) => m.role === "tool");
     res.end(JSON.stringify({
-      id: "completion-1", object: "chat.completion", created: 1, model: "test/research",
+      id: "completion-1", object: "chat.completion", created: 1, model: "z-ai/glm-5.3-flash",
       choices: [{ index: 0, finish_reason: hasResult ? "stop" : "tool_calls", message: hasResult
         ? { role: "assistant", content: "A larch is a deciduous conifer." }
         : { role: "assistant", content: null, tool_calls: [{ id: "call-search", type: "function", function: { name: "web_search", arguments: JSON.stringify({ query: "larch needles" }) } }] } }],
@@ -170,15 +181,16 @@ test("Mycel generation preserves per-user attribution and executes a research to
     const searches: string[] = [];
     const gateway = getGatewayClient(environment, "walker-17");
     const result = await gateway.generate({
-      model: "test/research", system: "Research the Capture.", prompt: "What is a larch?", requestTitle: false, media: [],
+      model: getSelectedGatewayModel(environment), system: "Research the Capture.", prompt: "What is a larch?", requestTitle: false, media: [],
       search: { provider: "test", async search(query) { searches.push(query); return []; }, async readPage() { return null; } },
     });
     expect(result.text).toBe("A larch is a deciduous conifer.");
-    expect(result.model).toBe("test/research");
+    expect(result.model).toBe("z-ai/glm-5.3-flash");
     expect(searches).toEqual(["larch needles"]);
     const calls = requests.filter((r) => r.path === "/v1/chat/completions");
     expect(calls).toHaveLength(2);
     for (const call of calls) {
+      expect(call.body.model).toBe("z-ai/glm-5.3-flash");
       expect(call.headers.authorization).toBe("Bearer test-credential");
       expect(call.headers["x-mycel-end-user"]).toBe("walker-17");
       expect(String(call.headers["x-exchange-require-capability"]).split(",")).toContain("tool-calling");

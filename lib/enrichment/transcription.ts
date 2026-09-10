@@ -7,7 +7,6 @@ import { createMycelClient, type MycelEnvironment } from "./mycel";
  * the original filename and MIME type; realtime-only models are not suitable.
  * A live, priced transcription offer is required, just as for chat/embeddings.
  */
-export const DEFAULT_TRANSCRIPTION_MODEL = "openai/whisper-large-v3";
 
 export type TranscriptionRequest = {
   attachmentId: string;
@@ -35,10 +34,7 @@ type TranscriptionGlobals = typeof globalThis & {
 export function getTranscriptionModel(
   environment: Record<string, string | undefined> = process.env,
 ): string {
-  const configured = environment.AI_TRANSCRIPTION_MODEL?.trim();
-  return configured && configured.length > 0
-    ? configured
-    : DEFAULT_TRANSCRIPTION_MODEL;
+  return environment.AI_TRANSCRIPTION_MODEL?.trim() ?? "";
 }
 
 export function createFakeTranscriptionClient(
@@ -61,6 +57,7 @@ function createGatewayTranscriptionClient(model: string, environment: MycelEnvir
   return {
     model,
     async transcribe(input) {
+      if (!model) throw new Error("AI_TRANSCRIPTION_MODEL_required");
       await mycel.requireModel(model, ["transcription"]);
       const body = new FormData();
       body.set("model", model);
@@ -105,5 +102,5 @@ export function getTranscriptionClient(
     return createGatewayTranscriptionClient(model, environment, userId);
   }
 
-  return createFakeTranscriptionClient(undefined, model);
+  return createFakeTranscriptionClient(undefined, model || undefined);
 }

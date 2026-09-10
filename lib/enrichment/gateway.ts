@@ -14,7 +14,7 @@ import type {
   GatewayGeneration,
 } from "./types";
 
-export const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.4";
+export const DEFAULT_GATEWAY_MODEL = "z-ai/glm-5.3-flash";
 
 /** Hard budget for the research loop (ADR 0012): tool steps + final text. */
 export const RESEARCH_STEP_LIMIT = 8;

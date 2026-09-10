@@ -6,7 +6,13 @@
 export const DATA_HANDLING_TITLE = "How synchronized data is handled";
 
 export const DATA_HANDLING_BODY =
-  "When you sync, Capture text and media leave this device and are processed through Mycel by the selected model supplier. Recorded audio is sent to a speech-to-text model there first, and its transcript is retained with the Thread. Walking Thoughts does not claim end-to-end encryption for synchronized content.";
+  "When you sync, Capture text and photos leave this device and are processed through Mycel by GLM-5.3-Flash. Audio transcription, video Enrichment, and similar-Thread suggestions are currently unavailable while open-source suppliers are being verified. Recordings remain preserved; Threads that need transcription wait rather than losing their audio. Walking Thoughts does not claim end-to-end encryption for synchronized content.";
+
+export const TRANSCRIPTION_UNAVAILABLE =
+  "Audio transcription is currently unavailable. Your recording is preserved; this Thread will wait until transcription is available.";
+
+export const SIMILARITY_UNAVAILABLE =
+  "Similar-Thread suggestions are currently unavailable.";
 
 export const FOREGROUND_SYNC_IDLE =
   "Foreground sync when open and online (background is best effort)";

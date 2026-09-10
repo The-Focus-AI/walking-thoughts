@@ -15,6 +15,8 @@ test("shell discloses gateway processing and refuses an E2E encryption claim", a
   const disclosure = page.getByTestId("data-handling-disclosure");
   await expect(disclosure).toBeVisible();
   await expect(disclosure).toContainText("Mycel");
+  await expect(disclosure).toContainText("GLM-5.3-Flash");
+  await expect(disclosure).toContainText("Audio transcription, video Enrichment, and similar-Thread suggestions are currently unavailable");
   await expect(disclosure).toContainText("does not claim end-to-end encryption");
   await expect(disclosure).toContainText(
     "local commits are never discarded",

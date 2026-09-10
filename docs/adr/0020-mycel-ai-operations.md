@@ -8,6 +8,12 @@ recorded-audio transcription. Keep the AI SDK tool loop in-process (ADR 0012),
 and transcribe recordings before Enrichment (ADR 0015). Mycel is the Umwelten
 model exchange, not the unrelated mycelhq agent runtime.
 
+Model selection is open-source-only. Text, tools, and photo input use
+`z-ai/glm-5.3-flash` (MIT-licensed weights with public inference code).
+Kimi K3 and non-Flash GLM-5.3 are excluded because their licenses have
+additional restrictions. Transcription and embeddings remain blocked pending
+verified open-source suppliers; no proprietary fallback is authorized.
+
 The application uses the public OpenAI-compatible protocol directly rather
 than depending on an unpublished Umwelten package. Chat and embeddings use
 the AI SDK compatible provider; transcription uses multipart HTTP so the
@@ -28,6 +34,8 @@ The model configuration variable names remain compatible. Stored Enrichments
 and transcripts retain their original model IDs. Switching transport alone
 does not rewrite history or justify comparing different embedding spaces.
 
-Release requires live verification of all existing media paths and separate
-Preview/Production Application credentials. Image/video generation UI is not
-part of this migration.
+The approved first release requires live text/tool/photo verification and
+separate Preview/Production Application credentials. Transcription and
+embeddings deliberately stay unconfigured, with preserved recordings and
+visible limitations, rather than blocking the GLM rollout or using a
+proprietary fallback. Image/video generation UI is not part of this migration.

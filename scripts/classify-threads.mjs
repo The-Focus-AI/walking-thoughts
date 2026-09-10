@@ -44,7 +44,7 @@ const SYSTEM = [
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const force = args.has("--force");
-const model = process.env.AI_GATEWAY_MODEL?.trim() || "openai/gpt-5.4";
+const model = process.env.AI_GATEWAY_MODEL?.trim() || "z-ai/glm-5.3-flash";
 const CONCURRENCY = 5;
 
 const databaseUrl = process.env.DATABASE_URL;

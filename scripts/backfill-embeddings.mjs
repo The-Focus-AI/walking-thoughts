@@ -9,9 +9,8 @@
  * nonsense).
  *
  * Check the model against the gateway's live /v1/models table before running
- * this; AI_GATEWAY_EMBEDDING_MODEL names it, and the default mirrors
- * lib/enrichment/embeddings.ts — that file is canonical, this copy exists
- * because a plain-JS script cannot import the TypeScript module.
+ * this; AI_GATEWAY_EMBEDDING_MODEL must explicitly name a verified
+ * open-source supplier model. There is no implicit model selection.
  *
  *   # Source .fnox/env first so OP_SERVICE_ACCOUNT_TOKEN is set, then:
  *   fnox exec --profile prod -- node scripts/backfill-embeddings.mjs --dry-run
@@ -22,7 +21,6 @@ import { neon } from "@neondatabase/serverless";
 import { embed } from "ai";
 import { createMycelClient } from "../lib/enrichment/mycel.ts";
 
-const DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small";
 const TEXT_LIMIT = 4000;
 
 const args = new Set(process.argv.slice(2));
@@ -34,8 +32,11 @@ if (!databaseUrl) {
   console.error("DATABASE_URL is not set. Run under fnox exec.");
   process.exit(1);
 }
-const model =
-  process.env.AI_GATEWAY_EMBEDDING_MODEL?.trim() || DEFAULT_EMBEDDING_MODEL;
+const model = process.env.AI_GATEWAY_EMBEDDING_MODEL?.trim();
+if (!model) {
+  console.error("AI_GATEWAY_EMBEDDING_MODEL is required; select a verified open-source supplier first.");
+  process.exit(1);
+}
 
 const sql = neon(databaseUrl);
 

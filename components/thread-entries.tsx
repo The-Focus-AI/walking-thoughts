@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createIdbMediaStore } from "@/lib/local-capture/media-store";
+import { TRANSCRIPTION_UNAVAILABLE } from "@/lib/disclosures/copy";
 import type {
   CaptureSyncStatus,
   LocalAttachment,
@@ -103,10 +104,11 @@ export function CaptureEntryView({
       ) : null}
       {capture.status === "needs_attention" ? (
         <div className="capture-attention">
-          <span>{capture.syncReason ?? "Synchronization failed"}</span>
+          <span>{capture.syncReason?.startsWith("transcription_unavailable_")
+            ? TRANSCRIPTION_UNAVAILABLE
+            : (capture.syncReason ?? "Synchronization failed")}</span>
         </div>
       ) : null}
     </article>
   );
 }
-

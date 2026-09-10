@@ -69,10 +69,12 @@ export async function probeIntegrationDependencies(
     try {
       // Catalog reads do not run inference or charge the health caller.
       const mycel = createMycelClient(environment, "walking-thoughts-health");
+      const transcription = getTranscriptionModel(environment);
+      const embedding = getSelectedEmbeddingModel(environment);
       await Promise.all([
         mycel.requireModel(getSelectedGatewayModel(environment), ["chat", "tool-calling", "image-input"]),
-        mycel.requireModel(getTranscriptionModel(environment), ["transcription"]),
-        mycel.requireModel(getSelectedEmbeddingModel(environment), ["embeddings"]),
+        ...(transcription ? [mycel.requireModel(transcription, ["transcription"])] : []),
+        ...(embedding ? [mycel.requireModel(embedding, ["embeddings"])] : []),
       ]);
       gateway = { ok: true };
     } catch {

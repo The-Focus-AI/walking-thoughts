@@ -29,6 +29,7 @@ import {
   type FacetThread,
 } from "@/lib/desk/facets";
 import { fileThread } from "@/lib/desk/file-thread";
+import { SIMILARITY_UNAVAILABLE } from "@/lib/disclosures/copy";
 import { matchesQuery, searchSnippet } from "@/lib/desk/search";
 import {
   priorThreads,
@@ -211,15 +212,17 @@ function PriorThreads({
 }) {
   const onLinkClick = useLinkFallback();
   const [alike, setAlike] = useState<PriorThread[]>([]);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
         const response = await fetch(`/api/enrichment/similar/${threadId}`);
-        if (!response.ok) return;
-        const body = (await response.json()) as { similar?: PriorThread[] };
+        if (!response.ok) throw new Error("similarity_unavailable");
+        const body = (await response.json()) as { similar?: PriorThread[]; unavailable?: boolean };
         if (!active) return;
+        setUnavailable(Boolean(body.unavailable));
         // The device knows only its own Threads, so the corpus-wide answer
         // arrives already named; anything it repeats is dropped.
         const linked = new Set(shared.map((prior) => prior.threadId));
@@ -230,6 +233,7 @@ function PriorThreads({
         );
       } catch {
         // Offline, or no similarity stored: the shared mentions stand alone.
+        if (active) setUnavailable(true);
       }
     })();
     return () => {
@@ -241,7 +245,7 @@ function PriorThreads({
   if (all.length === 0) {
     return (
       <p className="thread-row-priors-none" data-testid="thread-priors-none">
-        First time this has come up.
+        {unavailable ? SIMILARITY_UNAVAILABLE : "First time this has come up."}
       </p>
     );
   }

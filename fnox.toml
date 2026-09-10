@@ -92,16 +92,16 @@ default = "https://mycel.thefocus.ai/v1"
 description = "Mycel OpenAI-compatible endpoint (server only)"
 
 [secrets.AI_GATEWAY_MODEL]
-default = "openai/gpt-5.4"
+default = "z-ai/glm-5.3-flash"
 description = "Mycel model for new Enrichments; requires chat, tool-calling and image-input"
 
 [secrets.AI_TRANSCRIPTION_MODEL]
-default = "openai/whisper-large-v3"
-description = "Mycel recorded-file transcription model"
+default = ""
+description = "Blocked until a verified open-source Mycel transcription model is selected"
 
 [secrets.AI_GATEWAY_EMBEDDING_MODEL]
-default = "openai/text-embedding-3-small"
-description = "Mycel embedding model; changing vector space requires re-embedding Threads"
+default = ""
+description = "Blocked until a verified open-source embedding model and re-embedding plan are selected"
 
 [secrets.FIRECRAWL_API_KEY]
 provider = "op"

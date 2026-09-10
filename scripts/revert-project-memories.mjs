@@ -43,7 +43,7 @@ const DEDUP_SYSTEM = [
 
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
-const model = process.env.AI_GATEWAY_MODEL?.trim() || "openai/gpt-5.4";
+const model = process.env.AI_GATEWAY_MODEL?.trim() || "z-ai/glm-5.3-flash";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");

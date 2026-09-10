@@ -8,6 +8,7 @@ import { EnrichmentReport } from "@/components/enrichment-report";
 import { ArtifactLightbox, useDeskViewport } from "@/components/artifact-lightbox";
 import { MediaLightbox } from "@/components/media-lightbox";
 import { statusLabel } from "@/components/thread-entries";
+import { SIMILARITY_UNAVAILABLE, TRANSCRIPTION_UNAVAILABLE } from "@/lib/disclosures/copy";
 import {
   DIALOGUE_ROLE_LABELS,
   dialogueRoles,
@@ -268,7 +269,9 @@ function CaptureHero({
         <p className="thread-capture-reason">
           {capture.syncReason?.startsWith("missing_original_media")
             ? "The original media never reached the server, so there is nothing to research. Move this Thread to Trash if it is not worth keeping."
-            : (capture.syncReason ?? "Synchronization failed")}
+            : capture.syncReason?.startsWith("transcription_unavailable_")
+              ? TRANSCRIPTION_UNAVAILABLE
+              : (capture.syncReason ?? "Synchronization failed")}
         </p>
       ) : null}
     </article>
@@ -366,6 +369,7 @@ export function ThreadChat({
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   /** What the walk already knew, folded into the turn that used it. */
   const [priors, setPriors] = useState<PriorThread[]>([]);
+  const [similarityUnavailable, setSimilarityUnavailable] = useState(false);
   const [filingBusy, setFilingBusy] = useState(false);
   const [artifact, setArtifact] = useState<ArtifactSummary | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -677,11 +681,15 @@ export function ThreadChat({
     void (async () => {
       try {
         const response = await fetch(`/api/enrichment/similar/${threadId}`);
-        if (!response.ok) return;
-        const body = (await response.json()) as { similar?: PriorThread[] };
-        if (active) setPriors(body.similar ?? []);
+        if (!response.ok) throw new Error("similarity_unavailable");
+        const body = (await response.json()) as { similar?: PriorThread[]; unavailable?: boolean };
+        if (active) {
+          setPriors(body.similar ?? []);
+          setSimilarityUnavailable(Boolean(body.unavailable));
+        }
       } catch {
         // The report stands on its own; continuity is the extra.
+        if (active) setSimilarityUnavailable(true);
       }
     })();
     return () => {
@@ -919,6 +927,11 @@ export function ThreadChat({
             />
           ),
         )}
+        {similarityUnavailable ? (
+          <p className="thread-row-priors-none" data-testid="thread-similarity-unavailable">
+            {SIMILARITY_UNAVAILABLE}
+          </p>
+        ) : null}
         {isEnriching ? (
           <article
             className="enrichment-report enrichment-report-pending"
