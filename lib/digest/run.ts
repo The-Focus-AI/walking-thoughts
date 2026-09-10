@@ -37,7 +37,7 @@ export async function runDayDigest(
   }
 
   const environment = deps.environment ?? process.env;
-  const gateway = deps.gateway ?? getGatewayClient(environment);
+  const gateway = deps.gateway ?? getGatewayClient(environment, deps.userId);
   const model = deps.model ?? enrichmentSystemAndModel(environment).model;
 
   let walkerProfile = request.walkerProfile ?? null;

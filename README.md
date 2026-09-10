@@ -43,6 +43,31 @@ integration, and merging the approved PR to `main` creates Production. Do not
 run `vercel deploy` directly. `mise deploy` validates the application and the
 current PR's Preview check; it does not create a deployment.
 
+## Mycel AI operations
+
+Enrichments, Day digests, Artifact publishing, recorded-audio transcription,
+and embeddings use Mycel's OpenAI-compatible API. `MYCEL_API_KEY` is a
+server-only Application credential, resolved from the `password` field of
+`MYCEL_WALKING_THOUGHTS_KEY` in the environment's own 1Password vault.
+Never reuse the Production Application key for Preview or Development.
+Keyless development uses isolated fakes; production fails closed.
+
+`MYCEL_BASE_URL` defaults to `https://mycel.thefocus.ai/v1`. Existing model
+setting names remain: `AI_GATEWAY_MODEL`, `AI_TRANSCRIPTION_MODEL`, and
+`AI_GATEWAY_EMBEDDING_MODEL`. They now contain Mycel catalog IDs. Every real
+operation carries the signed-in walker's ID in `X-Mycel-End-User` and requires
+the live catalog capabilities for that operation. A missing model, missing
+capability, or failed transcription fails visibly, without dropping media or
+silently selecting another model. Existing Enrichment model history is retained.
+
+Before cutover, verify chat + tools + photo input, recorded-file transcription,
+and embeddings against live, priced Mycel suppliers using isolated Preview
+credentials. Sync the five Mycel/model settings to the corresponding Vercel
+environment, verify Preview, then merge the approved PR. Old AI Gateway keys
+are no longer used by this code; remove them from Vercel after rollout.
+Changing embedding models requires a separately verified re-embedding run;
+do not compare vectors from different models.
+
 ## Verification
 
 ```sh

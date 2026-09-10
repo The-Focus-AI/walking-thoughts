@@ -9,6 +9,7 @@ function probes(overrides: Partial<HealthProbeResults> = {}): HealthProbeResults
     database: { ok: true },
     blob: { ok: true, privateAccess: true },
     queue: { ok: true },
+    gateway: { ok: true },
     ...overrides,
   };
 }
@@ -22,7 +23,7 @@ test("integration health reports each service without embedding secret values", 
       CLERK_ALLOWED_USER_IDS: "user_owner",
       DATABASE_URL: "postgres://secret-user:secret-pass@host/db",
       BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_secret",
-      AI_GATEWAY_API_KEY: "gateway_secret",
+      MYCEL_API_KEY: "gateway_secret",
       AI_GATEWAY_MODEL: "anthropic/claude-sonnet-5",
       TAVILY_API_KEY: "tavily_secret",
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: "vapid_public",

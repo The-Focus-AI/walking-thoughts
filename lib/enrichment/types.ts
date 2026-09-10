@@ -171,6 +171,8 @@ export type GatewayGenerateInput = {
 };
 
 export type GatewayClient = {
+  /** Real gateways validate against live offers; offline fakes use the fixture registry. */
+  validateMedia?(model: string, kinds: MediaKind[]): Promise<void>;
   generate(input: GatewayGenerateInput): Promise<GatewayGeneration>;
 };
 

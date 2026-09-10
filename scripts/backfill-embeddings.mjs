@@ -20,6 +20,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { embed } from "ai";
+import { createMycelClient } from "../lib/enrichment/mycel.ts";
 
 const DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small";
 const TEXT_LIMIT = 4000;
@@ -115,7 +116,9 @@ async function main() {
     }
 
     try {
-      const { embedding } = await embed({ model, value: text });
+      const mycel = createMycelClient(process.env, thread.user_id);
+      await mycel.requireModel(model, ["embeddings"]);
+      const { embedding } = await embed({ model: mycel.provider(["embeddings"]).embeddingModel(model), value: text });
       const literal = `[${[...embedding].join(",")}]`;
       await sql`
         INSERT INTO thread_embeddings (

@@ -75,8 +75,7 @@ export function getWebSearchClient(
   // Mirror the gateway's real-model detection: synthetic search results must
   // never be fed to a real model as citable sources — skip search instead.
   if (
-    environment.AI_GATEWAY_API_KEY ||
-    environment.VERCEL_OIDC_TOKEN ||
+    environment.MYCEL_API_KEY ||
     environment.NODE_ENV === "production"
   ) {
     return null;

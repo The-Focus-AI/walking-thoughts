@@ -523,10 +523,11 @@ async function runJob(
     const readableMedia = media.filter(
       (part) => part.kind !== "audio" || !transcribed.has(part.attachmentId),
     );
-    const capability = assertModelSupportsMedia(
-      running.model,
-      readableMedia.map((part) => part.kind),
-    );
+    const kinds = readableMedia.map((part) => part.kind);
+    if (gateway.validateMedia) await gateway.validateMedia(running.model, kinds);
+    const capability = gateway.validateMedia
+      ? { ok: true as const }
+      : assertModelSupportsMedia(running.model, kinds);
     if (!capability.ok) {
       await repository.markJobFailed(userId, running.id, capability.reason);
       await maybeNotify(userId, push, {
@@ -772,7 +773,12 @@ async function rememberThreadShape(
     });
   } catch {
     // The report stands; similarity is what is missing, and the backfill
-    // is how it is recovered.
+    // is how it is recovered. Report operational failure without logging
+    // the Capture text, provider response body, or credentials.
+    console.error("thread_embedding_failed", {
+      threadId: input.threadId,
+      model: embeddings.model,
+    });
   }
 }
 
@@ -805,12 +811,12 @@ export async function processPendingEnrichments(
 ): Promise<EnrichmentBatchResponse> {
   const environment = options.environment ?? process.env;
   const { system, model } = enrichmentSystemAndModel(environment);
-  const gateway = options.gateway ?? getGatewayClient(environment);
-  const embeddings = options.embeddings ?? getEmbeddingClient(environment);
+  const gateway = options.gateway ?? getGatewayClient(environment, userId);
+  const embeddings = options.embeddings ?? getEmbeddingClient(environment, userId);
   const blobStore =
     options.blobStore ??
     getPrivateBlobStore(environment as NodeJS.ProcessEnv);
-  const transcriber = options.transcriber ?? getTranscriptionClient(environment);
+  const transcriber = options.transcriber ?? getTranscriptionClient(environment, userId);
   const placeResolver =
     options.placeResolver ?? getNearbyPlaceResolver(environment);
   const search = options.search
@@ -829,7 +835,7 @@ export async function processPendingEnrichments(
   const artifacts: ArtifactHooks | undefined = options.artifactRepository
     ? {
         repository: options.artifactRepository,
-        gateway: options.artifactGateway ?? getGatewayClient(environment),
+        gateway: options.artifactGateway ?? getGatewayClient(environment, userId),
       }
     : undefined;
 

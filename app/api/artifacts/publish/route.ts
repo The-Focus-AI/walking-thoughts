@@ -69,7 +69,7 @@ export async function POST(request: Request) {
           .filter((text) => text.length > 0),
         walkedAt: thread.captures[0]?.createdAt ?? null,
         repository: getArtifactRepository(),
-        gateway: getGatewayClient(),
+        gateway: getGatewayClient(process.env, access.userId),
         republish,
       });
     logPublishOutcome({

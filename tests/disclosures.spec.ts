@@ -14,7 +14,7 @@ test("shell discloses gateway processing and refuses an E2E encryption claim", a
   await page.getByText("Account & data handling").click();
   const disclosure = page.getByTestId("data-handling-disclosure");
   await expect(disclosure).toBeVisible();
-  await expect(disclosure).toContainText("Vercel AI Gateway");
+  await expect(disclosure).toContainText("Mycel");
   await expect(disclosure).toContainText("does not claim end-to-end encryption");
   await expect(disclosure).toContainText(
     "local commits are never discarded",

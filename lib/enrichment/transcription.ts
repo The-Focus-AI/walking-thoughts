@@ -1,24 +1,13 @@
-import { experimental_transcribe as transcribeAudio } from "ai";
+import { z } from "zod";
+import { createMycelClient, type MycelEnvironment } from "./mycel";
 
 /**
- * Transcription is its own gateway call because no Enrichment model can decode
- * audio. Not "the one we run" — checked against the gateway's own model list on
- * 2026-07-26, all 204 language models accept text, image, and pdf, and nothing
- * else (see capabilities.ts). A held-button audio Capture has exactly one route
- * to a report: speech-to-text first. It also gives the walker their own words
- * back at the desk, which sending bytes to a model never would.
- *
- * Newest is not the same as callable. The gateway lists five transcription
- * models, and `openai/gpt-realtime-whisper` — the newest, and briefly the
- * default here — is tagged `websocket-realtime`: it streams transcript deltas
- * from live audio over a socket, and a held recording posted to the batch
- * endpoint gets nothing back. Enrichment runs long after the walk, on a file,
- * so the model has to do batch. `xai/grok-stt` says so outright ("batch and
- * streaming modes"), was released 2026-03-16, and costs a tenth of the realtime
- * model per second. The model that heard a Capture is recorded on its
- * transcript, so a later change leaves the record of what produced each one.
+ * Recorded audio is transcribed before Enrichment, preserving the walker's
+ * words and the model that heard them. Mycel's multipart transcription endpoint keeps
+ * the original filename and MIME type; realtime-only models are not suitable.
+ * A live, priced transcription offer is required, just as for chat/embeddings.
  */
-export const DEFAULT_TRANSCRIPTION_MODEL = "xai/grok-stt";
+export const DEFAULT_TRANSCRIPTION_MODEL = "openai/whisper-large-v3";
 
 export type TranscriptionRequest = {
   attachmentId: string;
@@ -67,19 +56,31 @@ export function createFakeTranscriptionClient(
   };
 }
 
-function createGatewayTranscriptionClient(model: string): TranscriptionClient {
+function createGatewayTranscriptionClient(model: string, environment: MycelEnvironment, userId?: string): TranscriptionClient {
+  const mycel = createMycelClient(environment, userId);
   return {
     model,
     async transcribe(input) {
-      const result = await transcribeAudio({
-        model,
-        audio: input.bytes,
+      await mycel.requireModel(model, ["transcription"]);
+      const body = new FormData();
+      body.set("model", model);
+      body.set("file", new Blob([new Uint8Array(input.bytes)], { type: input.mimeType }), input.fileName);
+      const response = await fetch(`${mycel.baseURL}/audio/transcriptions`, {
+        method: "POST", body,
+        headers: { ...mycel.headers, "X-Exchange-Require-Capability": "transcription" },
+        signal: AbortSignal.timeout(120_000),
       });
+      if (!response.ok) throw new Error(`mycel_transcription_http_${response.status}`);
+      const result = z.object({
+        text: z.string(), language: z.string().nullish(), duration: z.number().nullish(),
+        usage: z.object({ seconds: z.number().nullish() }).nullish(),
+      }).parse(await response.json());
+      if (!result.text.trim()) throw new Error("mycel_transcription_empty");
       return {
         text: result.text.trim(),
         model,
         language: result.language ?? null,
-        durationSeconds: result.durationInSeconds ?? null,
+        durationSeconds: result.duration ?? result.usage?.seconds ?? null,
       };
     },
   };
@@ -91,17 +92,17 @@ function createGatewayTranscriptionClient(model: string): TranscriptionClient {
  */
 export function getTranscriptionClient(
   environment: Record<string, string | undefined> = process.env,
+  userId?: string,
 ): TranscriptionClient {
   const injected = (globalThis as TranscriptionGlobals).__WT_TRANSCRIBER__;
   if (injected) return injected;
 
   const model = getTranscriptionModel(environment);
   if (
-    environment.AI_GATEWAY_API_KEY ||
-    environment.VERCEL_OIDC_TOKEN ||
+    environment.MYCEL_API_KEY ||
     environment.NODE_ENV === "production"
   ) {
-    return createGatewayTranscriptionClient(model);
+    return createGatewayTranscriptionClient(model, environment, userId);
   }
 
   return createFakeTranscriptionClient(undefined, model);

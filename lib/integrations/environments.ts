@@ -33,7 +33,7 @@ export function expectedResourceSeparation(
     clerk: `${label} Clerk application`,
     neon: `${label} Neon database`,
     blob: `${label} private Vercel Blob store`,
-    gateway: `${label} Vercel AI Gateway credentials`,
+    gateway: `${label} Mycel Application credentials`,
     push: `${label} VAPID keypair`,
     queue: `${label} Neon Enrichment job tables`,
   };

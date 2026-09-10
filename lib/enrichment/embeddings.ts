@@ -1,4 +1,5 @@
 import { embed } from "ai";
+import { createMycelClient, type MycelEnvironment } from "./mycel";
 
 /**
  * Embedding rides the gateway like every other model choice (ADR 0004), so
@@ -56,11 +57,13 @@ export function createFakeEmbeddingClient(dimensions = 64): EmbeddingClient {
   };
 }
 
-function createGatewayEmbeddingClient(model: string): EmbeddingClient {
+function createGatewayEmbeddingClient(model: string, environment: MycelEnvironment, userId?: string): EmbeddingClient {
+  const mycel = createMycelClient(environment, userId);
   return {
     model,
     async embed(text: string) {
-      const { embedding } = await embed({ model, value: text });
+      await mycel.requireModel(model, ["embeddings"]);
+      const { embedding } = await embed({ model: mycel.provider(["embeddings"]).embeddingModel(model), value: text });
       return [...embedding];
     },
   };
@@ -73,14 +76,15 @@ function createGatewayEmbeddingClient(model: string): EmbeddingClient {
  */
 export function getEmbeddingClient(
   environment: Record<string, string | undefined> = process.env,
+  userId?: string,
 ): EmbeddingClient {
   const injected = (globalThis as EmbeddingGlobals).__WT_EMBEDDINGS__;
   if (injected) return injected;
   const hasGateway =
-    Boolean(environment.AI_GATEWAY_API_KEY?.trim()) ||
-    Boolean(environment.VERCEL_OIDC_TOKEN?.trim());
+    Boolean(environment.MYCEL_API_KEY?.trim()) ||
+    environment.NODE_ENV === "production";
   return hasGateway
-    ? createGatewayEmbeddingClient(getSelectedEmbeddingModel(environment))
+    ? createGatewayEmbeddingClient(getSelectedEmbeddingModel(environment), environment, userId)
     : createFakeEmbeddingClient();
 }
 

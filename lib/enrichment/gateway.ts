@@ -1,5 +1,6 @@
 import { generateText, stepCountIs, tool, type ToolSet } from "ai";
 import { z } from "zod";
+import { createMycelClient, type MycelEnvironment } from "./mycel";
 import { truncatePage, type ResearchStep } from "./research";
 import {
   getEnrichmentSystemInstruction,
@@ -13,7 +14,7 @@ import type {
   GatewayGeneration,
 } from "./types";
 
-export const DEFAULT_GATEWAY_MODEL = "anthropic/claude-sonnet-5";
+export const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.4";
 
 /** Hard budget for the research loop (ADR 0012): tool steps + final text. */
 export const RESEARCH_STEP_LIMIT = 8;
@@ -127,8 +128,12 @@ export function createFakeGatewayClient(
  * candidate pages, read_page fetches one in full — under a step budget.
  * Every tool call becomes a ResearchStep; read pages become Sources.
  */
-function createAiSdkGatewayClient(): GatewayClient {
+function createAiSdkGatewayClient(environment: MycelEnvironment, userId?: string): GatewayClient {
+  const mycel = createMycelClient(environment, userId);
   return {
+    async validateMedia(model, kinds) {
+      await mycel.requireModel(model, ["chat", ...kinds.map((kind) => `${kind}-input`)]);
+    },
     async generate(input) {
       const research: ResearchStep[] = [];
       const readSources = new Map<string, EnrichmentSource>();
@@ -232,27 +237,27 @@ function createAiSdkGatewayClient(): GatewayClient {
       }
 
       const hasTools = Object.keys(tools).length > 0;
+      const capabilities = ["chat", ...(hasTools ? ["tool-calling"] : [])];
+      for (const part of input.media) {
+        capabilities.push(`${part.kind}-input`);
+      }
+      await mycel.requireModel(input.model, capabilities);
 
       const content: Array<
         | { type: "text"; text: string }
         | { type: "file"; data: Uint8Array; mediaType: string }
-        | { type: "image"; image: Uint8Array }
       > = [{ type: "text", text: input.prompt }];
 
       for (const part of input.media) {
-        if (part.kind === "image") {
-          content.push({ type: "image", image: part.bytes });
-        } else {
-          content.push({
-            type: "file",
-            data: part.bytes,
-            mediaType: part.mimeType,
-          });
-        }
+        content.push({
+          type: "file",
+          data: part.bytes,
+          mediaType: part.mimeType,
+        });
       }
 
       const result = await generateText({
-        model: input.model,
+        model: mycel.provider(capabilities).chatModel(input.model),
         system: input.system,
         messages: [{ role: "user", content }],
         // The SDK's Anthropic default is 4,096 — enough for a report, not
@@ -300,16 +305,16 @@ function createAiSdkGatewayClient(): GatewayClient {
 
 export function getGatewayClient(
   environment: Record<string, string | undefined> = process.env,
+  userId?: string,
 ): GatewayClient {
   const injected = (globalThis as GatewayGlobals).__WT_GATEWAY__;
   if (injected) return injected;
 
   if (
-    environment.AI_GATEWAY_API_KEY ||
-    environment.VERCEL_OIDC_TOKEN ||
+    environment.MYCEL_API_KEY ||
     environment.NODE_ENV === "production"
   ) {
-    return createAiSdkGatewayClient();
+    return createAiSdkGatewayClient(environment, userId);
   }
 
   return createFakeGatewayClient();
