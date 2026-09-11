@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Runs after snapshot activation, with this orb's injected credentials only.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# No vault reads, interactive login, or dependency installation on wake.
+# Removed or rotated Amp secrets must not leave a previous token active.
+if [ -f "$ROOT/.fnox/env" ]; then
+  sed -i '/^\(OP_SERVICE_ACCOUNT_TOKEN\|VERCEL_TOKEN\|GITHUB_TOKEN\)=/d' "$ROOT/.fnox/env"
+fi
+bash "$ROOT/scripts/bootstrap-fnox-env.sh"
+printf 'Walking Thoughts credential bootstrap ready (no vault access performed).\n'

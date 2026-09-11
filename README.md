@@ -22,6 +22,26 @@ service-account token from the `thefocus` vault into the protected,
 gitignored `.fnox/env` bootstrap file. Interactive shells may use
 `fnox activate`; non-interactive commands should use `fnox exec -- <command>`.
 
+## Amp orbs
+
+`.agents/setup` installs mise tools, the 1Password CLI, frozen pnpm dependencies,
+and Playwright's headless Chromium for Amp's reusable project snapshot. It uses
+`mise run install:dependencies`: skills are already committed, and the broader
+`install` task's experimental skills installer can rewrite them from upstream.
+Exact snapshots skip setup; stale snapshots rerun it using installed tools and
+package caches. No database or credentials are needed for public-surface work.
+
+`.agents/resume` only copies injected bootstrap tokens into protected `.fnox/env`
+using the existing helper; it never installs packages or signs into 1Password.
+Supply a Development-scoped `OP_SERVICE_ACCOUNT_TOKEN` through Amp secrets for
+authenticated work, then use the existing fnox-backed tasks. Setup does not
+fetch vault secrets, start services, or deploy. Without Clerk configuration the
+app continues to fail closed. Use `mise exec -- <command>` in non-interactive
+shells; setup also makes mise shims available in repo-scoped login shells.
+
+These lifecycle files must reach the project's default branch before future
+orbs use them. No snapshot deletion is needed for normal setup changes.
+
 ## Environments
 
 - Development: `Walking Thoughts - Development` 1Password vault and a Clerk

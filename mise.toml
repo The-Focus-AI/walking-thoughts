@@ -57,11 +57,15 @@ fi
 
 [tasks.install]
 description = "Install project dependencies and locked agent skills"
+depends = ["install:dependencies"]
+run = "skills experimental_install"
+
+[tasks."install:dependencies"]
+description = "Install locked app dependencies and test browser (skills are already committed)"
 run = '''
 set -euo pipefail
 pnpm install --frozen-lockfile
 pnpm exec playwright install chromium-headless-shell
-skills experimental_install
 '''
 
 [tasks.dev]

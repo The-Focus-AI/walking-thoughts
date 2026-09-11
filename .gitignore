@@ -8,6 +8,7 @@ test-results/
 .env.*.local
 .fnox/
 .webreel/
+.amp/portals/*
 *.tsbuildinfo
 .vercel
 .env*

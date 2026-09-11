@@ -45,6 +45,16 @@ Cloud Agent tokens often lack `issues:write`. Merging to `main` with
 (`.github/workflows/agent-ticket-claim.yml`) fails `cursor/*` PRs that omit it.
 Details: `docs/agents/issue-workflow.md`.
 
+## Amp orb environment
+
+Amp uses `.agents/setup` for snapshot-safe tools and dependencies, and
+`.agents/resume` for current-orb bootstrap tokens. See README's **Amp orbs**
+section. Do not run the Cursor bootstrap in an orb: it mixes installation and
+credential persistence. Orb setup calls `mise run install:dependencies` because
+skills are committed; `skills experimental_install` rewrites tracked skills and
+their lockfile from upstream. Resume replaces the three managed bootstrap keys
+from injected Amp secrets, preserving unrelated `.fnox/env` entries.
+
 ## Cursor Cloud specific instructions
 
 `.cursor/environment.json` runs `.cursor/install.sh` on each machine boot. That
