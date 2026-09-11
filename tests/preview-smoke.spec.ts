@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 import { del, get, put } from "@vercel/blob";
-import { generateText, createGateway } from "ai";
+import { getGatewayClient, getSelectedGatewayModel } from "@/lib/enrichment/gateway";
 import { createTavilySearchClient } from "@/lib/enrichment/search";
 import { createWebPushSender } from "@/lib/push/send";
 
@@ -13,7 +13,7 @@ const smokeEnabled = Boolean(
   process.env.PREVIEW_SMOKE === "1" &&
     process.env.DATABASE_URL &&
     process.env.BLOB_READ_WRITE_TOKEN &&
-    process.env.AI_GATEWAY_API_KEY &&
+    process.env.MYCEL_API_KEY &&
     process.env.TAVILY_API_KEY &&
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
     process.env.CLERK_SECRET_KEY &&
@@ -54,16 +54,15 @@ test.describe("preview integration smoke", () => {
     await del(pathname, { token });
   });
 
-  test("Vercel AI Gateway accepts a minimal generation", async () => {
-    const gateway = createGateway({
-      apiKey: process.env.AI_GATEWAY_API_KEY!,
-    });
-    const model =
-      process.env.AI_GATEWAY_MODEL?.trim() || "anthropic/claude-sonnet-5";
-    const result = await generateText({
-      model: gateway(model),
+  test("Mycel accepts a minimal generation", async () => {
+    const gateway = getGatewayClient(process.env, "walking-thoughts-preview-smoke");
+    const result = await gateway.generate({
+      model: getSelectedGatewayModel(),
+      system: "Follow the instruction exactly.",
       prompt: "Reply with exactly: ok",
-      maxOutputTokens: 16,
+      requestTitle: false,
+      media: [],
+      maxOutputTokens: 128,
     });
     expect(result.text.toLowerCase()).toContain("ok");
   });

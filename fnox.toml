@@ -72,23 +72,36 @@ description = "Vercel Blob read/write token for private media"
 default = "https://dfshk3veycwqp13u.public.blob.vercel-storage.com/offline-region/home"
 description = "Public Blob base URL for the home Offline Region pack (no trailing slash)"
 
-[secrets.AI_GATEWAY_API_KEY]
+[secrets.MYCEL_API_KEY]
 provider = "op"
-value = "AI_GATEWAY_API_KEY"
+value = "op://Walking Thoughts - Development/MYCEL_WALKING_THOUGHTS_KEY/password"
 if_missing = "ignore"
-description = "Vercel AI Gateway API key for Enrichments"
+description = "Server-only Mycel Application credential for this environment"
+
+[profiles.preview.secrets.MYCEL_API_KEY]
+provider = "op"
+value = "op://Walking Thoughts - Preview/MYCEL_WALKING_THOUGHTS_KEY/password"
+if_missing = "ignore"
+
+[profiles.prod.secrets.MYCEL_API_KEY]
+provider = "op"
+value = "op://Walking Thoughts - Production/MYCEL_WALKING_THOUGHTS_KEY/password"
+
+[secrets.MYCEL_BASE_URL]
+default = "https://mycel.thefocus.ai/v1"
+description = "Mycel OpenAI-compatible endpoint (server only)"
 
 [secrets.AI_GATEWAY_MODEL]
-provider = "op"
-value = "AI_GATEWAY_MODEL"
-if_missing = "ignore"
-description = "Global gateway model id for new Enrichments (e.g. anthropic/claude-sonnet-5)"
+default = "z-ai/glm-5.3-flash"
+description = "Mycel model for new Enrichments; requires chat, tool-calling and image-input"
 
 [secrets.AI_TRANSCRIPTION_MODEL]
-provider = "op"
-value = "AI_TRANSCRIPTION_MODEL"
-if_missing = "ignore"
-description = "Gateway batch speech-to-text model for audio Captures (e.g. xai/grok-stt)"
+default = ""
+description = "Blocked until a verified open-source Mycel transcription model is selected"
+
+[secrets.AI_GATEWAY_EMBEDDING_MODEL]
+default = ""
+description = "Blocked until a verified open-source embedding model and re-embedding plan are selected"
 
 [secrets.FIRECRAWL_API_KEY]
 provider = "op"

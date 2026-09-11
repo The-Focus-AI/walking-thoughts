@@ -21,6 +21,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { generateText } from "ai";
+import { createMycelClient } from "../lib/enrichment/mycel.ts";
 
 const ROUTE_SYSTEM = [
   "You are Walking Thoughts, sorting one walker's remembered facts.",
@@ -42,12 +43,12 @@ const DEDUP_SYSTEM = [
 
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
-const model = process.env.AI_GATEWAY_MODEL?.trim() || "anthropic/claude-sonnet-5";
+const model = process.env.AI_GATEWAY_MODEL?.trim() || "z-ai/glm-5.3-flash";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
-if (!process.env.AI_GATEWAY_API_KEY) {
-  throw new Error("AI_GATEWAY_API_KEY is required");
+if (!process.env.MYCEL_API_KEY) {
+  throw new Error("MYCEL_API_KEY is required");
 }
 const sql = neon(databaseUrl);
 
@@ -109,9 +110,11 @@ async function loadPatches() {
  * once and names one effort once — the same reason the Enrichment is handed
  * the existing Proposed Projects instead of coining a name per Thread.
  */
-async function routeMemories(memories) {
+async function routeMemories(memories, userId) {
+  const mycel = createMycelClient(process.env, userId);
+  await mycel.requireModel(model, ["chat"]);
   const { text } = await generateText({
-    model,
+    model: mycel.provider(["chat"]).chatModel(model),
     system: ROUTE_SYSTEM,
     prompt: memories
       .map((memory, index) => `${index + 1}. (${memory.category}) ${memory.content}`)
@@ -133,10 +136,12 @@ async function routeMemories(memories) {
   }));
 }
 
-async function findDuplicates(memories) {
+async function findDuplicates(memories, userId) {
   if (memories.length < 2) return new Set();
+  const mycel = createMycelClient(process.env, userId);
+  await mycel.requireModel(model, ["chat"]);
   const { text } = await generateText({
-    model,
+    model: mycel.provider(["chat"]).chatModel(model),
     system: DEDUP_SYSTEM,
     prompt: memories
       .map((memory, index) => `${index + 1}. (${memory.category}) ${memory.content}`)
@@ -188,10 +193,10 @@ for (const [userId, userPatches] of byUser) {
   const interviewed = memories.filter((memory) => memory.source === "interview");
   const learned = memories.filter((memory) => memory.source !== "interview");
 
-  const routed = await routeMemories(learned);
+  const routed = await routeMemories(learned, userId);
   const kept = routed.filter((entry) => entry.route.kind === "memory");
   const projects = routed.filter((entry) => entry.route.kind === "project");
-  const duplicates = await findDuplicates(kept.map((entry) => entry.memory));
+  const duplicates = await findDuplicates(kept.map((entry) => entry.memory), userId);
 
   console.log(`\n  Projects to propose (${new Set(projects.map((p) => p.route.name)).size} distinct):`);
   for (const name of new Set(projects.map((entry) => entry.route.name))) {

@@ -55,13 +55,13 @@ async function seedCapture(
 }
 
 test("the model is configuration, not a constant", () => {
-  expect(getSelectedEmbeddingModel({})).toBe("openai/text-embedding-3-small");
+  expect(getSelectedEmbeddingModel({})).toBe("");
   expect(
     getSelectedEmbeddingModel({ AI_GATEWAY_EMBEDDING_MODEL: "voyage/v3" }),
   ).toBe("voyage/v3");
   // Blank is not a choice.
   expect(getSelectedEmbeddingModel({ AI_GATEWAY_EMBEDDING_MODEL: "  " })).toBe(
-    "openai/text-embedding-3-small",
+    "",
   );
 });
 

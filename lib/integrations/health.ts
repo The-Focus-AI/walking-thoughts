@@ -30,6 +30,7 @@ export type HealthProbeResults = {
   database: { ok: boolean; reason?: string };
   blob: { ok: boolean; privateAccess?: boolean; reason?: string };
   queue: { ok: boolean; reason?: string };
+  gateway?: { ok: boolean; reason?: string };
 };
 
 type Environment = Record<string, string | undefined>;
@@ -94,9 +95,11 @@ export function reportIntegrationHealth(
       blobBase.status === "ready" ? Boolean(probes.blob.privateAccess) : false,
   };
 
-  const gateway: ServiceReport = configured(environment.AI_GATEWAY_API_KEY)
-    ? { status: "ready" }
-    : { status: "missing", detail: "AI_GATEWAY_API_KEY" };
+  const gateway = fromProbe(
+    configured(environment.MYCEL_API_KEY),
+    probes.gateway ?? { ok: false, reason: "mycel_not_verified" },
+    "MYCEL_API_KEY",
+  );
 
   const search: ServiceReport = configured(environment.FIRECRAWL_API_KEY)
     ? { status: "ready" }

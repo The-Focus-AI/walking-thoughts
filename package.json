@@ -15,6 +15,7 @@
     "test": "node tests/clerk-proxy-regression.mjs && playwright test"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.45",
     "@clerk/nextjs": "latest",
     "@neondatabase/serverless": "^1.1.0",
     "@protomaps/basemaps": "^5.7.2",

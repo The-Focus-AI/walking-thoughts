@@ -135,7 +135,7 @@ test("health reports configuration without exposing secret values", async ({
     process.env.CLERK_SECRET_KEY,
     process.env.DATABASE_URL,
     process.env.BLOB_READ_WRITE_TOKEN,
-    process.env.AI_GATEWAY_API_KEY,
+    process.env.MYCEL_API_KEY,
     process.env.VAPID_PRIVATE_KEY,
   ]) {
     if (secret && secret.length > 8) {

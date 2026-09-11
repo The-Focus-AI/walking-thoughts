@@ -1,5 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 import { getPrivateBlobStore } from "@/lib/media/blob-store";
+import { createMycelClient } from "@/lib/enrichment/mycel";
+import { getSelectedGatewayModel } from "@/lib/enrichment/gateway";
+import { getTranscriptionModel } from "@/lib/enrichment/transcription";
+import { getSelectedEmbeddingModel } from "@/lib/enrichment/embeddings";
 import type { HealthProbeResults } from "./health";
 
 /**
@@ -60,5 +64,22 @@ export async function probeIntegrationDependencies(
     }
   }
 
-  return { database, blob, queue };
+  let gateway: HealthProbeResults["gateway"] = { ok: false, reason: "MYCEL_API_KEY" };
+  if (environment.MYCEL_API_KEY?.trim()) {
+    try {
+      // Catalog reads do not run inference or charge the health caller.
+      const mycel = createMycelClient(environment, "walking-thoughts-health");
+      const transcription = getTranscriptionModel(environment);
+      const embedding = getSelectedEmbeddingModel(environment);
+      await Promise.all([
+        mycel.requireModel(getSelectedGatewayModel(environment), ["chat", "tool-calling", "image-input"]),
+        ...(transcription ? [mycel.requireModel(transcription, ["transcription"])] : []),
+        ...(embedding ? [mycel.requireModel(embedding, ["embeddings"])] : []),
+      ]);
+      gateway = { ok: true };
+    } catch {
+      gateway = { ok: false, reason: "mycel_models_unavailable" };
+    }
+  }
+  return { database, blob, queue, gateway };
 }

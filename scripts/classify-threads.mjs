@@ -16,6 +16,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { generateText } from "ai";
+import { createMycelClient } from "../lib/enrichment/mycel.ts";
 
 const KINDS = [
   "question",
@@ -43,13 +44,13 @@ const SYSTEM = [
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const force = args.has("--force");
-const model = process.env.AI_GATEWAY_MODEL?.trim() || "anthropic/claude-sonnet-5";
+const model = process.env.AI_GATEWAY_MODEL?.trim() || "z-ai/glm-5.3-flash";
 const CONCURRENCY = 5;
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
-if (!process.env.AI_GATEWAY_API_KEY) {
-  throw new Error("AI_GATEWAY_API_KEY is required");
+if (!process.env.MYCEL_API_KEY) {
+  throw new Error("MYCEL_API_KEY is required");
 }
 const sql = neon(databaseUrl);
 
@@ -171,8 +172,10 @@ async function loadThreads() {
 }
 
 async function classify(thread) {
+  const mycel = createMycelClient(process.env, thread.userId);
+  await mycel.requireModel(model, ["chat"]);
   const result = await generateText({
-    model,
+    model: mycel.provider(["chat"]).chatModel(model),
     system: SYSTEM,
     prompt: buildPrompt(thread),
   });

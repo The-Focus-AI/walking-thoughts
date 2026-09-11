@@ -14,6 +14,7 @@ import { seedPile } from "./helpers/desk-pile";
 test("a Thread with nothing behind it says so rather than showing an error", async ({
   page,
 }) => {
+  await page.route("**/api/enrichment/similar/**", route => route.fulfill({ json: { similar: [] } }));
   const ids = await seedPile(page);
   await page.goto("/days?state=open");
   await expect(page.locator(".desk-stack .thread-row")).toHaveCount(3);
@@ -22,4 +23,14 @@ test("a Thread with nothing behind it says so rather than showing an error", asy
   await expect(page.getByTestId("thread-priors-none")).toContainText(
     "First time this has come up",
   );
+});
+
+test("unavailable similarity is distinct from no matching Threads", async ({ page }) => {
+  await page.route("**/api/enrichment/similar/**", route => route.fulfill({ json: { similar: [], unavailable: true } }));
+  const ids = await seedPile(page);
+  await page.goto("/days?state=open");
+  await page.getByTestId(`expand-thread-${ids.goldin}`).click();
+  await expect(page.getByTestId("thread-priors-none")).toHaveText("Similar-Thread suggestions are currently unavailable.");
+  await page.goto(`/threads/${ids.goldin}`);
+  await expect(page.getByTestId("thread-similarity-unavailable")).toHaveText("Similar-Thread suggestions are currently unavailable.");
 });

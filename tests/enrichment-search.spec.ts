@@ -3,8 +3,7 @@ import { getWebSearchClient } from "@/lib/enrichment/search";
 
 test("real-model environments without TAVILY_API_KEY skip search entirely", () => {
   expect(getWebSearchClient({ NODE_ENV: "production" })).toBeNull();
-  expect(getWebSearchClient({ AI_GATEWAY_API_KEY: "gateway" })).toBeNull();
-  expect(getWebSearchClient({ VERCEL_OIDC_TOKEN: "token" })).toBeNull();
+  expect(getWebSearchClient({ MYCEL_API_KEY: "token" })).toBeNull();
   expect(getWebSearchClient({ NODE_ENV: "production", TAVILY_API_KEY: " " })).toBeNull();
 });
 

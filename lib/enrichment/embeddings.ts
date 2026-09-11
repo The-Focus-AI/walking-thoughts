@@ -1,26 +1,20 @@
 import { embed } from "ai";
+import { createMycelClient, type MycelEnvironment } from "./mycel";
 
 /**
  * Embedding rides the gateway like every other model choice (ADR 0004), so
  * the model is configuration rather than a constant compiled into the app:
- * `AI_GATEWAY_EMBEDDING_MODEL` names it, and the default below is what the
- * app asks for when nothing says otherwise.
+ * `AI_GATEWAY_EMBEDDING_MODEL` must explicitly name a verified open-source
+ * supplier model. There is no default until that supplier is selected.
  *
- * The default is a starting point, not a measured verdict — it must be
- * checked against the gateway's live `/v1/models` table before the backfill
- * runs in production, and changed there rather than here if the table
- * disagrees. Changing the model changes the vector space: existing rows
+ * Check the model against the gateway's live `/v1/models` table before
+ * running a backfill in production. Changing the model changes the vector space: existing rows
  * must be re-embedded, which is what the backfill's `--force` is for.
  */
-export const DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small";
-
 export function getSelectedEmbeddingModel(
   environment: Record<string, string | undefined> = process.env,
 ): string {
-  const configured = environment.AI_GATEWAY_EMBEDDING_MODEL?.trim();
-  return configured && configured.length > 0
-    ? configured
-    : DEFAULT_EMBEDDING_MODEL;
+  return environment.AI_GATEWAY_EMBEDDING_MODEL?.trim() ?? "";
 }
 
 export type EmbeddingClient = {
@@ -56,11 +50,14 @@ export function createFakeEmbeddingClient(dimensions = 64): EmbeddingClient {
   };
 }
 
-function createGatewayEmbeddingClient(model: string): EmbeddingClient {
+function createGatewayEmbeddingClient(model: string, environment: MycelEnvironment, userId?: string): EmbeddingClient {
+  const mycel = createMycelClient(environment, userId);
   return {
     model,
     async embed(text: string) {
-      const { embedding } = await embed({ model, value: text });
+      if (!model) throw new Error("AI_GATEWAY_EMBEDDING_MODEL_required");
+      await mycel.requireModel(model, ["embeddings"]);
+      const { embedding } = await embed({ model: mycel.provider(["embeddings"]).embeddingModel(model), value: text });
       return [...embedding];
     },
   };
@@ -73,14 +70,15 @@ function createGatewayEmbeddingClient(model: string): EmbeddingClient {
  */
 export function getEmbeddingClient(
   environment: Record<string, string | undefined> = process.env,
+  userId?: string,
 ): EmbeddingClient {
   const injected = (globalThis as EmbeddingGlobals).__WT_EMBEDDINGS__;
   if (injected) return injected;
   const hasGateway =
-    Boolean(environment.AI_GATEWAY_API_KEY?.trim()) ||
-    Boolean(environment.VERCEL_OIDC_TOKEN?.trim());
+    Boolean(environment.MYCEL_API_KEY?.trim()) ||
+    environment.NODE_ENV === "production";
   return hasGateway
-    ? createGatewayEmbeddingClient(getSelectedEmbeddingModel(environment))
+    ? createGatewayEmbeddingClient(getSelectedEmbeddingModel(environment), environment, userId)
     : createFakeEmbeddingClient();
 }
 

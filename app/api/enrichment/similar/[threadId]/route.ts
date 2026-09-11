@@ -26,9 +26,13 @@ export async function GET(request: Request, context: RouteContext) {
     return Response.json({ error: "thread_id_required" }, { status: 400 });
   }
 
+  if (!process.env.AI_GATEWAY_EMBEDDING_MODEL?.trim()) {
+    return Response.json({ similar: [], unavailable: true });
+  }
+
   const repository = getEnrichmentRepository();
   if (!repository.listThreadIndex) {
-    return Response.json({ similar: [] });
+    return Response.json({ similar: [], unavailable: true });
   }
 
   // Continuity is an extra the desk offers. A similarity index that is
@@ -44,7 +48,7 @@ export async function GET(request: Request, context: RouteContext) {
         })
       : [];
   } catch {
-    return Response.json({ similar: [] });
+    return Response.json({ similar: [], unavailable: true });
   }
 
   const mine = index.find((entry) => entry.threadId === threadId);
