@@ -426,6 +426,43 @@ export function createNeonEnrichmentRepository(
       return mapJob(rows[0]);
     },
 
+    async releaseRunningJob(userId, jobId) {
+      await ensure();
+      await sql`
+        UPDATE enrichment_jobs
+        SET status = 'queued',
+            error = NULL,
+            started_at = NULL,
+            attempts = GREATEST(attempts - 1, 0)
+        WHERE user_id = ${userId}
+          AND id = ${jobId}
+          AND status = 'running'
+      `;
+      const rows = (await sql`
+        SELECT id, idempotency_key, thread_id, basis_revision, basis_entry_ids,
+               basis_history, target_capture_ids, model, status, attempts, error,
+               started_at
+        FROM enrichment_jobs
+        WHERE user_id = ${userId} AND id = ${jobId}
+        LIMIT 1
+      `) as Array<{
+        id: string;
+        idempotency_key: string;
+        thread_id: string;
+        basis_revision: number;
+        basis_entry_ids: string[];
+        basis_history: EnrichmentJob["basisHistory"];
+        target_capture_ids: string[];
+        model: string;
+        status: EnrichmentJob["status"];
+        attempts: number;
+        error: string | null;
+        started_at: string | Date | null;
+      }>;
+      if (!rows[0]) throw new Error(`Unknown job ${jobId}`);
+      return mapJob(rows[0]);
+    },
+
     async markJobFailed(userId, jobId, error) {
       await ensure();
       await sql`
