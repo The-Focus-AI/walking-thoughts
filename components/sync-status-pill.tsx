@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { getCaptureStore } from "@/lib/local-capture/store";
 import { SYNC_CYCLE_EVENT } from "@/lib/sync/cycle";
 import { isSyncAuthBlocked, SYNC_AUTH_EVENT } from "@/lib/sync/session-state";
+import { syncPillView } from "@/lib/sync/pill-view";
 import {
   emptySyncRollup,
   syncRollup,
@@ -12,43 +13,6 @@ import {
 } from "@/lib/sync/rollup";
 
 const REFRESH_INTERVAL_MS = 5_000;
-
-type PillTone = "ready" | "busy" | "attention" | "offline";
-
-function pillView(
-  rollup: SyncRollup,
-  online: boolean,
-  authBlocked: boolean,
-): { label: string; tone: PillTone } {
-  // Only what has not reached the server counts as "syncing". A Capture in
-  // "enriching" is safely uploaded and waiting on the desk's model queue —
-  // calling the whole backlog "Syncing 111…" read as sync being broken.
-  const uploading = rollup.saved_locally + rollup.syncing;
-  // A refused session outranks the queue depth: nothing will move until the
-  // walker signs in again, and "Syncing 1…" would be a lie about that.
-  if (authBlocked && online) {
-    return { label: "Sign in to sync", tone: "attention" };
-  }
-  if (rollup.needs_attention > 0) {
-    return {
-      label: `${rollup.needs_attention} need attention`,
-      tone: "attention",
-    };
-  }
-  if (!online) {
-    return {
-      label: uploading > 0 ? `Offline · ${uploading} on phone` : "Offline",
-      tone: "offline",
-    };
-  }
-  if (uploading > 0) {
-    return { label: `Syncing ${uploading}…`, tone: "busy" };
-  }
-  if (rollup.enriching > 0) {
-    return { label: `${rollup.enriching} enriching`, tone: "busy" };
-  }
-  return { label: "All synced", tone: "ready" };
-}
 
 /**
  * Glanceable Capture sync rollup. Links to Days, where each Thread carries
@@ -102,7 +66,7 @@ export function SyncStatusPill() {
     };
   }, []);
 
-  const { label, tone } = pillView(rollup, online, authBlocked);
+  const { label, tone } = syncPillView(rollup, online, authBlocked);
 
   return (
     <Link

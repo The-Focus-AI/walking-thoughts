@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { recoverStaleLocalCaptures } from "@/lib/enrichment/recover";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { createMemoryCaptureStore } from "@/lib/local-capture/store";
+import { syncPillView } from "@/lib/sync/pill-view";
+import { emptySyncRollup } from "@/lib/sync/rollup";
 import {
   isSyncAuthBlocked,
   noteSyncStatus,
@@ -47,6 +49,18 @@ test("a successful GET still clears a session refused on GET", () => {
 
   noteSyncStatus(200, { method: "GET" });
   expect(isSyncAuthBlocked()).toBe(false);
+});
+
+test("a refused session prefers Sign in to sync over Syncing N", () => {
+  const rollup = { ...emptySyncRollup(), saved_locally: 2 };
+  expect(syncPillView(rollup, true, true)).toEqual({
+    label: "Sign in to sync",
+    tone: "attention",
+  });
+  expect(syncPillView(rollup, true, false)).toEqual({
+    label: "Syncing 2…",
+    tone: "busy",
+  });
 });
 
 test("a server fault says nothing about the session", () => {

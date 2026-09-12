@@ -70,7 +70,7 @@ import type {
  */
 const MAX_JOBS_PER_CALL = 3;
 
-export function isRunningClaimExpired(
+function isRunningClaimExpired(
   job: Pick<EnrichmentJob, "status" | "startedAt">,
   nowMs: number = Date.now(),
 ): boolean {
@@ -95,7 +95,7 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 }
 
-function whenAborted<T>(
+function raceWithAbort<T>(
   signal: AbortSignal | undefined,
   work: Promise<T>,
 ): Promise<T> {
@@ -528,7 +528,7 @@ async function runJob(
             running.basisEntryIds.includes(entry.id),
           );
 
-    const media = await whenAborted(
+    const media = await raceWithAbort(
       signal,
       loadMediaParts(
         userId,
@@ -539,7 +539,7 @@ async function runJob(
     );
     throwIfAborted(signal);
 
-    const transcripts = await whenAborted(
+    const transcripts = await raceWithAbort(
       signal,
       transcribeAudioParts(media, transcriber),
     );
@@ -676,7 +676,7 @@ async function runJob(
       transcripts,
       priorThreads: formatPriorThreads(priors),
     });
-    const generation = await whenAborted(
+    const generation = await raceWithAbort(
       signal,
       gateway.generate({
         model: running.model,
@@ -777,6 +777,9 @@ async function runJob(
     }));
   } catch (error) {
     if (isAbortError(error) || signal?.aborted) {
+      // Requeue so the next 12s drain can take it. The in-flight generate
+      // is abandoned — a live isolate can overlap a reclaim, which is the
+      // tradeoff against leaving `running` until the lease (or a kill).
       await repository.releaseRunningJob(userId, running.id);
       return [];
     }
