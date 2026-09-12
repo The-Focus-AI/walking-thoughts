@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { createFakeGatewayClient } from "@/lib/enrichment/gateway";
 import {
   createMemoryEnrichmentRepository,
   resetMemoryEnrichmentRepository,
 } from "@/lib/enrichment/memory-repository";
+import {
+  PROCESS_MAX_DURATION_SEC,
+  RUNNING_CLAIM_LEASE_MS,
+} from "@/lib/enrichment/budget";
 import { processPendingEnrichments } from "@/lib/enrichment/process";
 import {
   createMemoryBlobStore,
@@ -15,6 +20,11 @@ import {
 } from "@/lib/sync/memory-repository";
 
 const NS = "enrichment-queue-tests";
+
+test("process route maxDuration stays a literal matching the time budget", () => {
+  const route = readFileSync("app/api/enrichment/process/route.ts", "utf8");
+  expect(route).toContain(`export const maxDuration = ${PROCESS_MAX_DURATION_SEC}`);
+});
 
 test.beforeEach(() => {
   resetMemoryThreadRepository(NS);
@@ -186,4 +196,81 @@ test("a running job with no claim stamp is an orphan and gets re-claimed", async
   const recovered = result.results.find((entry) => entry.id === "cap-orphan");
   expect(recovered?.status).toBe("complete");
   expect(await enrichment.listOpenJobs("user_orphan")).toHaveLength(0);
+});
+
+test("a running claim older than the lease is re-claimed", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const enrichment = createMemoryEnrichmentRepository(NS, threads);
+  const blobs = createMemoryBlobStore(NS);
+
+  await threads.upsertCaptures("user_stale", [
+    seedCapture("cap-stale", "Left running after the function died"),
+  ]);
+  await processPendingEnrichments("user_stale", enrichment, {
+    gateway: createFakeGatewayClient(async () => {
+      throw new Error("gateway_down");
+    }),
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+  });
+  await enrichment.requeueFailed("user_stale");
+  const [job] = await enrichment.listOpenJobs("user_stale");
+  const claimed = await enrichment.markJobRunning("user_stale", job.id);
+  claimed.startedAt = new Date(
+    Date.now() - RUNNING_CLAIM_LEASE_MS - 1,
+  ).toISOString();
+
+  const result = await processPendingEnrichments("user_stale", enrichment, {
+    gateway: createFakeGatewayClient(),
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+  });
+
+  const recovered = result.results.find((entry) => entry.id === "cap-stale");
+  expect(recovered?.status).toBe("complete");
+  expect(await enrichment.listOpenJobs("user_stale")).toHaveLength(0);
+});
+
+test("an aborted process call releases the running claim for the next drain", async () => {
+  const threads = createMemoryThreadRepository(NS);
+  const enrichment = createMemoryEnrichmentRepository(NS, threads);
+  const blobs = createMemoryBlobStore(NS);
+
+  await threads.upsertCaptures("user_abort", [
+    seedCapture("cap-abort", "Cut off mid-flight"),
+  ]);
+
+  const controller = new AbortController();
+  const hang = new Promise<never>(() => {
+    // The model never answers; the HTTP request dies instead.
+  });
+
+  const aborted = await processPendingEnrichments("user_abort", enrichment, {
+    gateway: createFakeGatewayClient(async () => {
+      controller.abort();
+      return hang;
+    }),
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+    signal: controller.signal,
+  });
+
+  expect(
+    aborted.results.filter((result) => result.status === "complete"),
+  ).toHaveLength(0);
+  const [released] = await enrichment.listOpenJobs("user_abort");
+  expect(released.status).toBe("queued");
+
+  const second = await processPendingEnrichments("user_abort", enrichment, {
+    gateway: createFakeGatewayClient(),
+    blobStore: blobs,
+    threadRepository: threads,
+    pushSender: null,
+  });
+  const recovered = second.results.find((entry) => entry.id === "cap-abort");
+  expect(recovered?.status).toBe("complete");
+  expect(await enrichment.listOpenJobs("user_abort")).toHaveLength(0);
 });

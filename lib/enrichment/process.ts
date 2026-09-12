@@ -13,6 +13,10 @@ import { getPushRepository } from "@/lib/push/repository";
 import { createWebPushSender } from "@/lib/push/send";
 import type { PushRepository, PushSender } from "@/lib/push/types";
 import type { Project, ThreadRepository } from "@/lib/sync/types";
+import {
+  CALL_TIME_BUDGET_MS,
+  RUNNING_CLAIM_LEASE_MS,
+} from "./budget";
 import { assertModelSupportsMedia } from "./capabilities";
 import {
   isPermanentEnrichmentError,
@@ -66,15 +70,54 @@ import type {
  */
 const MAX_JOBS_PER_CALL = 3;
 
-/** Stop starting new jobs once a call has been at it this long. */
-const CALL_TIME_BUDGET_MS = 45_000;
+function isRunningClaimExpired(
+  job: Pick<EnrichmentJob, "status" | "startedAt">,
+  nowMs: number = Date.now(),
+): boolean {
+  if (job.status !== "running") return false;
+  if (!job.startedAt) return true;
+  const started = Date.parse(job.startedAt);
+  if (Number.isNaN(started)) return true;
+  return nowMs - started > RUNNING_CLAIM_LEASE_MS;
+}
 
-/**
- * A running claim older than this belonged to a killed invocation and may be
- * re-claimed; a fresher one is another in-flight call working the same job,
- * and running it here too would spend the model twice on the same Thread.
- */
-const RUNNING_CLAIM_LEASE_MS = 5 * 60_000;
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException &&
+      (error.name === "AbortError" || error.name === "TimeoutError")) ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("process_aborted", "AbortError");
+  }
+}
+
+function raceWithAbort<T>(
+  signal: AbortSignal | undefined,
+  work: Promise<T>,
+): Promise<T> {
+  if (!signal) return work;
+  throwIfAborted(signal);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(new DOMException("process_aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
 
 type PushHooks = {
   repository: PushRepository;
@@ -442,6 +485,7 @@ async function runJob(
   push?: PushHooks,
   artifacts?: ArtifactHooks,
   embeddings?: EmbeddingClient,
+  signal?: AbortSignal,
 ): Promise<EnrichmentCaptureResult[]> {
   if (job.status === "failed") {
     return job.targetCaptureIds.map((id) => ({
@@ -484,14 +528,22 @@ async function runJob(
             running.basisEntryIds.includes(entry.id),
           );
 
-    const media = await loadMediaParts(
-      userId,
-      frozenHistory,
-      running.targetCaptureIds,
-      blobStore,
+    const media = await raceWithAbort(
+      signal,
+      loadMediaParts(
+        userId,
+        frozenHistory,
+        running.targetCaptureIds,
+        blobStore,
+      ),
     );
+    throwIfAborted(signal);
 
-    const transcripts = await transcribeAudioParts(media, transcriber);
+    const transcripts = await raceWithAbort(
+      signal,
+      transcribeAudioParts(media, transcriber),
+    );
+    throwIfAborted(signal);
     // The transcript is what the walker actually said, so it belongs on the
     // Capture, not only inside this report: the digest, search, the To-do
     // list and the Day flow card all read the Capture's words, and a spoken
@@ -624,15 +676,19 @@ async function runJob(
       transcripts,
       priorThreads: formatPriorThreads(priors),
     });
-    const generation = await gateway.generate({
-      model: running.model,
-      system,
-      prompt,
-      requestTitle,
-      media: readableMedia,
-      search,
-      memory: memoryTool,
-    });
+    const generation = await raceWithAbort(
+      signal,
+      gateway.generate({
+        model: running.model,
+        system,
+        prompt,
+        requestTitle,
+        media: readableMedia,
+        search,
+        memory: memoryTool,
+      }),
+    );
+    throwIfAborted(signal);
     // PROJECT may name anything already known, confirmed or merely proposed —
     // joining a proposal is how one effort stops fragmenting into four names.
     // An invented name is dropped, as it always has been.
@@ -720,6 +776,13 @@ async function runJob(
       threadTitle: completed.enrichment.title ?? undefined,
     }));
   } catch (error) {
+    if (isAbortError(error) || signal?.aborted) {
+      // Requeue so the next 12s drain can take it. The in-flight generate
+      // is abandoned — a live isolate can overlap a reclaim, which is the
+      // tradeoff against leaving `running` until the lease (or a kill).
+      await repository.releaseRunningJob(userId, running.id);
+      return [];
+    }
     const reason =
       error instanceof Error ? error.message : "enrichment_failed";
     await repository.markJobFailed(userId, running.id, reason);
@@ -807,6 +870,8 @@ export async function processPendingEnrichments(
     artifactGateway?: GatewayClient;
     /** How a Thread is remembered for similarity; defaults to the gateway. */
     embeddings?: EmbeddingClient;
+    /** Set when the HTTP request dies; claimed jobs must be released. */
+    signal?: AbortSignal;
   } = {},
 ): Promise<EnrichmentBatchResponse> {
   const environment = options.environment ?? process.env;
@@ -865,11 +930,7 @@ export async function processPendingEnrichments(
   const openJobs = await repository.listOpenJobs(userId);
   const now = Date.now();
   const claimable = openJobs.filter(
-    (job) =>
-      job.status === "queued" ||
-      (job.status === "running" &&
-        (!job.startedAt ||
-          now - Date.parse(job.startedAt) > RUNNING_CLAIM_LEASE_MS)),
+    (job) => job.status === "queued" || isRunningClaimExpired(job, now),
   );
   // Fresh work first: the Capture the walker just took must not queue
   // behind a herd of retried failures.
@@ -881,6 +942,7 @@ export async function processPendingEnrichments(
   const deadline = Date.now() + CALL_TIME_BUDGET_MS;
   for (const job of runnable) {
     if (results.length > 0 && Date.now() > deadline) break;
+    if (options.signal?.aborted) break;
     const jobResults = await runJob(
       userId,
       repository,
@@ -900,6 +962,7 @@ export async function processPendingEnrichments(
       push,
       artifacts,
       embeddings,
+      options.signal,
     );
     results.push(...jobResults);
   }

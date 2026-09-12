@@ -13,6 +13,7 @@ export const SYNC_AUTH_EVENT = "wt:sync-auth";
 
 type SessionGlobals = typeof globalThis & {
   __WT_SYNC_AUTH_BLOCKED__?: boolean;
+  __WT_SYNC_AUTH_MUTATING_REFUSED__?: boolean;
 };
 
 function globals(): SessionGlobals {
@@ -35,36 +36,67 @@ export function isSyncAuthBlocked(): boolean {
   return globals().__WT_SYNC_AUTH_BLOCKED__ === true;
 }
 
+function isMutatingMethod(method?: string): boolean {
+  if (!method) return true;
+  const verb = method.toUpperCase();
+  return verb !== "GET" && verb !== "HEAD";
+}
+
 /**
  * Record what the server said about a sync request. 401/403 means the session
- * itself was refused; any answer the server was willing to give means the
- * session works again. A 5xx or a timeout says nothing either way — the
- * session is not the thing that failed — so it leaves the flag alone.
+ * itself was refused. A successful mutating call (POST Capture metadata,
+ * Enrichment process, media upload) proves the session can do work again.
+ * A successful GET must not clear a refused POST — hydrate answering 200
+ * while process still 401s is how Days showed "Syncing N…" instead of
+ * "Sign in to sync". A 5xx or a timeout says nothing either way.
  */
-export function noteSyncStatus(status: number): void {
+export function noteSyncStatus(
+  status: number,
+  request: { method?: string } = {},
+): void {
+  const store = globals();
+  const mutating = isMutatingMethod(request.method);
   if (status === 401 || status === 403) {
+    if (mutating) store.__WT_SYNC_AUTH_MUTATING_REFUSED__ = true;
     publish(true);
     return;
   }
   if (status < 500) {
-    publish(false);
+    if (mutating) {
+      store.__WT_SYNC_AUTH_MUTATING_REFUSED__ = false;
+      publish(false);
+      return;
+    }
+    if (!store.__WT_SYNC_AUTH_MUTATING_REFUSED__) {
+      publish(false);
+    }
   }
 }
 
 export function resetSyncAuthForTests(): void {
-  globals().__WT_SYNC_AUTH_BLOCKED__ = false;
+  const store = globals();
+  store.__WT_SYNC_AUTH_BLOCKED__ = false;
+  store.__WT_SYNC_AUTH_MUTATING_REFUSED__ = false;
 }
 
 /**
  * `fetchWithTimeout` that watches for a refused session. Sync transports go
  * through here so no caller has to remember to report.
  */
+function requestMethod(input: RequestInfo | URL, init: RequestInit): string {
+  if (init.method) return init.method;
+  if (typeof Request !== "undefined" && input instanceof Request) {
+    return input.method;
+  }
+  return "GET";
+}
+
 export async function trackedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
   timeoutMs?: number,
 ): Promise<Response> {
   const response = await fetchWithTimeout(input, init, timeoutMs);
-  noteSyncStatus(response.status);
+  noteSyncStatus(response.status, { method: requestMethod(input, init) });
   return response;
 }

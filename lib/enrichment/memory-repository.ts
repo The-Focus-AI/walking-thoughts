@@ -180,6 +180,22 @@ export function createMemoryEnrichmentRepository(
       return next;
     },
 
+    async releaseRunningJob(userId, jobId) {
+      const db = state();
+      const job = db.jobs.get(`${userId}:${jobId}`);
+      if (!job) throw new Error(`Unknown job ${jobId}`);
+      if (job.status !== "running") return job;
+      const next: EnrichmentJob = {
+        ...job,
+        status: "queued",
+        error: undefined,
+        startedAt: null,
+        attempts: Math.max(0, job.attempts - 1),
+      };
+      db.jobs.set(`${userId}:${jobId}`, next);
+      return next;
+    },
+
     async completeJob(userId, jobId, enrichment) {
       const db = state();
       const job = db.jobs.get(`${userId}:${jobId}`);

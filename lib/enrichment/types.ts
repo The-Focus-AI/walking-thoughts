@@ -228,6 +228,12 @@ export type EnrichmentRepository = {
     jobId: string,
     error: string,
   ): Promise<EnrichmentJob>;
+  /**
+   * Drop a running claim so the next process call can take the job.
+   * Used when the HTTP request dies after `markJobRunning` — leave it
+   * `running` and it sits until the lease expires.
+   */
+  releaseRunningJob(userId: string, jobId: string): Promise<EnrichmentJob>;
   completeJob(
     userId: string,
     jobId: string,

@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { recoverStaleLocalCaptures } from "@/lib/enrichment/recover";
 import type { ThreadEnrichment } from "@/lib/enrichment/types";
 import { createMemoryCaptureStore } from "@/lib/local-capture/store";
+import { syncPillView } from "@/lib/sync/pill-view";
+import { emptySyncRollup } from "@/lib/sync/rollup";
 import {
   isSyncAuthBlocked,
   noteSyncStatus,
@@ -18,12 +20,47 @@ test("a refused session is recorded; a served one clears it", () => {
   noteSyncStatus(401);
   expect(isSyncAuthBlocked()).toBe(true);
 
-  // A server that answers at all proves the session works again.
+  // A mutating call the server was willing to answer proves the session
+  // can do work again. GET is not enough — see the mixed-status test.
   noteSyncStatus(200);
   expect(isSyncAuthBlocked()).toBe(false);
 
   noteSyncStatus(403);
   expect(isSyncAuthBlocked()).toBe(true);
+});
+
+test("a successful GET does not hide a refused Enrichment or Capture POST", () => {
+  noteSyncStatus(401, { method: "POST" });
+  expect(isSyncAuthBlocked()).toBe(true);
+
+  // Hydrate (GET /api/sync/threads) answering 200 used to clear the flag
+  // while process/captures POSTs were still 401ing — Days then showed
+  // "Syncing N…" instead of "Sign in to sync".
+  noteSyncStatus(200, { method: "GET" });
+  expect(isSyncAuthBlocked()).toBe(true);
+
+  noteSyncStatus(200, { method: "POST" });
+  expect(isSyncAuthBlocked()).toBe(false);
+});
+
+test("a successful GET still clears a session refused on GET", () => {
+  noteSyncStatus(401, { method: "GET" });
+  expect(isSyncAuthBlocked()).toBe(true);
+
+  noteSyncStatus(200, { method: "GET" });
+  expect(isSyncAuthBlocked()).toBe(false);
+});
+
+test("a refused session prefers Sign in to sync over Syncing N", () => {
+  const rollup = { ...emptySyncRollup(), saved_locally: 2 };
+  expect(syncPillView(rollup, true, true)).toEqual({
+    label: "Sign in to sync",
+    tone: "attention",
+  });
+  expect(syncPillView(rollup, true, false)).toEqual({
+    label: "Syncing 2…",
+    tone: "busy",
+  });
 });
 
 test("a server fault says nothing about the session", () => {

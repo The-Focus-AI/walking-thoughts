@@ -1,5 +1,5 @@
 import type { CaptureStore } from "@/lib/local-capture/types";
-import { MODEL_TIMEOUT_MS } from "@/lib/net/timeout";
+import { PROCESS_CLIENT_TIMEOUT_MS } from "@/lib/enrichment/budget";
 import { trackedFetch } from "@/lib/sync/session-state";
 import type { EnrichmentBatchResponse } from "./types";
 
@@ -34,7 +34,7 @@ function defaultTransport(): EnrichmentTransport {
           headers: headers(),
           body: JSON.stringify({ retryFailed: options?.retryFailed ?? false }),
         },
-        MODEL_TIMEOUT_MS,
+        PROCESS_CLIENT_TIMEOUT_MS,
       );
       if (
         response.status === 401 ||
