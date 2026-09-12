@@ -11,6 +11,7 @@
  */
 export const CALL_TIME_BUDGET_MS = 45_000;
 
+/** Keep in sync with `export const maxDuration` on the process route. */
 export const PROCESS_MAX_DURATION_SEC = 120;
 
 /**

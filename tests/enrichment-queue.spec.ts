@@ -1,10 +1,14 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { createFakeGatewayClient } from "@/lib/enrichment/gateway";
 import {
   createMemoryEnrichmentRepository,
   resetMemoryEnrichmentRepository,
 } from "@/lib/enrichment/memory-repository";
-import { RUNNING_CLAIM_LEASE_MS } from "@/lib/enrichment/budget";
+import {
+  PROCESS_MAX_DURATION_SEC,
+  RUNNING_CLAIM_LEASE_MS,
+} from "@/lib/enrichment/budget";
 import { processPendingEnrichments } from "@/lib/enrichment/process";
 import {
   createMemoryBlobStore,
@@ -16,6 +20,11 @@ import {
 } from "@/lib/sync/memory-repository";
 
 const NS = "enrichment-queue-tests";
+
+test("process route maxDuration stays a literal matching the time budget", () => {
+  const route = readFileSync("app/api/enrichment/process/route.ts", "utf8");
+  expect(route).toContain(`export const maxDuration = ${PROCESS_MAX_DURATION_SEC}`);
+});
 
 test.beforeEach(() => {
   resetMemoryThreadRepository(NS);

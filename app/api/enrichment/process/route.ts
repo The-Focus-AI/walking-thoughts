@@ -1,5 +1,4 @@
 import { getArtifactRepository } from "@/lib/artifacts/repository";
-import { PROCESS_MAX_DURATION_SEC } from "@/lib/enrichment/budget";
 import { processPendingEnrichments } from "@/lib/enrichment/process";
 import { getEnrichmentRepository } from "@/lib/enrichment/repository";
 import { requireSyncAccess } from "@/lib/sync/access";
@@ -11,8 +10,11 @@ export const dynamic = "force-dynamic";
  * Keep the function alive through `CALL_TIME_BUDGET_MS` plus one model
  * job. The platform default (~60s Pro) was killing invocations after
  * `markJobRunning`, which left a zombie `running` claim (Vercel status 0).
+ *
+ * Must stay a numeric literal (Next.js segment config) and match
+ * `PROCESS_MAX_DURATION_SEC` in `lib/enrichment/budget.ts`.
  */
-export const maxDuration = PROCESS_MAX_DURATION_SEC;
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   const access = await requireSyncAccess(request);
