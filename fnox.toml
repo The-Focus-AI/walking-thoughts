@@ -1,16 +1,20 @@
+# Vaults, in the organization 1Password account thefocusai.1password.com, by ID:
+#   default  "Focus - Walking Thoughts"
+#   preview  "Focus - Walking Thoughts - Preview"
+#   prod     "Focus - Walking Thoughts - Prod" (owner-only for people)
 # Source of truth: separate 1Password vaults for Development, Preview, and Production.
 
 [providers.op]
 type = "1password"
-vault = "Walking Thoughts - Development"
+vault = "yb6afgr5wlsumlfw4r7izirx5a"
 
 [profiles.preview.providers.op]
 type = "1password"
-vault = "Walking Thoughts - Preview"
+vault = "tfv6shuwc7rfqbe5yqqzubxg7m"
 
 [profiles.prod.providers.op]
 type = "1password"
-vault = "Walking Thoughts - Production"
+vault = "sbzcozrd2tj6ifr2zfcveh44oq"
 
 [secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY]
 provider = "op"
@@ -74,18 +78,18 @@ description = "Public Blob base URL for the home Offline Region pack (no trailin
 
 [secrets.MYCEL_API_KEY]
 provider = "op"
-value = "op://Walking Thoughts - Development/MYCEL_WALKING_THOUGHTS_KEY/password"
+value = "op://yb6afgr5wlsumlfw4r7izirx5a/MYCEL_WALKING_THOUGHTS_KEY/password"
 if_missing = "ignore"
 description = "Server-only Mycel Application credential for this environment"
 
 [profiles.preview.secrets.MYCEL_API_KEY]
 provider = "op"
-value = "op://Walking Thoughts - Preview/MYCEL_WALKING_THOUGHTS_KEY/password"
+value = "op://tfv6shuwc7rfqbe5yqqzubxg7m/MYCEL_WALKING_THOUGHTS_KEY/password"
 if_missing = "ignore"
 
 [profiles.prod.secrets.MYCEL_API_KEY]
 provider = "op"
-value = "op://Walking Thoughts - Production/MYCEL_WALKING_THOUGHTS_KEY/password"
+value = "op://sbzcozrd2tj6ifr2zfcveh44oq/MYCEL_WALKING_THOUGHTS_KEY/password"
 
 [secrets.MYCEL_BASE_URL]
 default = "https://mycel.thefocus.ai/v1"

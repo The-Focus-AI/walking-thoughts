@@ -21,28 +21,39 @@ unix_default_inline_shell_args = "bash -c -o errexit"
 _.file = ".fnox/env"
 
 [tasks.setup]
-description = "First-time onboarding: pull bootstrap tokens into .fnox/env"
+description = "Get this checkout ready: working bootstrap tokens in .fnox/env, then a secrets check"
 run = '''
 set -euo pipefail
 mkdir -p .fnox && chmod 700 .fnox
-if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
-  OP_SERVICE_ACCOUNT_TOKEN="$(op read 'op://thefocus/walking thoughts service account token/credential')"
+OP_ACCOUNT_HOST="thefocusai.1password.com"
+OP_VAULT="yb6afgr5wlsumlfw4r7izirx5a" # Focus - Walking Thoughts
+# Keep a token that reads the project vault; replace a missing or dead one using
+# your own 1Password sign-in. Safe to re-run at any time.
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] || ! op vault get "$OP_VAULT" >/dev/null 2>&1; then
+  OP_SERVICE_ACCOUNT_TOKEN="$(env -u OP_SERVICE_ACCOUNT_TOKEN op read "op://$OP_VAULT/walking-thoughts service account token/credential" --account "$OP_ACCOUNT_HOST" --no-newline 2>/dev/null || true)"
+  if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    echo "Could not get the project token." >&2
+    echo "  Cloud workspace: set OP_SERVICE_ACCOUNT_TOKEN in Cursor Cloud Secrets to the value of 'walking-thoughts service account token', then restart the workspace." >&2
+    echo "  Your own machine: sign in to $OP_ACCOUNT_HOST in the 1Password app, turn on its command-line integration, and ask an owner to add you to the internal group." >&2
+    exit 1
+  fi
   export OP_SERVICE_ACCOUNT_TOKEN
 fi
 if [ -z "${VERCEL_TOKEN:-}" ]; then
-  VERCEL_TOKEN="$(op read 'op://Walking Thoughts - Development/VERCEL_TOKEN/password' 2>/dev/null || true)"
+  VERCEL_TOKEN="$(op read "op:///VERCEL_TOKEN/password" --account "" 2>/dev/null || true)"
   export VERCEL_TOKEN
 fi
 if [ -z "${GITHUB_TOKEN:-}" ]; then
-  GITHUB_TOKEN="$(op read 'op://Walking Thoughts - Development/GITHUB_TOKEN/password' 2>/dev/null || true)"
+  GITHUB_TOKEN="$(op read "op:///GITHUB_TOKEN/password" --account "" 2>/dev/null || true)"
   export GITHUB_TOKEN
 fi
 bash scripts/bootstrap-fnox-env.sh
 if ! grep -q '^OP_SERVICE_ACCOUNT_TOKEN=.\+' .fnox/env 2>/dev/null; then
-  echo "Missing OP_SERVICE_ACCOUNT_TOKEN. Add it to Cursor Cloud Secrets or the thefocus vault."
+  echo "Missing OP_SERVICE_ACCOUNT_TOKEN. Add it to Cursor Cloud Secrets, or sign in to the organization 1Password account."
   exit 1
 fi
 echo "✓ .fnox/env written."
+mise run secrets:check
 if grep -q '^VERCEL_TOKEN=.\+' .fnox/env 2>/dev/null; then
   echo "✓ VERCEL_TOKEN present — mise run vercel:sync works."
 else
@@ -117,10 +128,6 @@ run = "fnox check"
 [tasks."secrets:list"]
 description = "List declared fnox secrets without values"
 run = "fnox list"
-
-[tasks."secrets:rotate-token"]
-description = "Re-pull bootstrap tokens into .fnox/env"
-run = "mise run setup"
 
 [tasks."vercel:sync"]
 description = "Push fnox-resolved configuration to a Vercel environment"

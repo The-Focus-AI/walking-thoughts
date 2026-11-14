@@ -44,11 +44,11 @@ orbs use them. No snapshot deletion is needed for normal setup changes.
 
 ## Environments
 
-- Development: `Walking Thoughts - Development` 1Password vault and a Clerk
+- Development: `Focus - Walking Thoughts` 1Password vault (organization account) and a Clerk
   development instance.
-- Preview: `Walking Thoughts - Preview` vault and the same non-production Clerk
+- Preview: `Focus - Walking Thoughts - Preview` vault and the same non-production Clerk
   application.
-- Production: `Walking Thoughts - Production` vault and a dedicated Clerk
+- Production: `Focus - Walking Thoughts - Prod` vault and a dedicated Clerk
   production instance with live keys, custom Clerk domain, Dashboard identity
   allowlist, and `CLERK_AUTHORIZED_PARTIES` locked to the production app origin.
 
